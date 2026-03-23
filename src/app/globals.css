@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+/* =============================================
+   JARBAS — Tema Híbrido
+   Interface moderna dark + escritório retrô Win98
+   ============================================= */
+
+:root {
+  /* Cores modernas (interface principal) */
+  --bg-primary: #0c0c14;
+  --bg-secondary: #14141f;
+  --bg-tertiary: #1c1c2e;
+  --bg-card: #1e1e32;
+  --accent: #7c5cfc;
+  --accent-hover: #6a4ae0;
+  --accent-soft: rgba(124, 92, 252, 0.12);
+  --text-primary: #f0f0f5;
+  --text-secondary: #8888a0;
+  --text-muted: #555570;
+  --border: #2a2a40;
+  --border-light: #353555;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+
+  /* Cores Win98 (área do escritório) */
+  --win-bg: #008080;
+  --win-titlebar: #000080;
+  --win-surface: #c0c0c0;
+  --win-text: #000000;
+  --win-white: #ffffff;
+  --win-border-light: #dfdfdf;
+  --win-border-dark: #404040;
+  --win-border-darkest: #000000;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  margin: 0;
+  padding: 0;
+}
+
+/* Scrollbar moderna */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ---- Win98 styles (apenas para a janela do escritório) ---- */
+.win-border-outset {
+  border: 2px solid;
+  border-color: var(--win-border-light) var(--win-border-darkest) var(--win-border-darkest) var(--win-border-light);
+}
+
+.win-titlebar {
+  background: linear-gradient(90deg, var(--win-titlebar), #1084d0);
+  color: #fff;
+  padding: 3px 4px;
+  font-weight: bold;
+  font-size: 12px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.win-button {
+  background: var(--win-surface);
+  border: 2px solid;
+  border-color: var(--win-border-light) var(--win-border-darkest) var(--win-border-darkest) var(--win-border-light);
+  padding: 1px 6px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+  min-height: 18px;
+}
+.win-button:active {
+  border-color: var(--win-border-darkest) var(--win-border-light) var(--win-border-light) var(--win-border-darkest);
+}
+
+.win-menubar {
+  background: var(--win-surface);
+  padding: 1px 0;
+  border-bottom: 1px solid var(--win-border-dark);
+  display: flex;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 12px;
+  color: #000;
+}
+.win-menubar button {
+  background: none;
+  border: none;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  color: #000;
+}
+.win-menubar button:hover {
+  background: var(--win-titlebar);
+  color: #fff;
+}
+
+.win-statusbar {
+  background: var(--win-surface);
+  border-top: 1px solid var(--win-border-dark);
+  padding: 2px 4px;
+  font-size: 11px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--win-text);
+}
+.win-statusbar-section {
+  border: 1px solid;
+  border-color: var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark);
+  padding: 1px 6px;
+}
+
+/* Office floor pattern */
+.office-floor {
+  background-color: #d9d9d9;
+  background-image:
+    linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* Desk hover animations */
+.desk-hover {
+  transition: transform 0.2s, filter 0.2s;
+}
+.desk-hover:hover {
+  transform: translateY(-3px);
+  filter: brightness(1.08);
+}
+.desk-hover:hover .monitor-screen {
+  box-shadow: 0 0 10px rgba(51, 255, 51, 0.4);
+}
+
+/* ---- Modern UI components ---- */
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-secondary:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.input-modern {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.input-modern:focus { border-color: var(--accent); }
+.input-modern::placeholder { color: var(--text-muted); }
