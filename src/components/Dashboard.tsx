@@ -347,12 +347,16 @@ export default function Dashboard({ session }: DashboardProps) {
                   borderBottom: "3px solid #555",
                 }}
               >
-                <div
-                  className="absolute top-1.5 left-4 px-3 py-0.5 text-white font-bold"
+                <a
+                  href="https://t.me/jarbas_af_bot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute top-1.5 left-4 px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
                   style={{ background: "#2a2a5a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
+                  title="Abrir Jarbas no Telegram"
                 >
-                  {selectedRoom ? `${selectedContext} › ${selectedRoom}` : `JARBAS — ${selectedContext}`}
-                </div>
+                  JARBAS
+                </a>
                 {!selectedRoom && (
                   <div className="absolute top-1 right-4" style={{ width: 45, height: 30, background: "#1a3a1a", border: "2px solid #8B7355" }}>
                     <svg viewBox="0 0 45 35" width="45" height="30">
