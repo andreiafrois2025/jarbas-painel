@@ -18,6 +18,7 @@ import {
 } from "@/lib/storage";
 import type { Execution, Category as CategoryType } from "@/lib/types";
 import DeskCard from "./DeskCard";
+import OfficeScene from "./OfficeScene";
 import AgentModal from "./AgentModal";
 import CategoryModal from "./CategoryModal";
 import FlowsPage from "./FlowsPage";
@@ -420,16 +421,11 @@ export default function Dashboard({ session }: DashboardProps) {
               {/* ===== VISTA EXPANDIDA DA SALA ===== */}
               {selectedRoom && (
                 agentsInRoom.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 justify-center py-3">
-                    {agentsInRoom.map((agent) => (
-                      <DeskCard
-                        key={agent.id}
-                        agent={agent}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                  </div>
+                  <OfficeScene
+                    agents={agentsInRoom}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
                 ) : (
                   <div className="text-center py-16" style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
                     <p className="text-2xl mb-2">🪑</p>

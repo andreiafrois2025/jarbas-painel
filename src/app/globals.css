@@ -278,3 +278,24 @@ body {
 }
 .input-modern:focus { border-color: var(--accent); }
 .input-modern::placeholder { color: var(--text-muted); }
+
+/* ---- Office Scene (isometric view) ---- */
+.office-scene {
+  cursor: default;
+}
+.office-scene .desk-group {
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+.office-scene .desk-group:hover {
+  filter: brightness(1.12) drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+.office-scene .agent-tooltip {
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.office-scene .desk-group:hover .agent-tooltip {
+  opacity: 1;
+  pointer-events: auto;
+}
