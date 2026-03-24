@@ -56,10 +56,11 @@ export async function seedDefaultData(userId: string) {
 
   if (existing && existing.length > 0) return; // já tem dados
 
-  // Inserir categorias padrão
-  const categories = DEFAULT_CATEGORIES.map((name, i) => ({
-    name,
-    order: i,
+  // Inserir categorias padrão com contexto
+  const categories = DEFAULT_CATEGORIES.map((cat) => ({
+    name: cat.name,
+    context: cat.context,
+    order: cat.order,
     user_id: userId,
   }));
   await supabase.from("categories").insert(categories);
@@ -133,11 +134,11 @@ export async function getCategories(): Promise<Category[]> {
 }
 
 /** Criar categoria */
-export async function addCategory(name: string): Promise<Category> {
+export async function addCategory(name: string, context: string = "IGAM"): Promise<Category> {
   const user = await getUser();
   const { data, error } = await supabase
     .from("categories")
-    .insert({ name, user_id: user?.id })
+    .insert({ name, context, user_id: user?.id })
     .select()
     .single();
 

@@ -30,7 +30,7 @@ export default function AgentModal({ agent, categories, onSave, onClose }: Agent
   const [agentName, setAgentName] = useState("");
   const [aiTool, setAiTool] = useState("");
   const [link, setLink] = useState("");
-  const [category, setCategory] = useState(DEFAULT_CATEGORIES[0]);
+  const [category, setCategory] = useState(DEFAULT_CATEGORIES[0].name);
   const [type, setType] = useState<"manual" | "automatic">("manual");
   const [icon, setIcon] = useState("⚡");
   const [description, setDescription] = useState("");
@@ -38,7 +38,7 @@ export default function AgentModal({ agent, categories, onSave, onClose }: Agent
   const [isNewCategory, setIsNewCategory] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState("");
 
-  const categoryList = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES;
+  const categoryList = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES.map((c) => c.name);
 
   useEffect(() => {
     if (agent) {

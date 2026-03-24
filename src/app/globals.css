@@ -147,6 +147,94 @@ body {
   box-shadow: 0 0 10px rgba(51, 255, 51, 0.4);
 }
 
+/* ---- Room cards (salas do escritório) ---- */
+.room-card {
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border: 2px solid;
+  border-color: var(--win-border-light) var(--win-border-darkest) var(--win-border-darkest) var(--win-border-light);
+  background: #d0d8e4;
+  position: relative;
+  min-height: 140px;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+}
+.room-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+}
+.room-card-header {
+  background: #2a2a6a;
+  color: #fff;
+  font-size: 10px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-weight: bold;
+  padding: 3px 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.room-card-body {
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-content: flex-start;
+}
+.room-agent-chip {
+  background: #e8eaf0;
+  border: 1px solid #a0a8b0;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  color: #1a1a3a;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.room-empty {
+  color: #888;
+  font-size: 10px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-style: italic;
+  padding: 4px;
+}
+.room-count-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 9px;
+  color: #666;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+/* Context tabs (Win98 style) */
+.context-tab {
+  padding: 3px 14px;
+  font-size: 12px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: var(--win-surface);
+  color: #000;
+  position: relative;
+  top: 2px;
+}
+.context-tab.active {
+  border-color: var(--win-border-light) var(--win-border-dark) transparent var(--win-border-darkest);
+  background: var(--win-surface);
+  z-index: 1;
+  font-weight: bold;
+}
+.context-tab:not(.active) {
+  border-color: var(--win-border-light) var(--win-border-dark) var(--win-border-dark) var(--win-border-darkest);
+  background: #b0b0b0;
+  top: 4px;
+}
+
 /* ---- Modern UI components ---- */
 .btn-primary {
   background: var(--accent);

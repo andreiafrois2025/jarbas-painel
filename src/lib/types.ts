@@ -25,13 +25,18 @@ export interface Agent {
   created_at?: string;
 }
 
-/** Categoria/Aba — workspace do usuário */
+/** Categoria/Sala — ambiente dentro de um contexto */
 export interface Category {
   id: string;
   name: string;
   order: number;
+  context: string; // "IGAM" | "AndréIA" | "Pessoal" | "Família"
   user_id?: string;
 }
+
+/** Contextos disponíveis no painel */
+export const CONTEXTS = ["IGAM", "AndréIA", "Pessoal", "Família"] as const;
+export type ContextType = typeof CONTEXTS[number];
 
 /** Fluxo — sequência de ações entre agentes */
 export interface Flow {
@@ -60,12 +65,29 @@ export interface Execution {
   user_id?: string;
 }
 
-/** Categorias padrão para novos usuários */
-export const DEFAULT_CATEGORIES = [
-  "Trabalho",
-  "Pessoal",
-  "Criação",
-  "Pesquisa",
+/** Categorias/Salas padrão para novos usuários */
+export const DEFAULT_CATEGORIES: { name: string; context: string; order: number }[] = [
+  // IGAM
+  { name: "Geotecnologias", context: "IGAM", order: 0 },
+  { name: "Comunicação & Divulgação", context: "IGAM", order: 1 },
+  { name: "Dados & Análise", context: "IGAM", order: 2 },
+  { name: "Administrativo", context: "IGAM", order: 3 },
+  { name: "Planejamento Estratégico", context: "IGAM", order: 4 },
+  // AndréIA
+  { name: "Produção", context: "AndréIA", order: 0 },
+  { name: "Publicação", context: "AndréIA", order: 1 },
+  { name: "Cursos", context: "AndréIA", order: 2 },
+  { name: "Comunidade", context: "AndréIA", order: 3 },
+  { name: "Financeiro", context: "AndréIA", order: 4 },
+  { name: "Administrativo AndréIA", context: "AndréIA", order: 5 },
+  { name: "Planejamento AndréIA", context: "AndréIA", order: 6 },
+  // Família
+  { name: "Finanças", context: "Família", order: 0 },
+  { name: "Luiz Fernando", context: "Família", order: 1 },
+  { name: "Viagens & Lazer", context: "Família", order: 2 },
+  { name: "Casa", context: "Família", order: 3 },
+  // Pessoal
+  { name: "Pessoal", context: "Pessoal", order: 0 },
 ];
 
 /** Agentes padrão para novos usuários */
@@ -74,7 +96,7 @@ export const DEFAULT_AGENTS: Omit<Agent, "id" | "user_id" | "created_at">[] = [
     agent_name: "Atlas",
     name: "ChatGPT",
     link: "https://chat.openai.com",
-    category: "Trabalho",
+    category: "Dados & Análise",
     type: "manual",
     icon: "🤖",
     description: "Chat",
@@ -84,7 +106,7 @@ export const DEFAULT_AGENTS: Omit<Agent, "id" | "user_id" | "created_at">[] = [
     agent_name: "Sofia",
     name: "Claude",
     link: "https://claude.ai",
-    category: "Trabalho",
+    category: "Produção",
     type: "manual",
     icon: "🧠",
     description: "Chat",
@@ -94,7 +116,7 @@ export const DEFAULT_AGENTS: Omit<Agent, "id" | "user_id" | "created_at">[] = [
     agent_name: "Neo",
     name: "Gemini",
     link: "https://gemini.google.com",
-    category: "Pesquisa",
+    category: "Dados & Análise",
     type: "manual",
     icon: "💎",
     description: "Chat",
@@ -104,7 +126,7 @@ export const DEFAULT_AGENTS: Omit<Agent, "id" | "user_id" | "created_at">[] = [
     agent_name: "Luna",
     name: "Midjourney",
     link: "https://www.midjourney.com",
-    category: "Criação",
+    category: "Produção",
     type: "manual",
     icon: "🎨",
     description: "Imagem",
@@ -114,20 +136,10 @@ export const DEFAULT_AGENTS: Omit<Agent, "id" | "user_id" | "created_at">[] = [
     agent_name: "Max",
     name: "Perplexity",
     link: "https://www.perplexity.ai",
-    category: "Pesquisa",
+    category: "Geotecnologias",
     type: "manual",
     icon: "🔍",
     description: "Pesquisa",
-    gender: "male",
-  },
-  {
-    agent_name: "Dev",
-    name: "GitHub Copilot",
-    link: "https://github.com/features/copilot",
-    category: "Trabalho",
-    type: "manual",
-    icon: "👨‍💻",
-    description: "Código",
     gender: "male",
   },
 ];

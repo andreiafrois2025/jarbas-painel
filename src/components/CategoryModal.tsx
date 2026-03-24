@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import type { Agent, Category } from "@/lib/types";
+import { CONTEXTS } from "@/lib/types";
 
 // =============================================
 // Modal de gerenciamento de Setores/Categorias
@@ -13,7 +14,8 @@ interface CategoryModalProps {
   categories: Category[];
   agents: Agent[];
   editCategory?: Category | null;
-  onAddCategory: (name: string) => Promise<void>;
+  defaultContext?: string;
+  onAddCategory: (name: string, context?: string) => Promise<void>;
   onRenameCategory: (id: string, newName: string, oldName: string) => Promise<void>;
   onDeleteCategory: (id: string) => Promise<void>;
   onMoveAgent: (agentId: string, newCategory: string) => Promise<void>;
@@ -24,6 +26,7 @@ export default function CategoryModal({
   categories,
   agents,
   editCategory,
+  defaultContext = "IGAM",
   onAddCategory,
   onRenameCategory,
   onDeleteCategory,
@@ -32,6 +35,7 @@ export default function CategoryModal({
 }: CategoryModalProps) {
   const [mode, setMode] = useState<"list" | "create" | "edit">(editCategory ? "edit" : "list");
   const [name, setName] = useState(editCategory?.name || "");
+  const [newContext, setNewContext] = useState(defaultContext);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(editCategory || null);
   const [saving, setSaving] = useState(false);
 
@@ -57,7 +61,7 @@ export default function CategoryModal({
     if (!name.trim() || saving) return;
     setSaving(true);
     try {
-      await onAddCategory(name.trim());
+      await onAddCategory(name.trim(), newContext);
       setName("");
       setMode("list");
     } finally {
@@ -129,7 +133,7 @@ export default function CategoryModal({
           {mode === "list" && (
             <div className="space-y-3">
               <p className="text-sm text-[var(--text-secondary)] mb-3">
-                Organize seus agentes em setores. Cada setor aparece como uma aba no escritório.
+                Gerencie as salas do escritório por contexto.
               </p>
 
               {/* Setores existentes */}
@@ -143,7 +147,9 @@ export default function CategoryModal({
                     >
                       <div className="flex-1">
                         <div className="text-sm font-medium">{cat.name}</div>
-                        <div className="text-xs text-[var(--text-muted)]">{count} {count === 1 ? "agente" : "agentes"}</div>
+                        <div className="text-xs text-[var(--text-muted)]">
+                          {cat.context || "IGAM"} · {count} {count === 1 ? "agente" : "agentes"}
+                        </div>
                       </div>
                       <button
                         onClick={() => {
@@ -178,19 +184,31 @@ export default function CategoryModal({
           {mode === "create" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Nome do setor</label>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Contexto</label>
+                <select
+                  value={newContext}
+                  onChange={(e) => setNewContext(e.target.value)}
+                  className="input-modern cursor-pointer"
+                >
+                  {CONTEXTS.map((ctx) => (
+                    <option key={ctx} value={ctx}>{ctx}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Nome da sala</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); }}
                   className="input-modern"
-                  placeholder="Ex: Servidora Pública, Marketing, Pessoal..."
+                  placeholder="Ex: Geoprocessamento, Produção..."
                   autoFocus
                 />
               </div>
               <p className="text-xs text-[var(--text-muted)]">
-                Após criar, você pode mover agentes para este setor editando-os ou pelo botão "Editar" do setor.
+                A sala aparecerá no escritório do contexto selecionado.
               </p>
               <div className="flex gap-3 pt-1">
                 <button
