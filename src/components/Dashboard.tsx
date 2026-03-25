@@ -308,7 +308,9 @@ export default function Dashboard({ session }: DashboardProps) {
             <div className="win-titlebar">
               <div className="flex items-center gap-2">
                 <span className="text-sm">🏢</span>
-                <span className="text-xs md:text-sm">Jarbas v1.0</span>
+                <span className="text-xs md:text-sm">
+                  Jarbas{selectedContext ? ` › ${selectedContext}` : ""}{selectedRoom ? ` › ${selectedRoom}` : ""} v{process.env.NEXT_PUBLIC_APP_VERSION || "1.9.0"}
+                </span>
               </div>
               <div className="flex gap-0.5">
                 <button className="win-button" style={{ padding: "0 4px", minHeight: 14, fontSize: 9, color: "#000" }}>_</button>

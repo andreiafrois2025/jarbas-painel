@@ -467,12 +467,13 @@ function drawStation(
   // === AGENT NAME above head (always visible) ===
   const agentDisplayName = agent.agent_name || agent.name;
   const nameCX = (x+dW/2)*PX;
-  const nameCY = (headY-5)*PX;
-  C.font=`bold ${PX*3}px "Courier New",monospace`;
+  const nameCY = (headY-10)*PX;
+  C.font=`bold ${PX*5}px sans-serif`;
   C.textAlign="center"; C.textBaseline="middle";
   // Shadow for readability
   C.fillStyle="#000";
   C.fillText(agentDisplayName, nameCX+1, nameCY+1);
+  C.fillText(agentDisplayName, nameCX-1, nameCY+1);
   // Main text
   C.fillStyle="#FFF";
   C.fillText(agentDisplayName, nameCX, nameCY);
@@ -492,11 +493,11 @@ function drawStation(
   // === Function/description below desk ===
   const descText = agent.description || "";
   if (descText) {
-    C.font=`${PX*2.5}px "Courier New",monospace`;
+    C.font=`${PX*4}px sans-serif`;
     C.textAlign="center"; C.textBaseline="top";
     const desc = descText;
     // Word wrap if needed
-    const maxLineW = dW * PX * 0.95;
+    const maxLineW = dW * PX * 1.1;
     const words = desc.split(" ");
     const lines: string[] = [];
     let currentLine = "";
@@ -543,10 +544,10 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
   const cols = Math.min(agents.length, 5);
   const rows = Math.ceil(agents.length / 5) || 1;
   const stW = 52;
-  const stH = 56;
+  const stH = 64;
   const cW = Math.max(260, 16 + cols * stW);
-  const wallH = Math.round(cW * 0.13) + 24;
-  const cH = wallH + 8 + rows * stH + 20;
+  const wallH = Math.round(cW * 0.13) + 30;
+  const cH = wallH + 12 + rows * stH + 24;
 
   const styles = agents.map((a,i) => getStyle(a,i));
 
@@ -555,7 +556,7 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
     const col = i%5;
     const total = Math.min(5, agents.length-row*5);
     const sx = (cW - total*stW)/2;
-    return { x: sx+col*stW+4, y: wallH+6+row*stH };
+    return { x: sx+col*stW+4, y: wallH+14+row*stH };
   });
 
   const render = useCallback(() => {
