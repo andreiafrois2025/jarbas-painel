@@ -464,12 +464,18 @@ function drawStation(
   if (h%4===0) drawPapers(x+dW-7, dY-6);
   if (h%5===0) drawPenHolder(x+dW-5, dY-3);
 
-  // === AGENT NAME above head (always visible, black text, no background) ===
+  // === AGENT NAME above head (always visible) ===
   const agentDisplayName = agent.agent_name || agent.name;
-  C.fillStyle="#000";
+  const nameCX = (x+dW/2)*PX;
+  const nameCY = (headY-5)*PX;
   C.font=`bold ${PX*3}px "Courier New",monospace`;
   C.textAlign="center"; C.textBaseline="middle";
-  C.fillText(agentDisplayName, (x+dW/2)*PX, (headY-6)*PX);
+  // Shadow for readability
+  C.fillStyle="#000";
+  C.fillText(agentDisplayName, nameCX+1, nameCY+1);
+  // Main text
+  C.fillStyle="#FFF";
+  C.fillText(agentDisplayName, nameCX, nameCY);
 
   // === Nameplate on desk (tool name) ===
   const toolName = agent.name;
@@ -484,28 +490,35 @@ function drawStation(
   C.fillText(dispTool, (x+dW/2)*PX, (dY+4)*PX);
 
   // === Function/description below desk ===
-  if (agent.description) {
-    C.fillStyle="#333";
-    C.font=`${PX*2.2}px "Courier New",monospace`;
+  const descText = agent.description || "";
+  if (descText) {
+    C.font=`${PX*2.5}px "Courier New",monospace`;
     C.textAlign="center"; C.textBaseline="top";
-    const desc = agent.description;
+    const desc = descText;
     // Word wrap if needed
     const maxLineW = dW * PX * 0.95;
     const words = desc.split(" ");
     const lines: string[] = [];
-    let line = "";
+    let currentLine = "";
     for (const w of words) {
-      const test = line ? line + " " + w : w;
-      if (C.measureText(test).width > maxLineW && line) {
-        lines.push(line);
-        line = w;
+      const test = currentLine ? currentLine + " " + w : w;
+      if (C.measureText(test).width > maxLineW && currentLine) {
+        lines.push(currentLine);
+        currentLine = w;
       } else {
-        line = test;
+        currentLine = test;
       }
     }
-    if (line) lines.push(line);
+    if (currentLine) lines.push(currentLine);
     for (let li = 0; li < Math.min(lines.length, 2); li++) {
-      C.fillText(lines[li], (x+dW/2)*PX, (dY+8 + li*3.5)*PX);
+      const lx = (x+dW/2)*PX;
+      const ly = (dY+9 + li*4)*PX;
+      // Shadow
+      C.fillStyle="#000";
+      C.fillText(lines[li], lx+1, ly+1);
+      // Main
+      C.fillStyle="#FFF";
+      C.fillText(lines[li], lx, ly);
     }
   }
 
@@ -533,7 +546,7 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
   const stH = 56;
   const cW = Math.max(260, 16 + cols * stW);
   const wallH = Math.round(cW * 0.13) + 24;
-  const cH = wallH + 8 + rows * stH + 12;
+  const cH = wallH + 8 + rows * stH + 20;
 
   const styles = agents.map((a,i) => getStyle(a,i));
 
