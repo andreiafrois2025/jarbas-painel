@@ -347,31 +347,47 @@ export default function Dashboard({ session }: DashboardProps) {
                   borderBottom: "3px solid #555",
                 }}
               >
-                <a
-                  href="https://t.me/jarbas_af_bot"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute top-1.5 left-4 px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                  style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
-                  title="Abrir Jarbas no Telegram"
-                >
-                  JARBAS
-                </a>
-                {!selectedRoom && (
-                  <div className="absolute top-1 right-4" style={{ width: 45, height: 30, background: "#1a3a1a", border: "2px solid #8B7355" }}>
-                    <svg viewBox="0 0 45 35" width="45" height="30">
-                      <text x="4" y="8" fill="#FFD700" fontSize="4.5" fontWeight="bold">SUCCESS</text>
-                      <polyline points="5,30 12,24 22,26 32,15 40,8" fill="none" stroke="#33ff33" strokeWidth="2" />
-                    </svg>
-                  </div>
-                )}
-                {selectedRoom && (
-                  <button
-                    onClick={() => setSelectedRoom(null)}
-                    style={{ position: "absolute", right: 8, top: 4, fontSize: 9, fontFamily: "'Segoe UI', Tahoma", cursor: "pointer", background: "#c0c0c0", border: "1px solid #888", padding: "1px 6px" }}
-                  >
-                    ← Voltar
-                  </button>
+                {selectedRoom ? (
+                  <>
+                    {/* Dentro da sala: Voltar na esquerda, JARBAS na direita */}
+                    <button
+                      onClick={() => setSelectedRoom(null)}
+                      className="absolute top-1.5 left-4 px-3 py-0.5 font-bold cursor-pointer hover:brightness-90 transition-all"
+                      style={{ background: "#c0c0c0", border: "1px solid #888", fontSize: 9, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}
+                    >
+                      ← Voltar
+                    </button>
+                    <a
+                      href="https://t.me/jarbas_af_bot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute top-1.5 right-4 px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
+                      style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
+                      title="Abrir Jarbas no Telegram"
+                    >
+                      JARBAS
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    {/* Visão geral: JARBAS na esquerda, SUCCESS na direita */}
+                    <a
+                      href="https://t.me/jarbas_af_bot"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute top-1.5 left-4 px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
+                      style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
+                      title="Abrir Jarbas no Telegram"
+                    >
+                      JARBAS
+                    </a>
+                    <div className="absolute top-1 right-4" style={{ width: 45, height: 30, background: "#1a3a1a", border: "2px solid #8B7355" }}>
+                      <svg viewBox="0 0 45 35" width="45" height="30">
+                        <text x="4" y="8" fill="#FFD700" fontSize="4.5" fontWeight="bold">SUCCESS</text>
+                        <polyline points="5,30 12,24 22,26 32,15 40,8" fill="none" stroke="#33ff33" strokeWidth="2" />
+                      </svg>
+                    </div>
+                  </>
                 )}
               </div>
 

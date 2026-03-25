@@ -39,17 +39,20 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
   const [description, setDescription] = useState("");
   const [gender, setGender] = useState<"male" | "female">("male");
 
-  // Setores filtrados pela aba selecionada
+  // Setores filtrados pela aba selecionada (sem duplicatas)
   const filteredSectors = useMemo(() => {
+    let names: string[] = [];
     if (allCategories && allCategories.length > 0) {
-      return allCategories
+      names = allCategories
         .filter((c) => (c.context || "IGAM") === selectedContext)
         .map((c) => c.name);
+    } else if (categories && categories.length > 0) {
+      names = categories;
+    } else {
+      names = DEFAULT_CATEGORIES.filter((c) => c.context === selectedContext).map((c) => c.name);
     }
-    // Fallback para lista simples
-    return categories && categories.length > 0
-      ? categories
-      : DEFAULT_CATEGORIES.filter((c) => c.context === selectedContext).map((c) => c.name);
+    // Remove duplicatas mantendo a ordem
+    return [...new Set(names)];
   }, [allCategories, categories, selectedContext]);
 
   // Quando muda o contexto, selecionar o primeiro setor disponível

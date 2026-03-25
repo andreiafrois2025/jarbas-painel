@@ -464,16 +464,50 @@ function drawStation(
   if (h%4===0) drawPapers(x+dW-7, dY-6);
   if (h%5===0) drawPenHolder(x+dW-5, dY-3);
 
-  // Nameplate
-  const maxChars = 10;
-  const dispName = agent.name.length>maxChars ? agent.name.slice(0,maxChars-1)+"…" : agent.name;
-  const nW = dispName.length*2.8+4;
+  // === AGENT NAME above head (always visible, black text, no background) ===
+  const agentDisplayName = agent.agent_name || agent.name;
+  C.fillStyle="#000";
+  C.font=`bold ${PX*3}px "Courier New",monospace`;
+  C.textAlign="center"; C.textBaseline="middle";
+  C.fillText(agentDisplayName, (x+dW/2)*PX, (headY-6)*PX);
+
+  // === Nameplate on desk (tool name) ===
+  const toolName = agent.name;
+  const maxChars = 12;
+  const dispTool = toolName.length>maxChars ? toolName.slice(0,maxChars-1)+"…" : toolName;
+  const nW = dispTool.length*2.5+4;
   const nX = x+dW/2-nW/2;
   p(nX, dY+2, nW, 4, "#2C2C44");
   C.fillStyle="#FFF";
-  C.font=`bold ${PX*2.5}px "Courier New",monospace`;
+  C.font=`bold ${PX*2.2}px "Courier New",monospace`;
   C.textAlign="center"; C.textBaseline="middle";
-  C.fillText(dispName, (x+dW/2)*PX, (dY+4)*PX);
+  C.fillText(dispTool, (x+dW/2)*PX, (dY+4)*PX);
+
+  // === Function/description below desk ===
+  if (agent.description) {
+    C.fillStyle="#333";
+    C.font=`${PX*2.2}px "Courier New",monospace`;
+    C.textAlign="center"; C.textBaseline="top";
+    const desc = agent.description;
+    // Word wrap if needed
+    const maxLineW = dW * PX * 0.95;
+    const words = desc.split(" ");
+    const lines: string[] = [];
+    let line = "";
+    for (const w of words) {
+      const test = line ? line + " " + w : w;
+      if (C.measureText(test).width > maxLineW && line) {
+        lines.push(line);
+        line = w;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    for (let li = 0; li < Math.min(lines.length, 2); li++) {
+      C.fillText(lines[li], (x+dW/2)*PX, (dY+8 + li*3.5)*PX);
+    }
+  }
 
   // Status dot (green = active)
   p(x+dW-2, dY-13, 2, 2, "#44CC44");
@@ -482,7 +516,7 @@ function drawStation(
   if (hovered) {
     C.strokeStyle="#FFD700";
     C.lineWidth=2;
-    C.strokeRect((x-1)*PX,(headY-5)*PX,(dW+2)*PX,(dY+13-headY+7)*PX);
+    C.strokeRect((x-1)*PX,(headY-10)*PX,(dW+2)*PX,(dY+15-headY+10)*PX);
   }
 }
 
@@ -495,8 +529,8 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
 
   const cols = Math.min(agents.length, 5);
   const rows = Math.ceil(agents.length / 5) || 1;
-  const stW = 48;
-  const stH = 44;
+  const stW = 52;
+  const stH = 56;
   const cW = Math.max(260, 16 + cols * stW);
   const wallH = Math.round(cW * 0.13) + 24;
   const cH = wallH + 8 + rows * stH + 12;
@@ -635,12 +669,21 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
       />
       {tip && (
         <div
-          className="absolute pointer-events-none bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg border border-yellow-500 z-50"
-          style={{left:tip.x,top:tip.y,maxWidth:220}}
+          className="absolute bg-gray-900 text-white text-xs px-2 py-1.5 rounded shadow-lg border border-yellow-500 z-50"
+          style={{left:Math.min(tip.x, (canvasRef.current?.getBoundingClientRect().width||300)-160),top:tip.y,maxWidth:220}}
         >
-          <strong>{tip.agent.name}</strong>
+          <strong>{tip.agent.agent_name || tip.agent.name}</strong>
           {tip.agent.description && <div className="text-gray-300">{tip.agent.description}</div>}
-          <div className="text-yellow-400 text-[10px]">Clique → abrir • Direito → editar</div>
+          <div className="flex gap-2 mt-1">
+            <button
+              className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded cursor-pointer"
+              onClick={() => onEdit(tip.agent)}
+            >✏️ Editar</button>
+            <button
+              className="text-[10px] bg-red-600 hover:bg-red-500 text-white px-2 py-0.5 rounded cursor-pointer"
+              onClick={() => { if (confirm(`Excluir ${tip.agent.agent_name || tip.agent.name}?`)) onDelete(tip.agent.id); }}
+            >🗑️ Excluir</button>
+          </div>
         </div>
       )}
     </div>
