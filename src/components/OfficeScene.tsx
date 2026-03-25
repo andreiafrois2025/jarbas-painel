@@ -544,23 +544,21 @@ function IsometricDesk({
         )}
       </g>
 
-      {/* Agent name tooltip */}
-      <g className="agent-tooltip">
-        <rect x={x - 30} y={y - 34} width="60" height="14" rx="3" fill="rgba(0,0,0,0.8)" />
-        <text x={x} y={y - 24} textAnchor="middle" fill="#fff" fontSize="7" fontFamily="'Segoe UI', Tahoma, sans-serif">
-          {displayName.length > 12 ? displayName.slice(0, 11) + "…" : displayName}
-        </text>
-      </g>
+      {/* === AGENT NAME — always visible above head === */}
+      <text x={x} y={y - 38} textAnchor="middle" fill="#000" fontSize="9" fontWeight="bold" fontFamily="'Segoe UI', Tahoma, sans-serif"
+        stroke="#fff" strokeWidth="2" paintOrder="stroke">
+        {displayName}
+      </text>
 
-      {/* Edit/Delete buttons on hover */}
+      {/* Edit/Delete buttons on hover — larger */}
       <g className="agent-tooltip">
         <g onClick={(e) => { e.stopPropagation(); onEdit(agent); }} style={{ cursor: "pointer" }}>
-          <rect x={x + 22} y={y - 34} width="14" height="14" rx="3" fill="rgba(50,50,50,0.9)" />
-          <text x={x + 29} y={y - 24} textAnchor="middle" fontSize="8">✏️</text>
+          <rect x={x + 28} y={y - 48} width="20" height="20" rx="4" fill="#2563eb" />
+          <text x={x + 38} y={y - 34} textAnchor="middle" fontSize="12" fill="#fff">✏️</text>
         </g>
-        <g onClick={(e) => { e.stopPropagation(); onDelete(agent.id); }} style={{ cursor: "pointer" }}>
-          <rect x={x + 38} y={y - 34} width="14" height="14" rx="3" fill="rgba(80,30,30,0.9)" />
-          <text x={x + 45} y={y - 24} textAnchor="middle" fontSize="8">❌</text>
+        <g onClick={(e) => { e.stopPropagation(); if (confirm(`Excluir ${displayName}?`)) onDelete(agent.id); }} style={{ cursor: "pointer" }}>
+          <rect x={x + 52} y={y - 48} width="20" height="20" rx="4" fill="#dc2626" />
+          <text x={x + 62} y={y - 34} textAnchor="middle" fontSize="12" fill="#fff">🗑️</text>
         </g>
       </g>
 
@@ -569,6 +567,36 @@ function IsometricDesk({
       <text x={x} y={y + 28} textAnchor="middle" fill="#FFD700" fontSize="5" fontWeight="bold" fontFamily="'Segoe UI',Tahoma,sans-serif">
         {agent.name.length > 10 ? agent.name.slice(0, 9) + "…" : agent.name}
       </text>
+
+      {/* === FUNCTION/DESCRIPTION — always visible below desk === */}
+      {agent.description && (
+        <text x={x} y={y + 60} textAnchor="middle" fill="#000" fontSize="7" fontFamily="'Segoe UI', Tahoma, sans-serif"
+          stroke="#fff" strokeWidth="1.5" paintOrder="stroke">
+          {agent.description.length > 25 ? agent.description.slice(0, 24) + "…" : agent.description}
+        </text>
+      )}
+
+      {/* === SUB-LINKS — clickable buttons below description === */}
+      {agent.sub_links && agent.sub_links.length > 0 && (
+        <g>
+          {agent.sub_links.map((sl, si) => {
+            const btnW = Math.min(sl.label.length * 5 + 10, 50);
+            const totalW = agent.sub_links!.reduce((sum, s) => sum + Math.min(s.label.length * 5 + 10, 50) + 3, -3);
+            let btnX = x - totalW / 2;
+            for (let j = 0; j < si; j++) {
+              btnX += Math.min(agent.sub_links![j].label.length * 5 + 10, 50) + 3;
+            }
+            return (
+              <g key={si} onClick={(e) => { e.stopPropagation(); window.open(sl.url, "_blank"); recordExecution(agent.id); }} style={{ cursor: "pointer" }}>
+                <rect x={btnX} y={y + 66} width={btnW} height="12" rx="3" fill="#2563eb" />
+                <text x={btnX + btnW / 2} y={y + 74} textAnchor="middle" fill="#fff" fontSize="5.5" fontFamily="'Segoe UI',Tahoma,sans-serif">
+                  {sl.label}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      )}
     </g>
   );
 }
@@ -615,7 +643,7 @@ export default function OfficeScene({ agents, onEdit, onDelete }: OfficeScenePro
         <BigPlant x={30} y={340} />
 
         {/* Rug / carpet area */}
-        <rect x={120} y={155} width={600} height={viewHeight - 175} rx="4" fill="rgba(124, 92, 252, 0.06)" stroke="rgba(124,92,252,0.1)" strokeWidth="1" />
+        <rect x={120} y={155} width={600} height={viewHeight - 175} rx="4" fill="rgba(46, 134, 222, 0.06)" stroke="rgba(46,134,222,0.1)" strokeWidth="1" />
 
         {/* Desks with characters */}
         {agents.map((agent, i) => {

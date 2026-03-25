@@ -18,7 +18,7 @@ import {
 } from "@/lib/storage";
 import type { Execution, Category as CategoryType } from "@/lib/types";
 import DeskCard from "./DeskCard";
-import PixiOffice from "./PixiOffice";
+import OfficeScene from "./OfficeScene";
 import AgentModal from "./AgentModal";
 import CategoryModal from "./CategoryModal";
 import FlowsPage from "./FlowsPage";
@@ -443,7 +443,7 @@ export default function Dashboard({ session }: DashboardProps) {
               {/* ===== VISTA EXPANDIDA DA SALA ===== */}
               {selectedRoom && (
                 agentsInRoom.length > 0 ? (
-                  <PixiOffice
+                  <OfficeScene
                     agents={agentsInRoom}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
