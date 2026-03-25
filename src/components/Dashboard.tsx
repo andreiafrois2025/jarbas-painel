@@ -120,6 +120,7 @@ export default function Dashboard({ session }: DashboardProps) {
     icon: string;
     description: string;
     gender: "male" | "female";
+    sub_links?: { label: string; url: string }[];
   }) => {
     try {
       if (editingAgent) {
@@ -286,12 +287,12 @@ export default function Dashboard({ session }: DashboardProps) {
             />
           </div>
 
-          {/* Botão Gerenciar Setores */}
+          {/* Botão Gerenciar Setores e Agentes */}
           <button
             onClick={() => { setEditingCategoryObj(null); setShowCategoryModal(true); }}
             className="btn-secondary !py-2 !px-3 md:!px-4 text-xs md:text-sm"
           >
-            ⚙️ <span className="hidden sm:inline">Setores</span>
+            ⚙️ <span className="hidden sm:inline">Setores e Agentes</span>
           </button>
 
           <button
@@ -433,7 +434,7 @@ export default function Dashboard({ session }: DashboardProps) {
                     <div className="text-center py-16 w-full" style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
                       <p className="text-2xl mb-2">🏢</p>
                       <p className="text-sm">Nenhuma sala em {selectedContext}</p>
-                      <p className="text-xs mt-1">Clique em ⚙️ Setores para criar uma</p>
+                      <p className="text-xs mt-1">Clique em ⚙️ Setores e Agentes para criar uma</p>
                     </div>
                   )}
                 </div>
@@ -505,6 +506,14 @@ export default function Dashboard({ session }: DashboardProps) {
           onRenameCategory={handleRenameCategory}
           onDeleteCategory={handleDeleteCategory}
           onMoveAgent={handleMoveAgent}
+          onEditAgent={async (agent, updates) => {
+            await updateAgent(agent.id, updates);
+            await loadData();
+          }}
+          onDeleteAgent={async (id) => {
+            await deleteAgent(id);
+            await loadData();
+          }}
           onClose={() => {
             setShowCategoryModal(false);
             setEditingCategoryObj(null);

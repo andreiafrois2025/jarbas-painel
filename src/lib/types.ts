@@ -2,6 +2,12 @@
 // Tipos do Jarbas — Estrutura de dados do sistema
 // =============================================
 
+/** Sub-link — função adicional de um agente */
+export interface SubLink {
+  label: string;  // Nome da função ex: "Atendimento", "RH", "Folha"
+  url: string;    // Link do GPT/ferramenta
+}
+
 /** Agente de IA — representa um funcionário do escritório */
 export interface Agent {
   id: string;
@@ -21,6 +27,8 @@ export interface Agent {
   description?: string;
   /** Gênero do bonequinho */
   gender?: "male" | "female";
+  /** Links adicionais — cada botão abre um GPT/ferramenta diferente */
+  sub_links?: SubLink[];
   user_id?: string;
   created_at?: string;
 }

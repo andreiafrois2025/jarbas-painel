@@ -646,8 +646,12 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
 
   const onClick = useCallback(() => {
     if (tip?.agent) {
-      if (tip.agent.link) window.open(tip.agent.link,"_blank");
-      recordExecution(tip.agent.id);
+      // Se tem sub_links, não abre link principal no clique (usa os botões)
+      const hasSubLinks = tip.agent.sub_links && tip.agent.sub_links.length > 0;
+      if (!hasSubLinks && tip.agent.link) {
+        window.open(tip.agent.link,"_blank");
+        recordExecution(tip.agent.id);
+      }
     }
   }, [tip]);
 
@@ -683,21 +687,20 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
       />
       {tip && (
         <div
-          className="absolute bg-gray-900 text-white text-xs px-2 py-1.5 rounded shadow-lg border border-yellow-500 z-50"
-          style={{left:Math.min(tip.x, (canvasRef.current?.getBoundingClientRect().width||300)-160),top:tip.y,maxWidth:220}}
+          className="absolute bg-gray-900/95 text-white text-xs rounded-lg shadow-xl border border-yellow-500/80 z-50 flex items-center gap-1 px-2 py-1.5"
+          style={{left:Math.min(tip.x - 40, (canvasRef.current?.getBoundingClientRect().width||300)-180),top:tip.y}}
         >
-          <strong>{tip.agent.agent_name || tip.agent.name}</strong>
-          {tip.agent.description && <div className="text-gray-300">{tip.agent.description}</div>}
-          <div className="flex gap-2 mt-1">
-            <button
-              className="text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-2 py-0.5 rounded cursor-pointer"
-              onClick={() => onEdit(tip.agent)}
-            >✏️ Editar</button>
-            <button
-              className="text-[10px] bg-red-600 hover:bg-red-500 text-white px-2 py-0.5 rounded cursor-pointer"
-              onClick={() => { if (confirm(`Excluir ${tip.agent.agent_name || tip.agent.name}?`)) onDelete(tip.agent.id); }}
-            >🗑️ Excluir</button>
-          </div>
+          <span className="font-bold mr-1">{tip.agent.agent_name || tip.agent.name}</span>
+          <button
+            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white rounded-lg cursor-pointer text-base transition-all hover:scale-110"
+            title="Editar"
+            onClick={(e) => { e.stopPropagation(); onEdit(tip.agent); }}
+          >✏️</button>
+          <button
+            className="w-8 h-8 flex items-center justify-center bg-red-600 hover:bg-red-500 text-white rounded-lg cursor-pointer text-base transition-all hover:scale-110"
+            title="Excluir"
+            onClick={(e) => { e.stopPropagation(); if (confirm(`Excluir ${tip.agent.agent_name || tip.agent.name}?`)) onDelete(tip.agent.id); }}
+          >🗑️</button>
         </div>
       )}
     </div>

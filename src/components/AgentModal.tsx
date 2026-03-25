@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Agent, Category, CONTEXTS, DEFAULT_CATEGORIES } from "@/lib/types";
+import { Agent, SubLink, Category, CONTEXTS, DEFAULT_CATEGORIES } from "@/lib/types";
 
 // =============================================
 // Modal de criação/edição de agente
@@ -22,6 +22,7 @@ interface AgentModalProps {
     icon: string;
     description: string;
     gender: "male" | "female";
+    sub_links: SubLink[];
   }) => void;
   onClose: () => void;
 }
@@ -38,6 +39,7 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
   const [icon, setIcon] = useState("⚡");
   const [description, setDescription] = useState("");
   const [gender, setGender] = useState<"male" | "female">("male");
+  const [subLinks, setSubLinks] = useState<SubLink[]>([]);
 
   // Setores filtrados pela aba selecionada (sem duplicatas)
   const filteredSectors = useMemo(() => {
@@ -72,6 +74,7 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
       setIcon(agent.icon || "⚡");
       setDescription(agent.description || "");
       setGender(agent.gender || "male");
+      setSubLinks(agent.sub_links || []);
       // Detectar o contexto do agente
       if (allCategories) {
         const cat = allCategories.find((c) => c.name === agent.category);
@@ -92,6 +95,7 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
       icon,
       description,
       gender,
+      sub_links: subLinks.filter(sl => sl.label && sl.url),
     });
   };
 
@@ -225,6 +229,51 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
               placeholder="https://..."
               required
             />
+          </div>
+
+          {/* === FUNÇÕES EXTRAS (sub-links) === */}
+          <div>
+            <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
+              Funções extras <span className="text-[var(--text-muted)]">(botões abaixo da mesa)</span>
+            </label>
+            {subLinks.map((sl, idx) => (
+              <div key={idx} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={sl.label}
+                  onChange={(e) => {
+                    const updated = [...subLinks];
+                    updated[idx] = { ...updated[idx], label: e.target.value };
+                    setSubLinks(updated);
+                  }}
+                  className="input-modern flex-1"
+                  placeholder="Nome da função"
+                />
+                <input
+                  type="url"
+                  value={sl.url}
+                  onChange={(e) => {
+                    const updated = [...subLinks];
+                    updated[idx] = { ...updated[idx], url: e.target.value };
+                    setSubLinks(updated);
+                  }}
+                  className="input-modern flex-[2]"
+                  placeholder="https://..."
+                />
+                <button
+                  type="button"
+                  onClick={() => setSubLinks(subLinks.filter((_, i) => i !== idx))}
+                  className="text-red-400 hover:text-red-300 px-2 cursor-pointer"
+                >✕</button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setSubLinks([...subLinks, { label: "", url: "" }])}
+              className="text-xs text-[var(--accent)] hover:underline cursor-pointer"
+            >
+              + Adicionar função extra
+            </button>
           </div>
 
           {/* === ABA (Contexto) === */}

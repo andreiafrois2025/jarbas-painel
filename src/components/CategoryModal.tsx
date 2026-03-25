@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import type { Agent, Category } from "@/lib/types";
+import type { Agent, SubLink, Category } from "@/lib/types";
 import { CONTEXTS } from "@/lib/types";
 
 // =============================================
-// Modal de gerenciamento de Setores/Categorias
-// Filtro por aba (contexto) + criar, renomear, excluir
+// Modal de gerenciamento de Setores e Agentes
+// Filtro por aba + criar, renomear, excluir setores
+// + editar agentes (nome, função, sub_links)
 // =============================================
 
 interface CategoryModalProps {
@@ -18,6 +19,8 @@ interface CategoryModalProps {
   onRenameCategory: (id: string, newName: string, oldName: string) => Promise<void>;
   onDeleteCategory: (id: string) => Promise<void>;
   onMoveAgent: (agentId: string, newCategory: string) => Promise<void>;
+  onEditAgent?: (agent: Agent, updates: Partial<Agent>) => Promise<void>;
+  onDeleteAgent?: (id: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -30,14 +33,24 @@ export default function CategoryModal({
   onRenameCategory,
   onDeleteCategory,
   onMoveAgent,
+  onEditAgent,
+  onDeleteAgent,
   onClose,
 }: CategoryModalProps) {
-  const [mode, setMode] = useState<"list" | "create" | "edit">(editCategory ? "edit" : "list");
+  const [mode, setMode] = useState<"list" | "create" | "edit" | "editAgent">(editCategory ? "edit" : "list");
   const [name, setName] = useState(editCategory?.name || "");
   const [newContext, setNewContext] = useState(defaultContext);
   const [filterContext, setFilterContext] = useState(defaultContext);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(editCategory || null);
   const [saving, setSaving] = useState(false);
+
+  // Estado de edição de agente
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [agentName, setAgentName] = useState("");
+  const [agentTool, setAgentTool] = useState("");
+  const [agentDesc, setAgentDesc] = useState("");
+  const [agentLink, setAgentLink] = useState("");
+  const [agentSubLinks, setAgentSubLinks] = useState<SubLink[]>([]);
 
   useEffect(() => {
     if (editCategory) {
@@ -114,6 +127,48 @@ export default function CategoryModal({
     }
   };
 
+  // Abrir edição do agente
+  const openEditAgent = (agent: Agent) => {
+    setEditingAgent(agent);
+    setAgentName(agent.agent_name || "");
+    setAgentTool(agent.name);
+    setAgentDesc(agent.description || "");
+    setAgentLink(agent.link);
+    setAgentSubLinks(agent.sub_links || []);
+    setMode("editAgent");
+  };
+
+  const handleSaveAgent = async () => {
+    if (!editingAgent || !onEditAgent || saving) return;
+    setSaving(true);
+    try {
+      await onEditAgent(editingAgent, {
+        agent_name: agentName,
+        name: agentTool,
+        description: agentDesc,
+        link: agentLink,
+        sub_links: agentSubLinks.filter(sl => sl.label && sl.url),
+      });
+      setMode("edit");
+      setEditingAgent(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAgent = async () => {
+    if (!editingAgent || !onDeleteAgent) return;
+    if (!confirm(`Excluir agente "${editingAgent.agent_name || editingAgent.name}"?`)) return;
+    setSaving(true);
+    try {
+      await onDeleteAgent(editingAgent.id);
+      setMode("edit");
+      setEditingAgent(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -126,7 +181,7 @@ export default function CategoryModal({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
           <h2 className="text-lg font-semibold">
-            {mode === "create" ? "Novo Setor" : mode === "edit" ? "Editar Setor" : "Gerenciar Setores"}
+            {mode === "create" ? "Novo Setor" : mode === "edit" ? "Editar Setor" : mode === "editAgent" ? "Editar Agente" : "Setores e Agentes"}
           </h2>
           <button
             onClick={onClose}
@@ -139,7 +194,7 @@ export default function CategoryModal({
           {mode === "list" && (
             <div className="space-y-3">
               <p className="text-sm text-[var(--text-secondary)] mb-2">
-                Selecione a aba para ver os setores.
+                Selecione a aba para ver setores e agentes.
               </p>
 
               {/* Filtro por aba */}
@@ -167,28 +222,57 @@ export default function CategoryModal({
               {/* Setores da aba selecionada */}
               <div className="space-y-2">
                 {filteredCategories.map((cat) => {
-                  const count = agents.filter((a) => a.category === cat.name).length;
+                  const catAgents = agents.filter((a) => a.category === cat.name);
                   return (
                     <div
                       key={cat.id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] hover:border-[var(--border-light)] transition-all"
+                      className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] hover:border-[var(--border-light)] transition-all"
                     >
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{cat.name}</div>
-                        <div className="text-xs text-[var(--text-muted)]">
-                          {count} {count === 1 ? "agente" : "agentes"}
+                      <div className="flex items-center gap-3 p-3">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">{cat.name}</div>
+                          <div className="text-xs text-[var(--text-muted)]">
+                            {catAgents.length} {catAgents.length === 1 ? "agente" : "agentes"}
+                          </div>
                         </div>
+                        <button
+                          onClick={() => {
+                            setSelectedCategory(cat);
+                            setName(cat.name);
+                            setMode("edit");
+                          }}
+                          className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer px-2 py-1 rounded-lg hover:bg-[var(--bg-tertiary)] transition-all"
+                        >
+                          Editar
+                        </button>
                       </div>
-                      <button
-                        onClick={() => {
-                          setSelectedCategory(cat);
-                          setName(cat.name);
-                          setMode("edit");
-                        }}
-                        className="text-xs text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-pointer px-2 py-1 rounded-lg hover:bg-[var(--bg-tertiary)] transition-all"
-                      >
-                        Editar
-                      </button>
+
+                      {/* Lista de agentes expandida */}
+                      {catAgents.length > 0 && (
+                        <div className="border-t border-[var(--border)] px-3 py-2 space-y-1">
+                          {catAgents.map((agent) => (
+                            <div
+                              key={agent.id}
+                              className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-[var(--bg-tertiary)] transition-all group"
+                            >
+                              <span className="text-sm">{agent.icon || "⚡"}</span>
+                              <span className="flex-1 text-xs font-medium">{agent.agent_name || agent.name}</span>
+                              <span className="text-[10px] text-[var(--text-muted)]">{agent.name}</span>
+                              {agent.sub_links && agent.sub_links.length > 0 && (
+                                <span className="text-[10px] bg-[var(--accent-soft)] text-[var(--accent)] px-1.5 py-0.5 rounded">
+                                  {agent.sub_links.length} funções
+                                </span>
+                              )}
+                              <button
+                                onClick={() => openEditAgent(agent)}
+                                className="text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] cursor-pointer opacity-0 group-hover:opacity-100 transition-all"
+                              >
+                                ✏️
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -293,17 +377,29 @@ export default function CategoryModal({
                   Agentes neste setor ({agentsInSelected.length})
                 </label>
                 {agentsInSelected.length > 0 ? (
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {agentsInSelected.map((agent) => (
                       <div
                         key={agent.id}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm"
+                        className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-sm group"
                       >
                         <span>{agent.icon || "⚡"}</span>
-                        <span className="flex-1">{agent.agent_name || agent.name}</span>
-                        <span className="text-xs text-[var(--text-muted)]">{agent.name}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-xs truncate">{agent.agent_name || agent.name}</div>
+                          <div className="text-[10px] text-[var(--text-muted)] truncate">
+                            {agent.name}
+                            {agent.description ? ` · ${agent.description}` : ""}
+                            {agent.sub_links && agent.sub_links.length > 0 ? ` · ${agent.sub_links.length} funções` : ""}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => openEditAgent(agent)}
+                          className="text-xs text-[var(--accent)] hover:underline cursor-pointer px-2 py-1 rounded hover:bg-[var(--bg-tertiary)]"
+                        >
+                          Editar
+                        </button>
                         <select
-                          className="text-xs bg-[var(--bg-tertiary)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-secondary)] cursor-pointer"
+                          className="text-[10px] bg-[var(--bg-tertiary)] border border-[var(--border)] rounded px-1 py-0.5 text-[var(--text-secondary)] cursor-pointer"
                           value=""
                           onChange={(e) => {
                             if (e.target.value) handleMoveAgent(agent.id, e.target.value);
@@ -364,6 +460,146 @@ export default function CategoryModal({
                   className="px-4 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all bg-[var(--danger)]/10 text-[var(--danger)] hover:bg-[var(--danger)]/20 border border-[var(--danger)]/20 disabled:opacity-50"
                 >
                   Excluir Setor
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ===== EDITAR AGENTE ===== */}
+          {mode === "editAgent" && editingAgent && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
+                <span className="text-2xl">{editingAgent.icon || "⚡"}</span>
+                <div>
+                  <div className="font-medium">{editingAgent.agent_name || editingAgent.name}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{editingAgent.category}</div>
+                </div>
+              </div>
+
+              {/* Nome do agente */}
+              <div>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
+                  Nome do agente <span className="text-[var(--text-muted)]">(acima da cabeça)</span>
+                </label>
+                <input
+                  type="text"
+                  value={agentName}
+                  onChange={(e) => setAgentName(e.target.value)}
+                  className="input-modern"
+                  placeholder="Ex: Ana, Jarvis..."
+                />
+              </div>
+
+              {/* IA/Ferramenta */}
+              <div>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
+                  IA / Ferramenta <span className="text-[var(--text-muted)]">(plaquinha da mesa)</span>
+                </label>
+                <input
+                  type="text"
+                  value={agentTool}
+                  onChange={(e) => setAgentTool(e.target.value)}
+                  className="input-modern"
+                  placeholder="Ex: ChatGPT, Claude..."
+                />
+              </div>
+
+              {/* Função/Descrição */}
+              <div>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
+                  Função <span className="text-[var(--text-muted)]">(descrição curta)</span>
+                </label>
+                <input
+                  type="text"
+                  value={agentDesc}
+                  onChange={(e) => setAgentDesc(e.target.value)}
+                  className="input-modern"
+                  placeholder="Ex: Chat, Imagem, RH..."
+                />
+              </div>
+
+              {/* Link principal */}
+              <div>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Link principal</label>
+                <input
+                  type="url"
+                  value={agentLink}
+                  onChange={(e) => setAgentLink(e.target.value)}
+                  className="input-modern"
+                  placeholder="https://..."
+                />
+              </div>
+
+              {/* Sub-links (funções extras) */}
+              <div>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
+                  Funções extras <span className="text-[var(--text-muted)]">(botões abaixo da mesa)</span>
+                </label>
+                <p className="text-[10px] text-[var(--text-muted)] mb-2">
+                  Cada função vira um botão clicável no escritório. Ex: Ana com 3 GPTs diferentes.
+                </p>
+                {agentSubLinks.map((sl, idx) => (
+                  <div key={idx} className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={sl.label}
+                      onChange={(e) => {
+                        const updated = [...agentSubLinks];
+                        updated[idx] = { ...updated[idx], label: e.target.value };
+                        setAgentSubLinks(updated);
+                      }}
+                      className="input-modern flex-1"
+                      placeholder="Nome"
+                    />
+                    <input
+                      type="url"
+                      value={sl.url}
+                      onChange={(e) => {
+                        const updated = [...agentSubLinks];
+                        updated[idx] = { ...updated[idx], url: e.target.value };
+                        setAgentSubLinks(updated);
+                      }}
+                      className="input-modern flex-[2]"
+                      placeholder="https://..."
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAgentSubLinks(agentSubLinks.filter((_, i) => i !== idx))}
+                      className="text-red-400 hover:text-red-300 px-2 cursor-pointer"
+                    >✕</button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setAgentSubLinks([...agentSubLinks, { label: "", url: "" }])}
+                  className="text-xs text-[var(--accent)] hover:underline cursor-pointer"
+                >
+                  + Adicionar função extra
+                </button>
+              </div>
+
+              {/* Ações */}
+              <div className="flex gap-3 pt-2 border-t border-[var(--border)]">
+                <button
+                  type="button"
+                  onClick={() => { setMode("edit"); setEditingAgent(null); }}
+                  className="btn-secondary flex-1"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={handleDeleteAgent}
+                  disabled={saving}
+                  className="px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-all bg-[var(--danger)]/10 text-[var(--danger)] hover:bg-[var(--danger)]/20 border border-[var(--danger)]/20 disabled:opacity-50"
+                >
+                  Excluir
+                </button>
+                <button
+                  onClick={handleSaveAgent}
+                  disabled={saving || !agentTool}
+                  className="btn-primary flex-1 disabled:opacity-50"
+                >
+                  {saving ? "Salvando..." : "Salvar Agente"}
                 </button>
               </div>
             </div>
