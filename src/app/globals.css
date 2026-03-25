@@ -9,16 +9,16 @@
   /* Cores modernas (interface principal) */
   --bg-primary: #0c0c14;
   --bg-secondary: #14141f;
-  --bg-tertiary: #1c1c2e;
-  --bg-card: #1e1e32;
-  --accent: #7c5cfc;
-  --accent-hover: #6a4ae0;
-  --accent-soft: rgba(124, 92, 252, 0.12);
+  --bg-tertiary: #141c2e;
+  --bg-card: #162032;
+  --accent: #2e86de;
+  --accent-hover: #2475c7;
+  --accent-soft: rgba(46, 134, 222, 0.12);
   --text-primary: #f0f0f5;
   --text-secondary: #8888a0;
-  --text-muted: #555570;
-  --border: #2a2a40;
-  --border-light: #353555;
+  --text-muted: #4a5570;
+  --border: #1e2a40;
+  --border-light: #253555;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
@@ -165,7 +165,7 @@ body {
   box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
 }
 .room-card-header {
-  background: #2a2a6a;
+  background: #1a3a6a;
   color: #fff;
   font-size: 10px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -189,7 +189,7 @@ body {
   padding: 2px 6px;
   font-size: 10px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
-  color: #1a1a3a;
+  color: #1a2a3a;
   display: flex;
   align-items: center;
   gap: 3px;

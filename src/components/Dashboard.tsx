@@ -308,7 +308,7 @@ export default function Dashboard({ session }: DashboardProps) {
             <div className="win-titlebar">
               <div className="flex items-center gap-2">
                 <span className="text-sm">🏢</span>
-                <span>Jarbas — {selectedRoom ? selectedRoom : selectedContext} v1.0</span>
+                <span>Jarbas v1.0</span>
               </div>
               <div className="flex gap-0.5">
                 <button className="win-button" style={{ padding: "0 4px", minHeight: 14, fontSize: 9, color: "#000" }}>_</button>
@@ -352,7 +352,7 @@ export default function Dashboard({ session }: DashboardProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="absolute top-1.5 left-4 px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                  style={{ background: "#2a2a5a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
+                  style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
                   title="Abrir Jarbas no Telegram"
                 >
                   JARBAS
@@ -467,6 +467,8 @@ export default function Dashboard({ session }: DashboardProps) {
         <AgentModal
           agent={editingAgent}
           categories={availableCategories}
+          allCategories={categories}
+          defaultContext={selectedContext}
           onSave={handleSave}
           onClose={() => {
             setShowModal(false);

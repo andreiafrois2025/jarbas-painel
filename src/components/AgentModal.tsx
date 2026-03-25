@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Agent, DEFAULT_CATEGORIES } from "@/lib/types";
+import { useState, useEffect, useMemo } from "react";
+import { Agent, Category, CONTEXTS, DEFAULT_CATEGORIES } from "@/lib/types";
 
 // =============================================
 // Modal de criação/edição de agente
-// Design moderno — campos: nome, IA, função, gênero, link, categoria
+// Primeiro seleciona a aba, depois o setor
 // =============================================
 
 interface AgentModalProps {
   agent?: Agent | null;
   categories?: string[];
+  allCategories?: Category[];
+  defaultContext?: string;
   onSave: (data: {
     agent_name: string;
     name: string;
@@ -26,19 +28,36 @@ interface AgentModalProps {
 
 const ICONS = ["🤖", "🧠", "💎", "🎨", "🖼️", "🔍", "👨‍💻", "⚡", "📝", "🎬", "🎵", "📊"];
 
-export default function AgentModal({ agent, categories, onSave, onClose }: AgentModalProps) {
+export default function AgentModal({ agent, categories, allCategories, defaultContext, onSave, onClose }: AgentModalProps) {
   const [agentName, setAgentName] = useState("");
   const [aiTool, setAiTool] = useState("");
   const [link, setLink] = useState("");
-  const [category, setCategory] = useState(DEFAULT_CATEGORIES[0].name);
+  const [selectedContext, setSelectedContext] = useState(defaultContext || "IGAM");
+  const [category, setCategory] = useState("");
   const [type, setType] = useState<"manual" | "automatic">("manual");
   const [icon, setIcon] = useState("⚡");
   const [description, setDescription] = useState("");
   const [gender, setGender] = useState<"male" | "female">("male");
-  const [isNewCategory, setIsNewCategory] = useState(false);
-  const [newCategoryInput, setNewCategoryInput] = useState("");
 
-  const categoryList = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES.map((c) => c.name);
+  // Setores filtrados pela aba selecionada
+  const filteredSectors = useMemo(() => {
+    if (allCategories && allCategories.length > 0) {
+      return allCategories
+        .filter((c) => (c.context || "IGAM") === selectedContext)
+        .map((c) => c.name);
+    }
+    // Fallback para lista simples
+    return categories && categories.length > 0
+      ? categories
+      : DEFAULT_CATEGORIES.filter((c) => c.context === selectedContext).map((c) => c.name);
+  }, [allCategories, categories, selectedContext]);
+
+  // Quando muda o contexto, selecionar o primeiro setor disponível
+  useEffect(() => {
+    if (!agent && filteredSectors.length > 0) {
+      setCategory(filteredSectors[0]);
+    }
+  }, [selectedContext, filteredSectors, agent]);
 
   useEffect(() => {
     if (agent) {
@@ -50,12 +69,17 @@ export default function AgentModal({ agent, categories, onSave, onClose }: Agent
       setIcon(agent.icon || "⚡");
       setDescription(agent.description || "");
       setGender(agent.gender || "male");
+      // Detectar o contexto do agente
+      if (allCategories) {
+        const cat = allCategories.find((c) => c.name === agent.category);
+        if (cat) setSelectedContext(cat.context || "IGAM");
+      }
     }
-  }, [agent]);
+  }, [agent, allCategories]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiTool || !link) return;
+    if (!aiTool || !link || !category) return;
     onSave({
       agent_name: agentName,
       name: aiTool,
@@ -144,7 +168,7 @@ export default function AgentModal({ agent, categories, onSave, onClose }: Agent
             </div>
           </div>
 
-          {/* Nome do agente (aparece acima da cabeça) */}
+          {/* Nome do agente */}
           <div>
             <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
               Nome do agente <span className="text-[var(--text-muted)]">(aparece acima da cabeça)</span>
@@ -158,10 +182,10 @@ export default function AgentModal({ agent, categories, onSave, onClose }: Agent
             />
           </div>
 
-          {/* IA / Ferramenta (aparece na mesa) */}
+          {/* IA / Ferramenta */}
           <div>
             <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
-              IA / Ferramenta * <span className="text-[var(--text-muted)]">(plaquinha da mesa, linha 1)</span>
+              IA / Ferramenta * <span className="text-[var(--text-muted)]">(plaquinha da mesa)</span>
             </label>
             <input
               type="text"
@@ -173,10 +197,10 @@ export default function AgentModal({ agent, categories, onSave, onClose }: Agent
             />
           </div>
 
-          {/* Função (aparece na mesa, linha 2) */}
+          {/* Função */}
           <div>
             <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
-              Função <span className="text-[var(--text-muted)]">(plaquinha da mesa, linha 2)</span>
+              Função <span className="text-[var(--text-muted)]">(descrição curta)</span>
             </label>
             <input
               type="text"
@@ -200,67 +224,47 @@ export default function AgentModal({ agent, categories, onSave, onClose }: Agent
             />
           </div>
 
-          {/* Categoria + Tipo */}
+          {/* === ABA (Contexto) === */}
+          <div>
+            <label className="block text-sm text-[var(--text-secondary)] mb-2">Aba *</label>
+            <div className="flex gap-1.5">
+              {CONTEXTS.map((ctx) => (
+                <button
+                  key={ctx}
+                  type="button"
+                  onClick={() => setSelectedContext(ctx)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                    selectedContext === ctx
+                      ? "bg-[var(--accent)] text-white"
+                      : "bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-light)]"
+                  }`}
+                >
+                  {ctx}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* === SETOR (filtrado pela aba) === */}
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Setor / Aba</label>
-              {isNewCategory ? (
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={newCategoryInput}
-                    onChange={(e) => setNewCategoryInput(e.target.value)}
-                    className="input-modern flex-1"
-                    placeholder="Nome do novo setor..."
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (newCategoryInput.trim()) {
-                          setCategory(newCategoryInput.trim());
-                          setIsNewCategory(false);
-                        }
-                      }
-                      if (e.key === "Escape") {
-                        setIsNewCategory(false);
-                        setNewCategoryInput("");
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (newCategoryInput.trim()) {
-                        setCategory(newCategoryInput.trim());
-                        setIsNewCategory(false);
-                      }
-                    }}
-                    className="text-[var(--success)] text-sm cursor-pointer px-2"
-                  >✓</button>
-                  <button
-                    type="button"
-                    onClick={() => { setIsNewCategory(false); setNewCategoryInput(""); }}
-                    className="text-[var(--text-muted)] text-sm cursor-pointer px-1"
-                  >✕</button>
-                </div>
-              ) : (
+              <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
+                Setor em {selectedContext} *
+              </label>
+              {filteredSectors.length > 0 ? (
                 <select
                   value={category}
-                  onChange={(e) => {
-                    if (e.target.value === "__new__") {
-                      setIsNewCategory(true);
-                      setNewCategoryInput("");
-                    } else {
-                      setCategory(e.target.value);
-                    }
-                  }}
+                  onChange={(e) => setCategory(e.target.value)}
                   className="input-modern cursor-pointer"
                 >
-                  {categoryList.map((c) => (
+                  {filteredSectors.map((c) => (
                     <option key={c} value={c}>{c}</option>
                   ))}
-                  <option value="__new__">+ Novo setor...</option>
                 </select>
+              ) : (
+                <p className="text-xs text-[var(--text-muted)] py-3 text-center bg-[var(--bg-primary)] rounded-lg border border-[var(--border)]">
+                  Nenhum setor em {selectedContext}. Crie um setor primeiro.
+                </p>
               )}
             </div>
             <div className="flex-1">
@@ -297,7 +301,11 @@ export default function AgentModal({ agent, categories, onSave, onClose }: Agent
             <button type="button" onClick={onClose} className="btn-secondary flex-1">
               Cancelar
             </button>
-            <button type="submit" className="btn-primary flex-1">
+            <button
+              type="submit"
+              className="btn-primary flex-1"
+              disabled={!aiTool || !link || !category}
+            >
               {agent ? "Salvar" : "Contratar"}
             </button>
           </div>

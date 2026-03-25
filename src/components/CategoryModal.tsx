@@ -6,8 +6,7 @@ import { CONTEXTS } from "@/lib/types";
 
 // =============================================
 // Modal de gerenciamento de Setores/Categorias
-// Criar, renomear, excluir setores
-// Mover agentes entre setores
+// Filtro por aba (contexto) + criar, renomear, excluir
 // =============================================
 
 interface CategoryModalProps {
@@ -36,6 +35,7 @@ export default function CategoryModal({
   const [mode, setMode] = useState<"list" | "create" | "edit">(editCategory ? "edit" : "list");
   const [name, setName] = useState(editCategory?.name || "");
   const [newContext, setNewContext] = useState(defaultContext);
+  const [filterContext, setFilterContext] = useState(defaultContext);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(editCategory || null);
   const [saving, setSaving] = useState(false);
 
@@ -44,8 +44,14 @@ export default function CategoryModal({
       setMode("edit");
       setName(editCategory.name);
       setSelectedCategory(editCategory);
+      setFilterContext(editCategory.context || defaultContext);
     }
-  }, [editCategory]);
+  }, [editCategory, defaultContext]);
+
+  // Filtrar categorias pela aba selecionada
+  const filteredCategories = useMemo(() => {
+    return categories.filter((c) => (c.context || "IGAM") === filterContext);
+  }, [categories, filterContext]);
 
   const agentsInSelected = useMemo(() => {
     if (!selectedCategory) return [];
@@ -132,13 +138,35 @@ export default function CategoryModal({
           {/* ===== LISTA DE SETORES ===== */}
           {mode === "list" && (
             <div className="space-y-3">
-              <p className="text-sm text-[var(--text-secondary)] mb-3">
-                Gerencie as salas do escritório por contexto.
+              <p className="text-sm text-[var(--text-secondary)] mb-2">
+                Selecione a aba para ver os setores.
               </p>
 
-              {/* Setores existentes */}
+              {/* Filtro por aba */}
+              <div className="flex gap-1.5 mb-3">
+                {CONTEXTS.map((ctx) => {
+                  const count = categories.filter((c) => (c.context || "IGAM") === ctx).length;
+                  return (
+                    <button
+                      key={ctx}
+                      type="button"
+                      onClick={() => setFilterContext(ctx)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                        filterContext === ctx
+                          ? "bg-[var(--accent)] text-white"
+                          : "bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--border-light)]"
+                      }`}
+                    >
+                      {ctx}
+                      <span className="ml-1 opacity-60">({count})</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Setores da aba selecionada */}
               <div className="space-y-2">
-                {categories.map((cat) => {
+                {filteredCategories.map((cat) => {
                   const count = agents.filter((a) => a.category === cat.name).length;
                   return (
                     <div
@@ -148,7 +176,7 @@ export default function CategoryModal({
                       <div className="flex-1">
                         <div className="text-sm font-medium">{cat.name}</div>
                         <div className="text-xs text-[var(--text-muted)]">
-                          {cat.context || "IGAM"} · {count} {count === 1 ? "agente" : "agentes"}
+                          {count} {count === 1 ? "agente" : "agentes"}
                         </div>
                       </div>
                       <button
@@ -166,16 +194,18 @@ export default function CategoryModal({
                 })}
               </div>
 
-              {categories.length === 0 && (
-                <p className="text-center text-sm text-[var(--text-muted)] py-6">Nenhum setor criado</p>
+              {filteredCategories.length === 0 && (
+                <p className="text-center text-sm text-[var(--text-muted)] py-6">
+                  Nenhum setor em {filterContext}
+                </p>
               )}
 
               {/* Botão criar novo */}
               <button
-                onClick={() => { setMode("create"); setName(""); }}
+                onClick={() => { setMode("create"); setName(""); setNewContext(filterContext); }}
                 className="btn-primary w-full mt-2"
               >
-                + Criar Novo Setor
+                + Criar Setor em {filterContext}
               </button>
             </div>
           )}
@@ -184,7 +214,7 @@ export default function CategoryModal({
           {mode === "create" && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Contexto</label>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Aba</label>
                 <select
                   value={newContext}
                   onChange={(e) => setNewContext(e.target.value)}
@@ -208,7 +238,7 @@ export default function CategoryModal({
                 />
               </div>
               <p className="text-xs text-[var(--text-muted)]">
-                A sala aparecerá no escritório do contexto selecionado.
+                A sala aparecerá no escritório da aba <strong>{newContext}</strong>.
               </p>
               <div className="flex gap-3 pt-1">
                 <button
@@ -252,6 +282,9 @@ export default function CategoryModal({
                     </button>
                   )}
                 </div>
+                <div className="text-xs text-[var(--text-muted)] mt-1">
+                  Aba: <strong>{selectedCategory.context || "IGAM"}</strong>
+                </div>
               </div>
 
               {/* Agentes neste setor */}
@@ -269,7 +302,6 @@ export default function CategoryModal({
                         <span>{agent.icon || "⚡"}</span>
                         <span className="flex-1">{agent.agent_name || agent.name}</span>
                         <span className="text-xs text-[var(--text-muted)]">{agent.name}</span>
-                        {/* Mover para outro setor */}
                         <select
                           className="text-xs bg-[var(--bg-tertiary)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[var(--text-secondary)] cursor-pointer"
                           value=""
@@ -281,7 +313,7 @@ export default function CategoryModal({
                           {categories
                             .filter((c) => c.id !== selectedCategory.id)
                             .map((c) => (
-                              <option key={c.id} value={c.name}>{c.name}</option>
+                              <option key={c.id} value={c.name}>{c.context} › {c.name}</option>
                             ))}
                         </select>
                       </div>
