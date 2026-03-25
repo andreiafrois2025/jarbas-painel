@@ -235,7 +235,10 @@ function IsometricDesk({
   const displayName = agent.agent_name || agent.name;
   const activity = char.activity;
 
+  // Se tem descrição, o link principal vai no botão da descrição, não no bonequinho
+  const hasButtons = !!(agent.description || (agent.sub_links && agent.sub_links.length > 0));
   const handleClick = async () => {
+    if (hasButtons) return; // Usa os botões, não o clique no bonequinho
     await recordExecution(agent.id).catch(() => {});
     window.open(agent.link, "_blank");
   };
@@ -544,13 +547,16 @@ function IsometricDesk({
         )}
       </g>
 
+      {/* === INVISIBLE HITBOX — expands hover area so buttons don't disappear === */}
+      <rect x={x - 50} y={y - 55} width="100" height="140" fill="transparent" />
+
       {/* === AGENT NAME — always visible above head === */}
       <text x={x} y={y - 38} textAnchor="middle" fill="#000" fontSize="9" fontWeight="bold" fontFamily="'Segoe UI', Tahoma, sans-serif"
         stroke="#fff" strokeWidth="2" paintOrder="stroke">
         {displayName}
       </text>
 
-      {/* Edit/Delete buttons on hover — larger */}
+      {/* Edit/Delete buttons on hover — next to name */}
       <g className="agent-tooltip">
         <g onClick={(e) => { e.stopPropagation(); onEdit(agent); }} style={{ cursor: "pointer" }}>
           <rect x={x + 28} y={y - 48} width="20" height="20" rx="4" fill="#2563eb" />
@@ -568,35 +574,38 @@ function IsometricDesk({
         {agent.name.length > 10 ? agent.name.slice(0, 9) + "…" : agent.name}
       </text>
 
-      {/* === FUNCTION/DESCRIPTION — always visible below desk === */}
-      {agent.description && (
-        <text x={x} y={y + 60} textAnchor="middle" fill="#000" fontSize="7" fontFamily="'Segoe UI', Tahoma, sans-serif"
-          stroke="#fff" strokeWidth="1.5" paintOrder="stroke">
-          {agent.description.length > 25 ? agent.description.slice(0, 24) + "…" : agent.description}
-        </text>
-      )}
+      {/* === ALL FUNCTIONS AS BUTTONS below desk === */}
+      {(() => {
+        // Build list of all buttons: main description + sub_links
+        const buttons: { label: string; url: string }[] = [];
+        if (agent.description) {
+          buttons.push({ label: agent.description, url: agent.link });
+        }
+        if (agent.sub_links) {
+          agent.sub_links.forEach(sl => { if (sl.label && sl.url) buttons.push(sl); });
+        }
+        // If no description and no sub_links, show link as single button
+        if (buttons.length === 0 && agent.link) {
+          buttons.push({ label: agent.name, url: agent.link });
+        }
 
-      {/* === SUB-LINKS — clickable buttons below description === */}
-      {agent.sub_links && agent.sub_links.length > 0 && (
-        <g>
-          {agent.sub_links.map((sl, si) => {
-            const btnW = Math.min(sl.label.length * 5 + 10, 50);
-            const totalW = agent.sub_links!.reduce((sum, s) => sum + Math.min(s.label.length * 5 + 10, 50) + 3, -3);
-            let btnX = x - totalW / 2;
-            for (let j = 0; j < si; j++) {
-              btnX += Math.min(agent.sub_links![j].label.length * 5 + 10, 50) + 3;
-            }
-            return (
-              <g key={si} onClick={(e) => { e.stopPropagation(); window.open(sl.url, "_blank"); recordExecution(agent.id); }} style={{ cursor: "pointer" }}>
-                <rect x={btnX} y={y + 66} width={btnW} height="12" rx="3" fill="#2563eb" />
-                <text x={btnX + btnW / 2} y={y + 74} textAnchor="middle" fill="#fff" fontSize="5.5" fontFamily="'Segoe UI',Tahoma,sans-serif">
-                  {sl.label}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-      )}
+        const btnH = 13;
+        const gap = 2;
+        return buttons.map((btn, bi) => {
+          const label = btn.label.length > 22 ? btn.label.slice(0, 21) + "…" : btn.label;
+          const btnW = Math.max(label.length * 4.5 + 12, 40);
+          const btnX = x - btnW / 2;
+          const btnY = y + 56 + bi * (btnH + gap);
+          return (
+            <g key={bi} onClick={(e) => { e.stopPropagation(); window.open(btn.url, "_blank"); recordExecution(agent.id); }} style={{ cursor: "pointer" }}>
+              <rect x={btnX} y={btnY} width={btnW} height={btnH} rx="3" fill="#2563eb" />
+              <text x={x} y={btnY + 9.5} textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" fontFamily="'Segoe UI',Tahoma,sans-serif">
+                {label}
+              </text>
+            </g>
+          );
+        });
+      })()}
     </g>
   );
 }
