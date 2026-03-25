@@ -464,21 +464,7 @@ function drawStation(
   if (h%4===0) drawPapers(x+dW-7, dY-6);
   if (h%5===0) drawPenHolder(x+dW-5, dY-3);
 
-  // === AGENT NAME above head (always visible) ===
-  const agentDisplayName = agent.agent_name || agent.name;
-  const nameCX = (x+dW/2)*PX;
-  const nameCY = (headY-10)*PX;
-  C.font=`bold ${PX*5}px sans-serif`;
-  C.textAlign="center"; C.textBaseline="middle";
-  // Shadow for readability
-  C.fillStyle="#000";
-  C.fillText(agentDisplayName, nameCX+1, nameCY+1);
-  C.fillText(agentDisplayName, nameCX-1, nameCY+1);
-  // Main text
-  C.fillStyle="#FFF";
-  C.fillText(agentDisplayName, nameCX, nameCY);
-
-  // === Nameplate on desk (tool name) ===
+  // === Nameplate on desk (tool name) — kept on canvas ===
   const toolName = agent.name;
   const maxChars = 12;
   const dispTool = toolName.length>maxChars ? toolName.slice(0,maxChars-1)+"…" : toolName;
@@ -489,39 +475,6 @@ function drawStation(
   C.font=`bold ${PX*2.2}px "Courier New",monospace`;
   C.textAlign="center"; C.textBaseline="middle";
   C.fillText(dispTool, (x+dW/2)*PX, (dY+4)*PX);
-
-  // === Function/description below desk ===
-  const descText = agent.description || "";
-  if (descText) {
-    C.font=`${PX*4}px sans-serif`;
-    C.textAlign="center"; C.textBaseline="top";
-    const desc = descText;
-    // Word wrap if needed
-    const maxLineW = dW * PX * 1.1;
-    const words = desc.split(" ");
-    const lines: string[] = [];
-    let currentLine = "";
-    for (const w of words) {
-      const test = currentLine ? currentLine + " " + w : w;
-      if (C.measureText(test).width > maxLineW && currentLine) {
-        lines.push(currentLine);
-        currentLine = w;
-      } else {
-        currentLine = test;
-      }
-    }
-    if (currentLine) lines.push(currentLine);
-    for (let li = 0; li < Math.min(lines.length, 2); li++) {
-      const lx = (x+dW/2)*PX;
-      const ly = (dY+9 + li*4)*PX;
-      // Shadow
-      C.fillStyle="#000";
-      C.fillText(lines[li], lx+1, ly+1);
-      // Main
-      C.fillStyle="#FFF";
-      C.fillText(lines[li], lx, ly);
-    }
-  }
 
   // Status dot (green = active)
   p(x+dW-2, dY-13, 2, 2, "#44CC44");
@@ -539,7 +492,6 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
   const [hovered, setHovered] = useState<string|null>(null);
-  const [tip, setTip] = useState<{x:number;y:number;agent:Agent}|null>(null);
 
   const cols = Math.min(agents.length, 5);
   const rows = Math.ceil(agents.length / 5) || 1;
@@ -640,25 +592,27 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
     }
     if (foundAgent) {
       setHovered(foundAgent.id);
-      setTip({x:e.clientX-r.left, y:e.clientY-r.top-44, agent:foundAgent});
-    } else { setHovered(null); setTip(null); }
+    } else { setHovered(null); }
   }, [agents, positions]);
 
+  // Click no canvas — abre link do agente hovered (se não tem sub_links)
   const onClick = useCallback(() => {
-    if (tip?.agent) {
-      // Se tem sub_links, não abre link principal no clique (usa os botões)
-      const hasSubLinks = tip.agent.sub_links && tip.agent.sub_links.length > 0;
-      if (!hasSubLinks && tip.agent.link) {
-        window.open(tip.agent.link,"_blank");
-        recordExecution(tip.agent.id);
-      }
+    if (!hovered) return;
+    const agent = agents.find(a => a.id === hovered);
+    if (!agent) return;
+    const hasSubLinks = agent.sub_links && agent.sub_links.length > 0;
+    if (!hasSubLinks && agent.link) {
+      window.open(agent.link, "_blank");
+      recordExecution(agent.id);
     }
-  }, [tip]);
+  }, [hovered, agents]);
 
   const onCtx = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    if (tip?.agent) onEdit(tip.agent);
-  }, [tip, onEdit]);
+    if (!hovered) return;
+    const agent = agents.find(a => a.id === hovered);
+    if (agent) onEdit(agent);
+  }, [hovered, agents, onEdit]);
 
   if (agents.length===0) {
     return (
@@ -668,14 +622,18 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
     );
   }
 
+  // Calcular posições em % para os overlays HTML
+  const canvasW = cW * PX;
+  const canvasH = cH * PX;
+
   return (
     <div className="relative" style={{imageRendering:"pixelated"}}>
       <canvas
         ref={canvasRef}
-        width={cW*PX}
-        height={cH*PX}
+        width={canvasW}
+        height={canvasH}
         onMouseMove={onMove}
-        onMouseLeave={() => {setHovered(null);setTip(null);}}
+        onMouseLeave={() => setHovered(null)}
         onClick={onClick}
         onContextMenu={onCtx}
         style={{
@@ -685,24 +643,111 @@ export default function PixiOffice({ agents, onEdit, onDelete }: PixiOfficeProps
           borderRadius:4,
         }}
       />
-      {tip && (
-        <div
-          className="absolute bg-gray-900/95 text-white text-xs rounded-lg shadow-xl border border-yellow-500/80 z-50 flex items-center gap-1 px-2 py-1.5"
-          style={{left:Math.min(tip.x - 40, (canvasRef.current?.getBoundingClientRect().width||300)-180),top:tip.y}}
-        >
-          <span className="font-bold mr-1">{tip.agent.agent_name || tip.agent.name}</span>
-          <button
-            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white rounded-lg cursor-pointer text-base transition-all hover:scale-110"
-            title="Editar"
-            onClick={(e) => { e.stopPropagation(); onEdit(tip.agent); }}
-          >✏️</button>
-          <button
-            className="w-8 h-8 flex items-center justify-center bg-red-600 hover:bg-red-500 text-white rounded-lg cursor-pointer text-base transition-all hover:scale-110"
-            title="Excluir"
-            onClick={(e) => { e.stopPropagation(); if (confirm(`Excluir ${tip.agent.agent_name || tip.agent.name}?`)) onDelete(tip.agent.id); }}
-          >🗑️</button>
-        </div>
-      )}
+
+      {/* === HTML OVERLAYS: nome acima da cabeça + função abaixo da mesa === */}
+      {agents.map((agent, i) => {
+        const pos = positions[i];
+        if (!pos) return null;
+        const dW = 40;
+        const dY = pos.y + 14;
+        const headY = pos.y - 2;
+
+        // Converter coordenadas do canvas para % do container
+        const centerX = ((pos.x + dW / 2) * PX / canvasW) * 100;
+        const nameY = ((headY - 8) * PX / canvasH) * 100;
+        const descY = ((dY + 8) * PX / canvasH) * 100;
+        const subLinksY = ((dY + 14) * PX / canvasH) * 100;
+
+        const agentDisplayName = agent.agent_name || agent.name;
+        const isHovered = hovered === agent.id;
+        const hasSubLinks = agent.sub_links && agent.sub_links.length > 0;
+
+        return (
+          <div key={agent.id}>
+            {/* Nome acima da cabeça — sempre visível */}
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                left: `${centerX}%`,
+                top: `${nameY}%`,
+                transform: "translateX(-50%)",
+              }}
+            >
+              <span className="text-[11px] md:text-sm font-bold text-white whitespace-nowrap"
+                style={{textShadow:"1px 1px 2px #000, -1px 1px 2px #000, 0 0 4px #000"}}>
+                {agentDisplayName}
+              </span>
+            </div>
+
+            {/* Função/descrição abaixo da mesa */}
+            {agent.description && (
+              <div
+                className="absolute pointer-events-none"
+                style={{
+                  left: `${centerX}%`,
+                  top: `${descY}%`,
+                  transform: "translateX(-50%)",
+                  maxWidth: `${(dW * PX / canvasW) * 120}%`,
+                }}
+              >
+                <span className="text-[9px] md:text-[11px] text-white whitespace-normal text-center block leading-tight"
+                  style={{textShadow:"1px 1px 2px #000, -1px 1px 2px #000, 0 0 3px #000"}}>
+                  {agent.description}
+                </span>
+              </div>
+            )}
+
+            {/* Sub-links — botões clicáveis abaixo da função */}
+            {hasSubLinks && (
+              <div
+                className="absolute flex gap-0.5 flex-wrap justify-center"
+                style={{
+                  left: `${centerX}%`,
+                  top: `${subLinksY}%`,
+                  transform: "translateX(-50%)",
+                  maxWidth: `${(dW * PX / canvasW) * 150}%`,
+                }}
+              >
+                {agent.sub_links!.map((sl, si) => (
+                  <button
+                    key={si}
+                    onClick={(e) => { e.stopPropagation(); window.open(sl.url, "_blank"); recordExecution(agent.id); }}
+                    className="text-[8px] md:text-[10px] bg-blue-700/90 hover:bg-blue-500 text-white px-1.5 py-0.5 rounded cursor-pointer transition-all whitespace-nowrap"
+                    style={{textShadow:"1px 1px 1px #000"}}
+                  >
+                    {sl.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Hover: botões Editar/Excluir */}
+            {isHovered && (
+              <div
+                className="absolute flex items-center gap-1 z-50"
+                style={{
+                  left: `${centerX}%`,
+                  top: `${nameY - 5}%`,
+                  transform: "translateX(-50%)",
+                }}
+              >
+                <button
+                  className="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white rounded-lg cursor-pointer text-sm md:text-base transition-all hover:scale-110 shadow-lg"
+                  title="Editar"
+                  onClick={(e) => { e.stopPropagation(); onEdit(agent); }}
+                >✏️</button>
+                <button
+                  className="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center bg-red-600 hover:bg-red-500 text-white rounded-lg cursor-pointer text-sm md:text-base transition-all hover:scale-110 shadow-lg"
+                  title="Excluir"
+                  onClick={(e) => { e.stopPropagation(); if (confirm(`Excluir ${agentDisplayName}?`)) onDelete(agent.id); }}
+                >🗑️</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Tooltip antigo removido — agora os botões ficam diretamente sobre o agente */}
     </div>
   );
 }
