@@ -207,10 +207,10 @@ export default function Dashboard({ session }: DashboardProps) {
   }
 
   return (
-    <div className="h-screen flex bg-[var(--bg-primary)]">
-      {/* ===== SIDEBAR MODERNA ===== */}
-      <aside className="w-16 bg-[var(--bg-secondary)] border-r border-[var(--border)] flex flex-col items-center py-4 gap-2 shrink-0">
-        <div className="text-2xl mb-4 cursor-default" title="Jarbas">⚡</div>
+    <div className="h-screen flex flex-col md:flex-row bg-[var(--bg-primary)]">
+      {/* ===== SIDEBAR (desktop) / BOTTOM BAR (mobile) ===== */}
+      <aside className="order-2 md:order-none w-full md:w-16 bg-[var(--bg-secondary)] border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-2 shrink-0">
+        <div className="hidden md:block text-2xl mb-4 cursor-default" title="Jarbas">⚡</div>
 
         <button
           onClick={() => setCurrentPage("office")}
@@ -240,7 +240,7 @@ export default function Dashboard({ session }: DashboardProps) {
           title="Métricas"
         >📊</button>
 
-        <div className="flex-1" />
+        <div className="hidden md:block flex-1" />
 
         <button
           onClick={handleLogout}
@@ -250,7 +250,7 @@ export default function Dashboard({ session }: DashboardProps) {
       </aside>
 
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden order-1 md:order-none min-h-0">
         {currentPage === "flows" ? (
           <FlowsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics")} />
         ) : currentPage === "metrics" ? (
@@ -258,10 +258,10 @@ export default function Dashboard({ session }: DashboardProps) {
         ) : (
         <>
         {/* Header */}
-        <header className="h-14 bg-[var(--bg-secondary)] border-b border-[var(--border)] flex items-center px-5 gap-4 shrink-0">
-          <h1 className="text-lg font-semibold">Escritório</h1>
+        <header className="bg-[var(--bg-secondary)] border-b border-[var(--border)] flex flex-wrap items-center px-3 md:px-5 gap-2 md:gap-4 shrink-0 py-2 md:py-0 md:h-14">
+          <h1 className="text-base md:text-lg font-semibold">Escritório</h1>
 
-          <div className="flex gap-4 ml-4 text-sm">
+          <div className="hidden md:flex gap-4 ml-4 text-sm">
             <span className="text-[var(--text-secondary)]">
               <span className="text-[var(--text-primary)] font-medium">{agents.length}</span> agentes
             </span>
@@ -275,40 +275,40 @@ export default function Dashboard({ session }: DashboardProps) {
 
           <div className="flex-1" />
 
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm">🔍</span>
+          <div className="relative hidden lg:block">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">🔍</span>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar agente..."
-              className="input-modern pl-9 !w-52 !py-2 text-sm"
+              className="input-modern !pl-10 !w-52 !py-2 text-sm"
             />
           </div>
 
           {/* Botão Gerenciar Setores */}
           <button
             onClick={() => { setEditingCategoryObj(null); setShowCategoryModal(true); }}
-            className="btn-secondary !py-2 !px-4 text-sm"
+            className="btn-secondary !py-2 !px-3 md:!px-4 text-xs md:text-sm"
           >
-            ⚙️ Setores
+            ⚙️ <span className="hidden sm:inline">Setores</span>
           </button>
 
           <button
             onClick={() => { setEditingAgent(null); setShowModal(true); }}
-            className="btn-primary !py-2 !px-4 text-sm"
+            className="btn-primary !py-2 !px-3 md:!px-4 text-xs md:text-sm"
           >
-            + Novo Agente
+            + <span className="hidden sm:inline">Novo </span>Agente
           </button>
         </header>
 
         {/* ===== JANELA WIN98 DO ESCRITÓRIO ===== */}
-        <div className="flex-1 p-4 overflow-hidden">
+        <div className="flex-1 p-2 md:p-4 overflow-hidden">
           <div className="win-border-outset flex flex-col h-full" style={{ background: "var(--win-surface)" }}>
             <div className="win-titlebar">
               <div className="flex items-center gap-2">
                 <span className="text-sm">🏢</span>
-                <span>Jarbas v1.0</span>
+                <span className="text-xs md:text-sm">Jarbas v1.0</span>
               </div>
               <div className="flex gap-0.5">
                 <button className="win-button" style={{ padding: "0 4px", minHeight: 14, fontSize: 9, color: "#000" }}>_</button>
@@ -317,7 +317,7 @@ export default function Dashboard({ session }: DashboardProps) {
               </div>
             </div>
 
-            <div className="win-menubar">
+            <div className="win-menubar win-menubar-responsive">
               <button>Arquivo</button>
               <button>Editar</button>
               <button>Exibir</button>
@@ -326,7 +326,7 @@ export default function Dashboard({ session }: DashboardProps) {
             </div>
 
             {/* Context tabs */}
-            <div style={{ background: "var(--win-surface)", padding: "4px 8px 0", borderBottom: "2px solid var(--win-border-dark)", display: "flex", gap: 2 }}>
+            <div style={{ background: "var(--win-surface)", padding: "4px 4px 0", borderBottom: "2px solid var(--win-border-dark)", display: "flex", gap: 2, overflowX: "auto" }}>
               {CONTEXTS.map((ctx) => (
                 <button
                   key={ctx}
@@ -338,7 +338,7 @@ export default function Dashboard({ session }: DashboardProps) {
               ))}
             </div>
 
-            <div className="flex-1 overflow-auto office-floor p-4">
+            <div className="flex-1 overflow-auto office-floor p-2 md:p-4">
               {/* Parede do escritório */}
               <div
                 className="w-full h-10 mb-3 relative"
@@ -377,7 +377,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
               {/* ===== VISTA DE SALAS ===== */}
               {!selectedRoom && (
-                <div className="flex flex-wrap gap-4 justify-start py-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4 py-2">
                   {roomsInContext.length > 0 ? roomsInContext.map((cat) => {
                     const roomAgents = agents.filter((a) => a.category === cat.name);
                     const preview = roomAgents.slice(0, 6);
@@ -386,7 +386,6 @@ export default function Dashboard({ session }: DashboardProps) {
                       <div
                         key={cat.id}
                         className="room-card"
-                        style={{ width: 200 }}
                         onClick={() => setSelectedRoom(cat.name)}
                         title={`Abrir ${cat.name}`}
                       >
@@ -440,19 +439,19 @@ export default function Dashboard({ session }: DashboardProps) {
               )}
             </div>
 
-            <div className="win-statusbar">
+            <div className="win-statusbar text-[8px] md:text-xs">
               <div className="win-statusbar-section flex-1">
                 {selectedRoom
                   ? `${agentsInRoom.length} agente(s) em ${selectedRoom}`
-                  : `${agents.length} Funcionários Ativos`}
+                  : `${agents.length} Funcionários`}
+              </div>
+              <div className="win-statusbar-section hidden sm:block">
+                Exec: {todayCount}
               </div>
               <div className="win-statusbar-section">
-                Execuções hoje: {todayCount}
+                {timeStr}
               </div>
-              <div className="win-statusbar-section">
-                Horário: {timeStr}
-              </div>
-              <div className="win-statusbar-section">
+              <div className="win-statusbar-section hidden sm:block">
                 {capitalizedWeekday}
               </div>
             </div>
