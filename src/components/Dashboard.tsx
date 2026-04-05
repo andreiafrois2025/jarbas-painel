@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { Agent, CONTEXTS, Collaborator, Assignment, QuickLink, DeskOccupant, occupantToAgent } from "@/lib/types";
 import {
   getAgents,
-  addAgent,
   updateAgent,
   deleteAgent,
   getExecutions,
@@ -18,7 +17,6 @@ import {
   getCollaborators,
   addCollaborator,
   updateCollaborator,
-  deleteCollaborator,
   getAssignments,
   addAssignment,
   updateAssignment,
@@ -26,14 +24,12 @@ import {
   buildOccupants,
   getQuickLinks,
   addQuickLink,
-  updateQuickLink,
-  deleteQuickLink,
   migrateFromAgents,
 } from "@/lib/storage";
 import type { Execution, Category as CategoryType } from "@/lib/types";
 import OfficeScene from "./OfficeScene";
 import ContratarModal from "./ContratarModal";
-import CategoryModal from "./CategoryModal";
+import HRPage from "./HRPage";
 import FlowsPage from "./FlowsPage";
 import MetricsPage from "./MetricsPage";
 import type { Session } from "@supabase/supabase-js";
@@ -43,7 +39,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ session }: DashboardProps) {
-  // Estado legado (mantido para CategoryModal durante transição)
+  // Estado legado (mantido para retrocompatibilidade)
   const [agents, setAgents] = useState<Agent[]>([]);
   const [categories, setCategories] = useState<CategoryType[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
@@ -65,16 +61,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [editingCategoryObj, setEditingCategoryObj] = useState<CategoryType | null>(null);
-  const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics">("office");
-
-  // Quick-link edit
-  const [showQLForm, setShowQLForm] = useState(false);
-  const [qlLabel, setQlLabel] = useState("");
-  const [qlUrl, setQlUrl] = useState("");
-  const [qlIcon, setQlIcon] = useState("🔗");
-  const [editingQL, setEditingQL] = useState<QuickLink | null>(null);
+  const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics" | "hr">("office");
 
   const loadData = useCallback(async () => {
     try {
@@ -100,6 +87,13 @@ export default function Dashboard({ session }: DashboardProps) {
       setAssignments(assignData);
       setQuickLinks(qlData);
       setOccupants(buildOccupants(assignData));
+
+      // Auto-migrar JARBAS para quick_links se não existir
+      if (qlData.length === 0 || !qlData.some(ql => ql.label === "JARBAS")) {
+        await addQuickLink({ label: "JARBAS", url: "https://t.me/jarbas_af_bot", icon: "⚡", order: 0 });
+        const updatedQL = await getQuickLinks();
+        setQuickLinks(updatedQL);
+      }
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
     } finally {
@@ -113,20 +107,37 @@ export default function Dashboard({ session }: DashboardProps) {
     return () => clearInterval(timer);
   }, [loadData]);
 
-  // Salas do contexto selecionado
+  // Usar novo modelo
+  const useNewModel = occupants.length > 0 || collaborators.length > 0;
+
+  // Salas do contexto selecionado (com busca global)
   const roomsInContext = useMemo(() => {
     const seen = new Set<string>();
-    return categories.filter((c) => {
+    let rooms = categories.filter((c) => {
       const ctx = c.context || "IGAM";
       if (ctx !== selectedContext) return false;
       if (seen.has(c.name)) return false;
       seen.add(c.name);
       return true;
     });
-  }, [categories, selectedContext]);
 
-  // Usar novo modelo: ocupantes na sala (por category_id)
-  const useNewModel = occupants.length > 0 || collaborators.length > 0;
+    // Busca global: filtrar salas que contêm colaboradores que casam
+    if (search && !selectedRoom) {
+      const q = search.toLowerCase();
+      rooms = rooms.filter(room => {
+        if (room.name.toLowerCase().includes(q)) return true;
+        return occupants.some(o =>
+          o.assignment.category_id === room.id && (
+            o.collaborator.name.toLowerCase().includes(q) ||
+            o.assignment.tool_name.toLowerCase().includes(q) ||
+            o.assignment.description?.toLowerCase().includes(q)
+          )
+        );
+      });
+    }
+
+    return rooms;
+  }, [categories, selectedContext, search, selectedRoom, occupants]);
 
   // Ocupantes na sala expandida
   const occupantsInRoom = useMemo(() => {
@@ -143,7 +154,7 @@ export default function Dashboard({ session }: DashboardProps) {
     return result;
   }, [occupants, selectedRoomId, search]);
 
-  // Fallback: agentes antigos na sala (para retrocompatibilidade)
+  // Fallback: agentes antigos
   const agentsInRoom = useMemo(() => {
     if (!selectedRoom || useNewModel) return [];
     let result = agents.filter(a => a.category === selectedRoom);
@@ -154,7 +165,7 @@ export default function Dashboard({ session }: DashboardProps) {
     return result;
   }, [agents, selectedRoom, search, useNewModel]);
 
-  // Converter ocupantes para Agents (adapter para OfficeScene)
+  // Converter para Agents (adapter para OfficeScene)
   const agentsForScene = useMemo(() => {
     if (useNewModel) return occupantsInRoom.map(o => occupantToAgent(o));
     return agentsInRoom;
@@ -179,7 +190,7 @@ export default function Dashboard({ session }: DashboardProps) {
       .map(a => ({ id: a.id, icon: a.icon || "⚡", name: a.agent_name || a.name }));
   }, [useNewModel, occupants, agents]);
 
-  // Handlers para editar/excluir no OfficeScene (converte de Agent para Assignment)
+  // Handlers para editar/excluir no OfficeScene
   const handleEdit = (agent: Agent) => {
     if (useNewModel) {
       const asgn = assignments.find(a => a.id === agent.id);
@@ -212,62 +223,6 @@ export default function Dashboard({ session }: DashboardProps) {
     window.location.reload();
   };
 
-  // ---- Category handlers ----
-  const handleAddCategory = async (name: string, context?: string) => {
-    await addCategory(name, context || selectedContext);
-    await loadData();
-  };
-
-  const handleRenameCategory = async (id: string, newName: string, oldName: string) => {
-    await updateCategory(id, newName);
-    // Atualizar agentes legados
-    const agentsToUpdate = agents.filter(a => a.category === oldName);
-    await Promise.all(agentsToUpdate.map(a => updateAgent(a.id, { category: newName })));
-    if (selectedRoom === oldName) setSelectedRoom(newName);
-    await loadData();
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    const cat = categories.find(c => c.id === id);
-    if (!cat) return;
-    // Mover agentes legados
-    const agentsInCat = agents.filter(a => a.category === cat.name);
-    if (agentsInCat.length > 0) {
-      const fallback = categories.find(c => c.id !== id)?.name || "Geotecnologias";
-      await Promise.all(agentsInCat.map(a => updateAgent(a.id, { category: fallback })));
-    }
-    // Assignments serão deletados em cascata
-    await deleteCategory(id);
-    if (selectedRoom === cat.name) { setSelectedRoom(null); setSelectedRoomId(null); }
-    await loadData();
-  };
-
-  const handleMoveAgent = async (agentId: string, newCategory: string) => {
-    await updateAgent(agentId, { category: newCategory });
-    await loadData();
-  };
-
-  // ---- Quick-link handlers ----
-  const handleSaveQL = async () => {
-    if (!qlLabel || !qlUrl) return;
-    if (editingQL) {
-      await updateQuickLink(editingQL.id, { label: qlLabel, url: qlUrl, icon: qlIcon });
-    } else {
-      await addQuickLink({ label: qlLabel, url: qlUrl, icon: qlIcon, order: quickLinks.length });
-    }
-    setShowQLForm(false);
-    setQlLabel("");
-    setQlUrl("");
-    setQlIcon("🔗");
-    setEditingQL(null);
-    await loadData();
-  };
-
-  const handleDeleteQL = async (id: string) => {
-    await deleteQuickLink(id);
-    await loadData();
-  };
-
   const timeStr = currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const weekday = currentTime.toLocaleDateString("pt-BR", { weekday: "long" });
   const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
@@ -290,6 +245,7 @@ export default function Dashboard({ session }: DashboardProps) {
       <aside className="order-2 md:order-none w-full md:w-16 bg-[var(--bg-secondary)] border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-2 shrink-0">
         <div className="hidden md:block text-2xl mb-4 cursor-default" title="Jarbas">⚡</div>
         <button onClick={() => setCurrentPage("office")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "office" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Escritório">🏢</button>
+        <button onClick={() => setCurrentPage("hr")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "hr" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Gestão de RH">👥</button>
         <button onClick={() => setCurrentPage("flows")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "flows" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Fluxos">🔄</button>
         <button onClick={() => setCurrentPage("metrics")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "metrics" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Métricas">📊</button>
         <div className="hidden md:block flex-1" />
@@ -298,10 +254,12 @@ export default function Dashboard({ session }: DashboardProps) {
 
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
       <main className="flex-1 flex flex-col overflow-hidden order-1 md:order-none min-h-0">
-        {currentPage === "flows" ? (
-          <FlowsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics")} />
+        {currentPage === "hr" ? (
+          <HRPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr")} onDataChanged={loadData} />
+        ) : currentPage === "flows" ? (
+          <FlowsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr")} />
         ) : currentPage === "metrics" ? (
-          <MetricsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics")} />
+          <MetricsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr")} />
         ) : (
         <>
         {/* Header */}
@@ -323,8 +281,8 @@ export default function Dashboard({ session }: DashboardProps) {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">🔍</span>
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar colaborador..." className="input-modern !pl-10 !w-52 !py-2 text-sm" />
           </div>
-          <button onClick={() => { setEditingCategoryObj(null); setShowCategoryModal(true); }} className="btn-secondary !py-2 !px-3 md:!px-4 text-xs md:text-sm">
-            ⚙️ <span className="hidden sm:inline">Setores e Agentes</span>
+          <button onClick={() => setCurrentPage("hr")} className="btn-secondary !py-2 !px-3 md:!px-4 text-xs md:text-sm">
+            👥 <span className="hidden sm:inline">Gestão de RH</span>
           </button>
           <button onClick={() => { setEditingAssignment(null); setEditingCollaborator(null); setShowContratarModal(true); }} className="btn-primary !py-2 !px-3 md:!px-4 text-xs md:text-sm">
             + <span className="hidden sm:inline">Contratar </span>Colaborador
@@ -367,7 +325,7 @@ export default function Dashboard({ session }: DashboardProps) {
             </div>
 
             <div className="flex-1 overflow-auto office-floor p-2 md:p-4">
-              {/* Parede do escritório com Quick-links */}
+              {/* Parede do escritório com Quick-links UNIFICADOS */}
               <div className="w-full h-10 mb-3 relative" style={{ background: "linear-gradient(180deg, #E8E2DA 0%, #DDD6CC 60%, #D5CEC4 100%)", borderBottom: "2px solid #B0A898" }}>
                 {selectedRoom ? (
                   <>
@@ -376,45 +334,33 @@ export default function Dashboard({ session }: DashboardProps) {
                       style={{ background: "#EDE8E1", border: "1px solid #B0A898", fontSize: 9, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}>
                       ← Voltar
                     </button>
-                    <div className="absolute top-1.5 right-4 flex gap-1 items-center">
+                    <div className="absolute top-1.5 right-4 flex gap-2 items-center">
                       {quickLinks.map(ql => (
                         <a key={ql.id} href={ql.url} target="_blank" rel="noopener noreferrer"
-                          className="px-2 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                          style={{ background: "#A0583C", border: "1px solid #C4A460", fontSize: 8, fontFamily: "'Segoe UI', Tahoma" }}
+                          className="px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
+                          style={{ background: "#2D6B6B", border: "2px solid #C4A460", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
                           title={ql.label}>
                           {ql.icon} {ql.label}
                         </a>
                       ))}
-                      <a href="https://t.me/jarbas_af_bot" target="_blank" rel="noopener noreferrer"
-                        className="px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                        style={{ background: "#2D6B6B", border: "2px solid #C4A460", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
-                        title="Abrir Jarbas no Telegram">
-                        JARBAS
-                      </a>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="absolute top-1.5 left-4 flex gap-1 items-center">
-                      <a href="https://t.me/jarbas_af_bot" target="_blank" rel="noopener noreferrer"
-                        className="px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                        style={{ background: "#2D6B6B", border: "2px solid #C4A460", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
-                        title="Abrir Jarbas no Telegram">
-                        JARBAS
-                      </a>
+                    <div className="absolute top-1.5 left-4 flex gap-2 items-center">
                       {quickLinks.map(ql => (
                         <a key={ql.id} href={ql.url} target="_blank" rel="noopener noreferrer"
-                          className="px-2 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                          style={{ background: "#A0583C", border: "1px solid #C4A460", fontSize: 8, fontFamily: "'Segoe UI', Tahoma" }}
+                          className="px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
+                          style={{ background: "#2D6B6B", border: "2px solid #C4A460", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
                           title={ql.label}>
                           {ql.icon} {ql.label}
                         </a>
                       ))}
-                      <button onClick={() => { setEditingQL(null); setQlLabel(""); setQlUrl(""); setQlIcon("🔗"); setShowQLForm(true); }}
-                        className="px-1.5 py-0.5 cursor-pointer hover:brightness-90 transition-all"
-                        style={{ background: "#EDE8E1", border: "1px solid #B0A898", fontSize: 8, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}
-                        title="Adicionar atalho">
-                        +
+                      <button onClick={() => setCurrentPage("hr")}
+                        className="px-2 py-0.5 cursor-pointer hover:brightness-90 transition-all"
+                        style={{ background: "#EDE8E1", border: "1px solid #B0A898", fontSize: 9, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}
+                        title="Gerenciar atalhos no RH">
+                        + ✏️
                       </button>
                     </div>
                     <div className="absolute top-1 right-4" style={{ width: 45, height: 30, background: "#1F4F4F", border: "2px solid #C4A460" }}>
@@ -457,8 +403,8 @@ export default function Dashboard({ session }: DashboardProps) {
                   }) : (
                     <div className="text-center py-16 w-full" style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
                       <p className="text-2xl mb-2">🏢</p>
-                      <p className="text-sm">Nenhuma sala em {selectedContext}</p>
-                      <p className="text-xs mt-1">Clique em ⚙️ Setores e Agentes para criar uma</p>
+                      <p className="text-sm">{search ? "Nenhuma sala encontrada" : `Nenhuma sala em ${selectedContext}`}</p>
+                      <p className="text-xs mt-1">Clique em 👥 Gestão de RH para criar setores</p>
                     </div>
                   )}
                 </div>
@@ -530,84 +476,6 @@ export default function Dashboard({ session }: DashboardProps) {
             setEditingCollaborator(null);
           }}
         />
-      )}
-
-      {/* ===== MODAL CATEGORIAS ===== */}
-      {showCategoryModal && (
-        <CategoryModal
-          categories={categories}
-          agents={agents}
-          editCategory={editingCategoryObj}
-          defaultContext={selectedContext}
-          onAddCategory={handleAddCategory}
-          onRenameCategory={handleRenameCategory}
-          onDeleteCategory={handleDeleteCategory}
-          onMoveAgent={handleMoveAgent}
-          onEditAgent={async (agent, updates) => {
-            await updateAgent(agent.id, updates);
-            await loadData();
-          }}
-          onDeleteAgent={async (id) => {
-            await deleteAgent(id);
-            await loadData();
-          }}
-          onClose={() => {
-            setShowCategoryModal(false);
-            setEditingCategoryObj(null);
-          }}
-        />
-      )}
-
-      {/* ===== MODAL QUICK-LINK ===== */}
-      {showQLForm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowQLForm(false)}>
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl w-full max-w-xs p-5 space-y-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold">{editingQL ? "Editar Atalho" : "Novo Atalho"}</h3>
-            <div>
-              <label className="block text-sm text-[var(--text-secondary)] mb-1">Ícone</label>
-              <div className="flex gap-1 flex-wrap">
-                {["🔗","📓","📅","📌","💡","🎯","📊","🔔","💬","🌐"].map(i => (
-                  <button key={i} type="button" onClick={() => setQlIcon(i)}
-                    className={`text-lg w-8 h-8 rounded cursor-pointer ${qlIcon === i ? "bg-[var(--accent-soft)] border border-[var(--accent)]" : "bg-[var(--bg-primary)] border border-[var(--border)]"}`}>
-                    {i}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--text-secondary)] mb-1">Nome</label>
-              <input type="text" value={qlLabel} onChange={e => setQlLabel(e.target.value)} className="input-modern" placeholder="Ex: 2° Cérebro" />
-            </div>
-            <div>
-              <label className="block text-sm text-[var(--text-secondary)] mb-1">URL</label>
-              <input type="url" value={qlUrl} onChange={e => setQlUrl(e.target.value)} className="input-modern" placeholder="https://..." />
-            </div>
-            <div className="flex gap-2">
-              {editingQL && (
-                <button type="button" onClick={async () => { await handleDeleteQL(editingQL.id); setShowQLForm(false); setEditingQL(null); }}
-                  className="btn-secondary !text-red-400 flex-1">Excluir</button>
-              )}
-              <button type="button" onClick={() => setShowQLForm(false)} className="btn-secondary flex-1">Cancelar</button>
-              <button type="button" onClick={handleSaveQL} disabled={!qlLabel || !qlUrl} className="btn-primary flex-1">Salvar</button>
-            </div>
-
-            {/* Lista de quick-links existentes para editar */}
-            {quickLinks.length > 0 && !editingQL && (
-              <div className="border-t border-[var(--border)] pt-3 mt-3">
-                <label className="block text-xs text-[var(--text-muted)] mb-2">Atalhos existentes (clique para editar)</label>
-                {quickLinks.map(ql => (
-                  <button key={ql.id} type="button"
-                    onClick={() => { setEditingQL(ql); setQlLabel(ql.label); setQlUrl(ql.url); setQlIcon(ql.icon); }}
-                    className="w-full text-left text-sm p-2 rounded hover:bg-[var(--bg-tertiary)] cursor-pointer flex items-center gap-2">
-                    <span>{ql.icon}</span>
-                    <span className="flex-1">{ql.label}</span>
-                    <span className="text-xs text-[var(--text-muted)] truncate max-w-[120px]">{ql.url}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
       )}
     </div>
   );
