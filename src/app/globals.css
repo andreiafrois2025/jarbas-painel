@@ -6,32 +6,40 @@
    ============================================= */
 
 :root {
-  /* Cores modernas (interface principal) */
-  --bg-primary: #0c0c14;
-  --bg-secondary: #14141f;
-  --bg-tertiary: #141c2e;
-  --bg-card: #162032;
-  --accent: #2e86de;
-  --accent-hover: #2475c7;
-  --accent-soft: rgba(46, 134, 222, 0.12);
-  --text-primary: #f0f0f5;
-  --text-secondary: #8888a0;
-  --text-muted: #4a5570;
-  --border: #1e2a40;
-  --border-light: #253555;
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f87171;
+  /* Cores modernas — Identidade Visual AF (Andréia Frois) */
+  --bg-primary: #F5F0EA;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #EDE8E1;
+  --bg-card: #FFFFFF;
+  --accent: #2D6B6B;
+  --accent-hover: #1F4F4F;
+  --accent-soft: rgba(45, 107, 107, 0.10);
+  --text-primary: #2D3B3B;
+  --text-secondary: #5A6B6B;
+  --text-muted: #9BB8BE;
+  --border: #D8D0C8;
+  --border-light: #C4BDB5;
+  --success: #2D6B6B;
+  --warning: #C4A460;
+  --danger: #A0583C;
+
+  /* Cores de marca AF */
+  --af-teal: #2D6B6B;
+  --af-teal-dark: #1F4F4F;
+  --af-terracotta: #A0583C;
+  --af-gold: #C4A460;
+  --af-blue-gray: #9BB8BE;
+  --af-cream: #F5F0EA;
 
   /* Cores Win98 (área do escritório) */
   --win-bg: #008080;
-  --win-titlebar: #000080;
-  --win-surface: #c0c0c0;
-  --win-text: #000000;
+  --win-titlebar: #2D6B6B;
+  --win-surface: #E8E2DA;
+  --win-text: #2D3B3B;
   --win-white: #ffffff;
-  --win-border-light: #dfdfdf;
-  --win-border-dark: #404040;
-  --win-border-darkest: #000000;
+  --win-border-light: #F0EAE2;
+  --win-border-dark: #B0A898;
+  --win-border-darkest: #8A8078;
 }
 
 * {
@@ -41,10 +49,15 @@
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   margin: 0;
   padding: 0;
+  /* Fundo com padrão de circuito sutil (identidade AF) */
+  background-image:
+    radial-gradient(circle at 5% 15%, rgba(45,107,107,0.04) 0%, transparent 40%),
+    radial-gradient(circle at 95% 85%, rgba(160,88,60,0.04) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(196,164,96,0.02) 0%, transparent 60%);
 }
 
 /* Scrollbar moderna */
@@ -60,7 +73,7 @@ body {
 }
 
 .win-titlebar {
-  background: linear-gradient(90deg, var(--win-titlebar), #1084d0);
+  background: linear-gradient(90deg, var(--win-titlebar), #3A8585);
   color: #fff;
   padding: 3px 4px;
   font-weight: bold;
@@ -154,21 +167,24 @@ body {
 .room-card {
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
-  border: 2px solid;
-  border-color: var(--win-border-light) var(--win-border-darkest) var(--win-border-darkest) var(--win-border-light);
-  background: #d0d8e4;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #FFFFFF;
   position: relative;
   min-height: 140px;
   min-width: 180px;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 2px 8px rgba(45,59,59,0.08);
+  overflow: hidden;
 }
 .room-card:hover {
   transform: translateY(-3px);
-  box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+  box-shadow: 0 6px 20px rgba(45,107,107,0.15);
+  border-color: var(--af-teal);
 }
 .room-card-header {
-  background: #1a3a6a;
+  background: var(--af-teal);
   color: #fff;
   font-size: 10px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -186,13 +202,13 @@ body {
   align-content: flex-start;
 }
 .room-agent-chip {
-  background: #e8eaf0;
-  border: 1px solid #a0a8b0;
-  border-radius: 3px;
+  background: var(--af-cream);
+  border: 1px solid var(--border);
+  border-radius: 6px;
   padding: 2px 6px;
   font-size: 10px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
-  color: #1a2a3a;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 3px;
@@ -248,13 +264,14 @@ body {
   font-weight: 500;
   font-size: 14px;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  box-shadow: 0 2px 6px rgba(45,107,107,0.2);
 }
-.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:hover { background: var(--accent-hover); box-shadow: 0 4px 12px rgba(45,107,107,0.3); }
 .btn-primary:active { transform: scale(0.98); }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
   color: var(--text-secondary);
   border: 1px solid var(--border);
   padding: 10px 20px;
@@ -262,10 +279,12 @@ body {
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(45,59,59,0.06);
 }
 .btn-secondary:hover {
   color: var(--text-primary);
-  border-color: var(--border-light);
+  border-color: var(--af-teal);
+  box-shadow: 0 2px 6px rgba(45,107,107,0.1);
 }
 
 .input-modern {
@@ -276,10 +295,10 @@ body {
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
   width: 100%;
 }
-.input-modern:focus { border-color: var(--accent); }
+.input-modern:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,107,107,0.1); }
 .input-modern::placeholder { color: var(--text-muted); }
 
 /* ---- Office Scene (isometric view) ---- */

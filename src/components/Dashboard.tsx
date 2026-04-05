@@ -368,26 +368,26 @@ export default function Dashboard({ session }: DashboardProps) {
 
             <div className="flex-1 overflow-auto office-floor p-2 md:p-4">
               {/* Parede do escritório com Quick-links */}
-              <div className="w-full h-10 mb-3 relative" style={{ background: "linear-gradient(180deg, #b0b0b0 0%, #c0c0c0 60%, #cacaca 100%)", borderBottom: "3px solid #555" }}>
+              <div className="w-full h-10 mb-3 relative" style={{ background: "linear-gradient(180deg, #E8E2DA 0%, #DDD6CC 60%, #D5CEC4 100%)", borderBottom: "2px solid #B0A898" }}>
                 {selectedRoom ? (
                   <>
                     <button onClick={() => { setSelectedRoom(null); setSelectedRoomId(null); }}
                       className="absolute top-1.5 left-4 px-3 py-0.5 font-bold cursor-pointer hover:brightness-90 transition-all"
-                      style={{ background: "#c0c0c0", border: "1px solid #888", fontSize: 9, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}>
+                      style={{ background: "#EDE8E1", border: "1px solid #B0A898", fontSize: 9, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}>
                       ← Voltar
                     </button>
                     <div className="absolute top-1.5 right-4 flex gap-1 items-center">
                       {quickLinks.map(ql => (
                         <a key={ql.id} href={ql.url} target="_blank" rel="noopener noreferrer"
                           className="px-2 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                          style={{ background: "#2c4a2c", border: "1px solid #4a7a4a", fontSize: 8, fontFamily: "'Segoe UI', Tahoma" }}
+                          style={{ background: "#A0583C", border: "1px solid #C4A460", fontSize: 8, fontFamily: "'Segoe UI', Tahoma" }}
                           title={ql.label}>
                           {ql.icon} {ql.label}
                         </a>
                       ))}
                       <a href="https://t.me/jarbas_af_bot" target="_blank" rel="noopener noreferrer"
                         className="px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                        style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
+                        style={{ background: "#2D6B6B", border: "2px solid #C4A460", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
                         title="Abrir Jarbas no Telegram">
                         JARBAS
                       </a>
@@ -398,26 +398,26 @@ export default function Dashboard({ session }: DashboardProps) {
                     <div className="absolute top-1.5 left-4 flex gap-1 items-center">
                       <a href="https://t.me/jarbas_af_bot" target="_blank" rel="noopener noreferrer"
                         className="px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                        style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
+                        style={{ background: "#2D6B6B", border: "2px solid #C4A460", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
                         title="Abrir Jarbas no Telegram">
                         JARBAS
                       </a>
                       {quickLinks.map(ql => (
                         <a key={ql.id} href={ql.url} target="_blank" rel="noopener noreferrer"
                           className="px-2 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                          style={{ background: "#2c4a2c", border: "1px solid #4a7a4a", fontSize: 8, fontFamily: "'Segoe UI', Tahoma" }}
+                          style={{ background: "#A0583C", border: "1px solid #C4A460", fontSize: 8, fontFamily: "'Segoe UI', Tahoma" }}
                           title={ql.label}>
                           {ql.icon} {ql.label}
                         </a>
                       ))}
                       <button onClick={() => { setEditingQL(null); setQlLabel(""); setQlUrl(""); setQlIcon("🔗"); setShowQLForm(true); }}
                         className="px-1.5 py-0.5 cursor-pointer hover:brightness-90 transition-all"
-                        style={{ background: "#c0c0c0", border: "1px solid #888", fontSize: 8, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}
+                        style={{ background: "#EDE8E1", border: "1px solid #B0A898", fontSize: 8, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}
                         title="Adicionar atalho">
                         +
                       </button>
                     </div>
-                    <div className="absolute top-1 right-4" style={{ width: 45, height: 30, background: "#1a3a1a", border: "2px solid #8B7355" }}>
+                    <div className="absolute top-1 right-4" style={{ width: 45, height: 30, background: "#1F4F4F", border: "2px solid #C4A460" }}>
                       <svg viewBox="0 0 45 35" width="45" height="30">
                         <text x="4" y="8" fill="#FFD700" fontSize="4.5" fontWeight="bold">SUCCESS</text>
                         <polyline points="5,30 12,24 22,26 32,15 40,8" fill="none" stroke="#33ff33" strokeWidth="2" />

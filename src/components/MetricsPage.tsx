@@ -302,10 +302,10 @@ export default function MetricsPage({ onNavigate }: FlowsPageProps) {
                       </div>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                         exec.status === "completed"
-                          ? "bg-green-500/10 text-green-400"
+                          ? "bg-[var(--success)]/10 text-[var(--success)]"
                           : exec.status === "failed"
-                          ? "bg-red-500/10 text-red-400"
-                          : "bg-yellow-500/10 text-yellow-400"
+                          ? "bg-[var(--danger)]/10 text-[var(--danger)]"
+                          : "bg-[var(--warning)]/10 text-[var(--warning)]"
                       }`}>
                         {exec.status === "completed" ? "Concluído" : exec.status === "failed" ? "Falhou" : "Em andamento"}
                       </span>

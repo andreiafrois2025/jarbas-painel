@@ -328,13 +328,13 @@ export default function FlowsPage({ onNavigate }: FlowsPageProps) {
                   key={i}
                   className={`rounded-xl border p-4 ${
                     r.status === "success"
-                      ? "border-green-500/30 bg-green-500/5"
-                      : "border-red-500/30 bg-red-500/5"
+                      ? "border-[var(--success)]/30 bg-[var(--success)]/5"
+                      : "border-[var(--danger)]/30 bg-[var(--danger)]/5"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <span className={`w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center ${
-                      r.status === "success" ? "bg-green-500" : "bg-red-500"
+                      r.status === "success" ? "bg-[var(--success)]" : "bg-[var(--danger)]"
                     }`}>
                       {r.step}
                     </span>
@@ -361,7 +361,7 @@ export default function FlowsPage({ onNavigate }: FlowsPageProps) {
                   )}
 
                   {r.error && (
-                    <p className="text-xs text-red-400 mt-1">Erro: {r.error}</p>
+                    <p className="text-xs text-[var(--danger)] mt-1">Erro: {r.error}</p>
                   )}
 
                   {r.screenshot && (
