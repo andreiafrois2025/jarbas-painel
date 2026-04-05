@@ -25,7 +25,11 @@ const SKIN_NAMES = ["Claro","Claro médio","Médio","Moreno","Moreno escuro","Ne
 const HAIR_COLORS = ["#2C1810","#1a1a2e","#5C3317","#8B6914","#A0522D","#4A2800","#6B2D5B","#D4A03C","#C0392B","#E08040"];
 const HAIR_NAMES = ["Preto","Preto azulado","Castanho escuro","Castanho claro","Marrom","Marrom escuro","Roxo","Loiro","Ruivo","Ruivo claro"];
 const SHIRT_COLORS = ["#E74C3C","#4A90D9","#2ECC71","#9B59B6","#F39C12","#1ABC9C","#E67E22","#5DADE2","#FF6B9D","#48C9B0"];
-const ICONS = ["🤖","🧠","💎","🎨","🖼️","🔍","👨‍💻","⚡","📝","🎬","🎵","📊"];
+const ICONS = [
+  "🤖","🧠","💎","🎨","🖼️","🔍","👨‍💻","⚡","📝","🎬","🎵","📊",
+  "🍳","🥗","🏋️","🌍","💰","✈️","📚","💼","🎓","❤️","🧘","🛠️",
+  "📐","🔬","⚖️","🎯","💬","📣","🏠","🌱","🎤","📱","🖥️","🔒",
+];
 
 export default function ContratarModal({
   collaborators,

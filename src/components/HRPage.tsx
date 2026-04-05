@@ -18,8 +18,16 @@ const SKIN_NAMES = ["Claro","Claro médio","Médio","Moreno","Moreno escuro","Ne
 const HAIR_COLORS = ["#2C1810","#1a1a2e","#5C3317","#8B6914","#A0522D","#4A2800","#6B2D5B","#D4A03C","#C0392B","#E08040"];
 const HAIR_NAMES = ["Preto","Preto azulado","Castanho escuro","Castanho claro","Marrom","Marrom escuro","Roxo","Loiro","Ruivo","Ruivo claro"];
 const SHIRT_COLORS = ["#E74C3C","#4A90D9","#2ECC71","#9B59B6","#F39C12","#1ABC9C","#E67E22","#5DADE2","#FF6B9D","#48C9B0"];
-const ICONS = ["🤖","🧠","💎","🎨","🖼️","🔍","👨‍💻","⚡","📝","🎬","🎵","📊"];
-const QL_ICONS = ["⚡","🔗","📓","📅","📌","💡","🎯","📊","🔔","💬","🌐","🏠","💰","🎓","✈️","❤️","🧘","🛠️"];
+const ICONS = [
+  "🤖","🧠","💎","🎨","🖼️","🔍","👨‍💻","⚡","📝","🎬","🎵","📊",
+  "🍳","🥗","🏋️","🌍","💰","✈️","📚","💼","🎓","❤️","🧘","🛠️",
+  "📐","🔬","⚖️","🎯","💬","📣","🏠","🌱","🎤","📱","🖥️","🔒",
+];
+const QL_ICONS = [
+  "⚡","🔗","📓","📅","📌","💡","🎯","📊","🔔","💬","🌐","🏠",
+  "💰","🎓","✈️","❤️","🧘","🛠️","📚","🍳","🏋️","🌍","💼","📣",
+  "🎬","🎵","📱","🖥️","🌱","⚖️","🔬","📐","🔒","🎤","📝","🎨",
+];
 
 interface HRPageProps {
   onNavigate: (page: string) => void;
@@ -342,6 +350,39 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     setQlUrl(ql.url);
     setQlIcon(ql.icon);
     setShowNewQL(true);
+  };
+
+  // Reordenar quick-links (mover ↑ ou ↓)
+  const handleMoveQL = async (id: string, direction: "up" | "down") => {
+    const idx = quickLinks.findIndex(ql => ql.id === id);
+    if (idx < 0) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= quickLinks.length) return;
+    setSaving(true);
+    try {
+      const current = quickLinks[idx];
+      const target = quickLinks[targetIdx];
+      await updateQuickLink(current.id, { order: target.order });
+      await updateQuickLink(target.id, { order: current.order });
+      await reload();
+    } finally { setSaving(false); }
+  };
+
+  // Reordenar setores (mover ↑ ou ↓)
+  const handleMoveSector = async (catId: string, direction: "up" | "down") => {
+    const list = sectorsForTab;
+    const idx = list.findIndex(c => c.id === catId);
+    if (idx < 0) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    setSaving(true);
+    try {
+      const current = list[idx];
+      const target = list[targetIdx];
+      await updateCategory(current.id, { order: current.order !== target.order ? target.order : targetIdx });
+      await updateCategory(target.id, { order: target.order !== current.order ? current.order : idx });
+      await reload();
+    } finally { setSaving(false); }
   };
 
   // ---- Render ----
@@ -691,6 +732,10 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                         <>
                           <span className="text-sm font-bold">{cat.name}</span>
                           <div className="flex gap-1">
+                            <button onClick={() => handleMoveSector(cat.id, "up")}
+                              className="text-white/70 hover:text-white cursor-pointer text-xs px-1" title="Mover para cima">▲</button>
+                            <button onClick={() => handleMoveSector(cat.id, "down")}
+                              className="text-white/70 hover:text-white cursor-pointer text-xs px-1" title="Mover para baixo">▼</button>
                             <button onClick={() => { setEditingSector(cat); setSectorName(cat.name); }}
                               className="text-white/70 hover:text-white cursor-pointer text-xs px-1">✏️</button>
                             <button onClick={() => handleDeleteSector(cat)}
@@ -779,6 +824,13 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                       <div className="text-sm font-medium">{ql.label}</div>
                       <a href={ql.url} target="_blank" rel="noopener noreferrer"
                         className="text-xs text-[var(--accent)] hover:underline truncate block">{ql.url}</a>
+                    </div>
+                    {/* Botões mover ↑↓ */}
+                    <div className="flex flex-col gap-0.5">
+                      <button onClick={() => handleMoveQL(ql.id, "up")} disabled={idx === 0 || saving}
+                        className="w-6 h-6 rounded flex items-center justify-center text-[10px] cursor-pointer hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-20 disabled:cursor-default transition-all">▲</button>
+                      <button onClick={() => handleMoveQL(ql.id, "down")} disabled={idx === quickLinks.length - 1 || saving}
+                        className="w-6 h-6 rounded flex items-center justify-center text-[10px] cursor-pointer hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-20 disabled:cursor-default transition-all">▼</button>
                     </div>
                     <span className="text-[10px] text-[var(--text-muted)]">#{idx + 1}</span>
                     <div className="flex gap-1">

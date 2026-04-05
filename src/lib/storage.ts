@@ -146,11 +146,12 @@ export async function addCategory(name: string, context: string = "IGAM"): Promi
   return data;
 }
 
-/** Renomear categoria */
-export async function updateCategory(id: string, name: string): Promise<void> {
+/** Atualizar categoria (nome e/ou ordem) */
+export async function updateCategory(id: string, updates: string | { name?: string; order?: number }): Promise<void> {
+  const data = typeof updates === "string" ? { name: updates } : updates;
   const { error } = await supabase
     .from("categories")
-    .update({ name })
+    .update(data)
     .eq("id", id);
   if (error) throw error;
 }
