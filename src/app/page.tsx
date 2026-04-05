@@ -90,9 +90,7 @@ export default function Home() {
 
           {/* Form card */}
           <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-6">
-            <h2 className="text-lg font-semibold mb-5">
-              {isSignUp ? "Criar conta" : "Entrar"}
-            </h2>
+            <h2 className="text-lg font-semibold mb-5">Entrar</h2>
 
             {error && (
               <div className="bg-[var(--danger)]/10 border border-[var(--danger)]/20 text-[var(--danger)] text-sm rounded-lg p-3 mb-4">
@@ -132,27 +130,11 @@ export default function Home() {
                 disabled={authLoading}
                 className="btn-primary w-full disabled:opacity-50"
               >
-                {authLoading
-                  ? "Carregando..."
-                  : isSignUp
-                  ? "Criar conta"
-                  : "Entrar"}
+                {authLoading ? "Carregando..." : "Entrar"}
               </button>
             </form>
 
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setError("");
-                }}
-                className="text-sm text-[var(--accent)] hover:underline cursor-pointer"
-              >
-                {isSignUp
-                  ? "Já tem conta? Entrar"
-                  : "Não tem conta? Criar uma"}
-              </button>
-            </div>
+            {/* Opção de criar conta removida para segurança */}
           </div>
         </div>
       </div>

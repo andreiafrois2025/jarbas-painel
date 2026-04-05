@@ -27,6 +27,14 @@ export interface Agent {
   description?: string;
   /** Gênero do bonequinho */
   gender?: "male" | "female";
+  /** Tom de pele (índice 0-5) */
+  skin_tone?: number;
+  /** Cor do cabelo (índice 0-9) */
+  hair_color?: number;
+  /** Cor da camisa (índice 0-9) */
+  shirt_color?: number;
+  /** Usa óculos */
+  has_glasses?: boolean;
   /** Links adicionais — cada botão abre um GPT/ferramenta diferente */
   sub_links?: SubLink[];
   user_id?: string;

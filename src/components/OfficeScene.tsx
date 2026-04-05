@@ -32,22 +32,23 @@ const DESK_POSITIONS = [
 
 type Activity = "typing" | "coffee" | "thinking" | "reading";
 
-function getCharStyle(name: string, gender: string) {
-  const hash = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const hairColors = ["#2C1810", "#1a1a2e", "#5C3317", "#8B6914", "#A0522D", "#4A2800", "#6B2D5B", "#D4A03C", "#C0392B", "#E08040"];
-  const shirtColors = ["#E74C3C", "#4A90D9", "#2ECC71", "#9B59B6", "#F39C12", "#1ABC9C", "#E67E22", "#5DADE2", "#FF6B9D", "#48C9B0"];
-  const skinTones = ["#FDDCB5", "#F5D0A9", "#EDCAA8", "#DBA97B", "#C68642", "#A0724A"];
-  const pantColors = ["#2C3E50", "#1a1a3e", "#34495E", "#2E2E4E", "#3C3C5C"];
+const HAIR_COLORS = ["#2C1810", "#1a1a2e", "#5C3317", "#8B6914", "#A0522D", "#4A2800", "#6B2D5B", "#D4A03C", "#C0392B", "#E08040"];
+const SHIRT_COLORS = ["#E74C3C", "#4A90D9", "#2ECC71", "#9B59B6", "#F39C12", "#1ABC9C", "#E67E22", "#5DADE2", "#FF6B9D", "#48C9B0"];
+const SKIN_TONES = ["#FDDCB5", "#F5D0A9", "#EDCAA8", "#DBA97B", "#C68642", "#A0724A"];
+const PANT_COLORS = ["#2C3E50", "#1a1a3e", "#34495E", "#2E2E4E", "#3C3C5C"];
+
+function getCharStyle(agent: Agent) {
+  const hash = agent.name.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
   const activities: Activity[] = ["typing", "coffee", "thinking", "reading"];
 
   return {
-    hair: hairColors[hash % hairColors.length],
-    shirt: shirtColors[hash % shirtColors.length],
-    skin: skinTones[hash % skinTones.length],
-    pants: pantColors[hash % pantColors.length],
-    isFemale: gender === "female",
+    hair: HAIR_COLORS[agent.hair_color ?? (hash % HAIR_COLORS.length)],
+    shirt: SHIRT_COLORS[agent.shirt_color ?? (hash % SHIRT_COLORS.length)],
+    skin: SKIN_TONES[agent.skin_tone ?? (hash % SKIN_TONES.length)],
+    pants: PANT_COLORS[hash % PANT_COLORS.length],
+    isFemale: (agent.gender || "male") === "female",
     activity: activities[hash % activities.length],
-    hasGlasses: hash % 5 === 0,
+    hasGlasses: agent.has_glasses ?? (hash % 5 === 0),
   };
 }
 
@@ -231,7 +232,7 @@ function IsometricDesk({
   onEdit: (agent: Agent) => void;
   onDelete: (id: string) => void;
 }) {
-  const char = getCharStyle(agent.name, agent.gender || "male");
+  const char = getCharStyle(agent);
   const displayName = agent.agent_name || agent.name;
   const activity = char.activity;
 

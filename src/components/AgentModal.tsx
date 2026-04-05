@@ -22,6 +22,10 @@ interface AgentModalProps {
     icon: string;
     description: string;
     gender: "male" | "female";
+    skin_tone: number;
+    hair_color: number;
+    shirt_color: number;
+    has_glasses: boolean;
     sub_links: SubLink[];
   }) => void;
   onClose: () => void;
@@ -39,6 +43,10 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
   const [icon, setIcon] = useState("⚡");
   const [description, setDescription] = useState("");
   const [gender, setGender] = useState<"male" | "female">("male");
+  const [skinTone, setSkinTone] = useState(0);
+  const [hairColor, setHairColor] = useState(0);
+  const [shirtColor, setShirtColor] = useState(0);
+  const [hasGlasses, setHasGlasses] = useState(false);
   const [subLinks, setSubLinks] = useState<SubLink[]>([]);
 
   // Setores filtrados pela aba selecionada (sem duplicatas)
@@ -74,6 +82,10 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
       setIcon(agent.icon || "⚡");
       setDescription(agent.description || "");
       setGender(agent.gender || "male");
+      setSkinTone(agent.skin_tone ?? 0);
+      setHairColor(agent.hair_color ?? 0);
+      setShirtColor(agent.shirt_color ?? 0);
+      setHasGlasses(agent.has_glasses ?? false);
       setSubLinks(agent.sub_links || []);
       // Detectar o contexto do agente
       if (allCategories) {
@@ -95,6 +107,10 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
       icon,
       description,
       gender,
+      skin_tone: skinTone,
+      hair_color: hairColor,
+      shirt_color: shirtColor,
+      has_glasses: hasGlasses,
       sub_links: subLinks.filter(sl => sl.label && sl.url),
     });
   };
@@ -151,6 +167,58 @@ export default function AgentModal({ agent, categories, allCategories, defaultCo
                   👩 Feminino
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* === APARÊNCIA DO PERSONAGEM === */}
+          <div>
+            <label className="block text-sm text-[var(--text-secondary)] mb-2">Aparência</label>
+            {/* Tom de pele */}
+            <div className="mb-3">
+              <span className="text-xs text-[var(--text-muted)] mb-1.5 block">Tom de pele</span>
+              <div className="flex gap-1.5">
+                {["#FDDCB5","#F5D0A9","#EDCAA8","#DBA97B","#C68642","#A0724A"].map((color, i) => (
+                  <button key={i} type="button" onClick={() => setSkinTone(i)}
+                    className={`w-8 h-8 rounded-full cursor-pointer transition-all border-2 ${skinTone === i ? "border-[var(--accent)] scale-110" : "border-transparent"}`}
+                    style={{ backgroundColor: color }}
+                    title={["Claro","Claro médio","Médio","Moreno","Moreno escuro","Negro"][i]}
+                  />
+                ))}
+              </div>
+            </div>
+            {/* Cor do cabelo */}
+            <div className="mb-3">
+              <span className="text-xs text-[var(--text-muted)] mb-1.5 block">Cor do cabelo</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {["#2C1810","#1a1a2e","#5C3317","#8B6914","#A0522D","#4A2800","#6B2D5B","#D4A03C","#C0392B","#E08040"].map((color, i) => (
+                  <button key={i} type="button" onClick={() => setHairColor(i)}
+                    className={`w-7 h-7 rounded-full cursor-pointer transition-all border-2 ${hairColor === i ? "border-[var(--accent)] scale-110" : "border-transparent"}`}
+                    style={{ backgroundColor: color }}
+                    title={["Preto","Preto azulado","Castanho escuro","Castanho claro","Marrom","Marrom escuro","Roxo","Loiro","Ruivo","Ruivo claro"][i]}
+                  />
+                ))}
+              </div>
+            </div>
+            {/* Cor da camisa */}
+            <div className="mb-3">
+              <span className="text-xs text-[var(--text-muted)] mb-1.5 block">Cor da camisa</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {["#E74C3C","#4A90D9","#2ECC71","#9B59B6","#F39C12","#1ABC9C","#E67E22","#5DADE2","#FF6B9D","#48C9B0"].map((color, i) => (
+                  <button key={i} type="button" onClick={() => setShirtColor(i)}
+                    className={`w-7 h-7 rounded-full cursor-pointer transition-all border-2 ${shirtColor === i ? "border-[var(--accent)] scale-110" : "border-transparent"}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+            {/* Óculos */}
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setHasGlasses(!hasGlasses)}
+                className={`w-10 h-6 rounded-full cursor-pointer transition-all relative ${hasGlasses ? "bg-[var(--accent)]" : "bg-[var(--bg-primary)] border border-[var(--border)]"}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${hasGlasses ? "left-4" : "left-0.5"}`} />
+              </button>
+              <span className="text-xs text-[var(--text-muted)]">Usa óculos 👓</span>
             </div>
           </div>
 
