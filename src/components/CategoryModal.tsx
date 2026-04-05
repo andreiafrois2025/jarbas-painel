@@ -170,26 +170,29 @@ export default function CategoryModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl w-full max-w-lg overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold">
-            {mode === "create" ? "Novo Setor" : mode === "edit" ? "Editar Setor" : mode === "editAgent" ? "Editar Agente" : "Setores e Agentes"}
-          </h2>
+    <div className="fixed inset-0 bg-[var(--bg-primary)] z-50 flex flex-col">
+      {/* Header fixo */}
+      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] flex items-center justify-between px-6 py-4 shrink-0">
+        <div className="flex items-center gap-4">
           <button
             onClick={onClose}
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl cursor-pointer w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-tertiary)]"
-          >×</button>
+            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] transition-all"
+          >
+            ← Voltar ao Escritório
+          </button>
+          <h2 className="text-xl font-bold">
+            {mode === "create" ? "Novo Setor" : mode === "edit" ? "Editar Setor" : mode === "editAgent" ? "Editar Colaborador" : "⚙️ Configurações"}
+          </h2>
         </div>
+        <button
+          onClick={onClose}
+          className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl cursor-pointer w-10 h-10 flex items-center justify-center rounded-xl hover:bg-[var(--bg-tertiary)] transition-all"
+        >✕</button>
+      </div>
 
-        <div className="p-5 max-h-[70vh] overflow-y-auto">
+      {/* Conteúdo com scroll */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto p-6">
           {/* ===== LISTA DE SETORES ===== */}
           {mode === "list" && (
             <div className="space-y-3">
@@ -609,3 +612,5 @@ export default function CategoryModal({
     </div>
   );
 }
+
+// Note: closing </div> matches the new full-page layout
