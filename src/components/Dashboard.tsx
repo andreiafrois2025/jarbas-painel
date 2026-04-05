@@ -89,11 +89,25 @@ export default function Dashboard({ session }: DashboardProps) {
       setOccupants(buildOccupants(assignData));
 
       // Auto-migrar JARBAS para quick_links se não existir
-      if (qlData.length === 0 || !qlData.some(ql => ql.label === "JARBAS")) {
-        await addQuickLink({ label: "JARBAS", url: "https://t.me/jarbas_af_bot", icon: "⚡", order: 0 });
-        const updatedQL = await getQuickLinks();
-        setQuickLinks(updatedQL);
+      try {
+        if (qlData.length === 0 || !qlData.some(ql => ql.label === "JARBAS")) {
+          await addQuickLink({ label: "JARBAS", url: "https://t.me/jarbas_af_bot", icon: "⚡", order: 0 });
+          const updatedQL = await getQuickLinks();
+          setQuickLinks(updatedQL);
+        }
+      } catch (qlErr) {
+        console.warn("Aviso: não foi possível criar quick-link JARBAS:", qlErr);
       }
+
+      // Debug: log de dados carregados
+      console.log("[Jarbas] Dados carregados:", {
+        agents: agentsData.length,
+        categories: categoriesData.length,
+        collaborators: collabData.length,
+        assignments: assignData.length,
+        occupants: buildOccupants(assignData).length,
+        quickLinks: qlData.length,
+      });
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
     } finally {
