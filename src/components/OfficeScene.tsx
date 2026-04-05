@@ -557,6 +557,17 @@ function IsometricDesk({
         {displayName}
       </text>
 
+      {/* === BADGE DE PRESENÇA — quantos contextos este colaborador atua === */}
+      {agent.context_count && agent.context_count > 1 && (
+        <g>
+          <title>{displayName} atua em {agent.context_count} escritórios</title>
+          <circle cx={x + 16} cy={y - 22} r="7" fill="#2D6B6B" stroke="#C4A460" strokeWidth="1.2" />
+          <text x={x + 16} y={y - 19} textAnchor="middle" fill="#FFD700" fontSize="8" fontWeight="bold" fontFamily="'Segoe UI', Tahoma, sans-serif">
+            {agent.context_count}
+          </text>
+        </g>
+      )}
+
       {/* Edit/Delete buttons on hover — next to name */}
       <g className="agent-tooltip">
         <g onClick={(e) => { e.stopPropagation(); onEdit(agent); }} style={{ cursor: "pointer" }}>

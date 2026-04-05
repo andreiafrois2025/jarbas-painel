@@ -165,11 +165,22 @@ export default function Dashboard({ session }: DashboardProps) {
     return result;
   }, [agents, selectedRoom, search, useNewModel]);
 
-  // Converter para Agents (adapter para OfficeScene)
+  // Converter para Agents (adapter para OfficeScene) com badge de presença
   const agentsForScene = useMemo(() => {
-    if (useNewModel) return occupantsInRoom.map(o => occupantToAgent(o));
+    if (useNewModel) {
+      return occupantsInRoom.map(o => {
+        const agent = occupantToAgent(o);
+        // Contar em quantos contextos distintos esse colaborador atua
+        const ctxSet = new Set<string>();
+        assignments
+          .filter(a => a.collaborator_id === o.collaborator.id && a.category)
+          .forEach(a => ctxSet.add(a.category?.context || "?"));
+        agent.context_count = ctxSet.size;
+        return agent;
+      });
+    }
     return agentsInRoom;
-  }, [useNewModel, occupantsInRoom, agentsInRoom]);
+  }, [useNewModel, occupantsInRoom, agentsInRoom, assignments]);
 
   // Contar ocupantes por sala
   const countInRoom = useCallback((catId: string, catName: string) => {

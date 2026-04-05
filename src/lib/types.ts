@@ -37,6 +37,8 @@ export interface Agent {
   has_glasses?: boolean;
   /** Links adicionais — cada botão abre um GPT/ferramenta diferente */
   sub_links?: SubLink[];
+  /** Quantos contextos diferentes esse colaborador atua (badge de presença) */
+  context_count?: number;
   user_id?: string;
   created_at?: string;
 }
