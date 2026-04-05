@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Agent, CONTEXTS } from "@/lib/types";
+import { Agent, CONTEXTS, Collaborator, Assignment, QuickLink, DeskOccupant, occupantToAgent } from "@/lib/types";
 import {
   getAgents,
   addAgent,
@@ -15,35 +15,53 @@ import {
   deleteCategory,
   signOut,
   seedDefaultData,
+  getCollaborators,
+  addCollaborator,
+  updateCollaborator,
+  deleteCollaborator,
+  getAssignments,
+  addAssignment,
+  updateAssignment,
+  deleteAssignment,
+  buildOccupants,
+  getQuickLinks,
+  addQuickLink,
+  updateQuickLink,
+  deleteQuickLink,
+  migrateFromAgents,
 } from "@/lib/storage";
 import type { Execution, Category as CategoryType } from "@/lib/types";
-import DeskCard from "./DeskCard";
 import OfficeScene from "./OfficeScene";
-import AgentModal from "./AgentModal";
+import ContratarModal from "./ContratarModal";
 import CategoryModal from "./CategoryModal";
 import FlowsPage from "./FlowsPage";
 import MetricsPage from "./MetricsPage";
 import type { Session } from "@supabase/supabase-js";
-
-// =============================================
-// Dashboard Principal — Layout Híbrido
-// Interface moderna (sidebar, header, controles)
-// + Janela Win98 embutida (área dos agentes/escritório)
-// =============================================
 
 interface DashboardProps {
   session: Session;
 }
 
 export default function Dashboard({ session }: DashboardProps) {
+  // Estado legado (mantido para CategoryModal durante transição)
   const [agents, setAgents] = useState<Agent[]>([]);
   const [categories, setCategories] = useState<CategoryType[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [todayCount, setTodayCount] = useState(0);
+
+  // Novo modelo
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [quickLinks, setQuickLinks] = useState<QuickLink[]>([]);
+  const [occupants, setOccupants] = useState<DeskOccupant[]>([]);
+
+  // UI State
   const [selectedContext, setSelectedContext] = useState("IGAM");
   const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [showContratarModal, setShowContratarModal] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [editingCollaborator, setEditingCollaborator] = useState<Collaborator | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -51,23 +69,37 @@ export default function Dashboard({ session }: DashboardProps) {
   const [editingCategoryObj, setEditingCategoryObj] = useState<CategoryType | null>(null);
   const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics">("office");
 
-  // Carregar dados do Supabase
+  // Quick-link edit
+  const [showQLForm, setShowQLForm] = useState(false);
+  const [qlLabel, setQlLabel] = useState("");
+  const [qlUrl, setQlUrl] = useState("");
+  const [qlIcon, setQlIcon] = useState("🔗");
+  const [editingQL, setEditingQL] = useState<QuickLink | null>(null);
+
   const loadData = useCallback(async () => {
     try {
       if (session.user?.id) {
         await seedDefaultData(session.user.id);
+        await migrateFromAgents(session.user.id);
       }
-      const [agentsData, categoriesData, executionsData, todayData] =
+      const [agentsData, categoriesData, executionsData, todayData, collabData, assignData, qlData] =
         await Promise.all([
           getAgents(),
           getCategories(),
           getExecutions(),
           getTodayExecutionCount(),
+          getCollaborators(),
+          getAssignments(),
+          getQuickLinks(),
         ]);
       setAgents(agentsData);
       setCategories(categoriesData);
       setExecutions(executionsData);
       setTodayCount(todayData);
+      setCollaborators(collabData);
+      setAssignments(assignData);
+      setQuickLinks(qlData);
+      setOccupants(buildOccupants(assignData));
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
     } finally {
@@ -93,58 +125,81 @@ export default function Dashboard({ session }: DashboardProps) {
     });
   }, [categories, selectedContext]);
 
-  // Agentes na sala expandida (com filtro de busca)
-  const agentsInRoom = useMemo(() => {
-    if (!selectedRoom) return [];
-    let result = agents.filter((a) => a.category === selectedRoom);
+  // Usar novo modelo: ocupantes na sala (por category_id)
+  const useNewModel = occupants.length > 0 || collaborators.length > 0;
+
+  // Ocupantes na sala expandida
+  const occupantsInRoom = useMemo(() => {
+    if (!selectedRoomId) return [];
+    let result = occupants.filter(o => o.assignment.category_id === selectedRoomId);
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(
-        (a) => a.name.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q)
+      result = result.filter(o =>
+        o.collaborator.name.toLowerCase().includes(q) ||
+        o.assignment.tool_name.toLowerCase().includes(q) ||
+        o.assignment.description?.toLowerCase().includes(q)
       );
     }
     return result;
-  }, [agents, selectedRoom, search]);
+  }, [occupants, selectedRoomId, search]);
 
-  // Nomes de categorias para o AgentModal
-  const availableCategories = useMemo(() => {
-    return [...new Set(categories.map((c) => c.name))];
-  }, [categories]);
+  // Fallback: agentes antigos na sala (para retrocompatibilidade)
+  const agentsInRoom = useMemo(() => {
+    if (!selectedRoom || useNewModel) return [];
+    let result = agents.filter(a => a.category === selectedRoom);
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(a => a.name.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q));
+    }
+    return result;
+  }, [agents, selectedRoom, search, useNewModel]);
 
-  const handleSave = async (data: {
-    agent_name: string;
-    name: string;
-    link: string;
-    category: string;
-    type: "manual" | "automatic";
-    icon: string;
-    description: string;
-    gender: "male" | "female";
-    sub_links?: { label: string; url: string }[];
-  }) => {
-    try {
-      if (editingAgent) {
-        await updateAgent(editingAgent.id, data);
-      } else {
-        await addAgent(data);
+  // Converter ocupantes para Agents (adapter para OfficeScene)
+  const agentsForScene = useMemo(() => {
+    if (useNewModel) return occupantsInRoom.map(o => occupantToAgent(o));
+    return agentsInRoom;
+  }, [useNewModel, occupantsInRoom, agentsInRoom]);
+
+  // Contar ocupantes por sala
+  const countInRoom = useCallback((catId: string, catName: string) => {
+    if (useNewModel) return occupants.filter(o => o.assignment.category_id === catId).length;
+    return agents.filter(a => a.category === catName).length;
+  }, [useNewModel, occupants, agents]);
+
+  const previewInRoom = useCallback((catId: string, catName: string) => {
+    if (useNewModel) {
+      return occupants
+        .filter(o => o.assignment.category_id === catId)
+        .slice(0, 6)
+        .map(o => ({ id: o.assignment.id, icon: o.collaborator.icon, name: o.collaborator.name }));
+    }
+    return agents
+      .filter(a => a.category === catName)
+      .slice(0, 6)
+      .map(a => ({ id: a.id, icon: a.icon || "⚡", name: a.agent_name || a.name }));
+  }, [useNewModel, occupants, agents]);
+
+  // Handlers para editar/excluir no OfficeScene (converte de Agent para Assignment)
+  const handleEdit = (agent: Agent) => {
+    if (useNewModel) {
+      const asgn = assignments.find(a => a.id === agent.id);
+      if (asgn) {
+        const collab = collaborators.find(c => c.id === asgn.collaborator_id);
+        setEditingAssignment(asgn);
+        setEditingCollaborator(collab || null);
+        setShowContratarModal(true);
       }
-      await loadData();
-      setShowModal(false);
-      setEditingAgent(null);
-    } catch (err) {
-      console.error("Erro ao salvar:", err);
     }
   };
 
-  const handleEdit = (agent: Agent) => {
-    setEditingAgent(agent);
-    setShowModal(true);
-  };
-
   const handleDelete = async (id: string) => {
-    if (confirm("Excluir este agente?")) {
+    if (confirm("Excluir esta atribuição?")) {
       try {
-        await deleteAgent(id);
+        if (useNewModel) {
+          await deleteAssignment(id);
+        } else {
+          await deleteAgent(id);
+        }
         await loadData();
       } catch (err) {
         console.error("Erro ao excluir:", err);
@@ -157,7 +212,7 @@ export default function Dashboard({ session }: DashboardProps) {
     window.location.reload();
   };
 
-  // ---- Handlers do CategoryModal ----
+  // ---- Category handlers ----
   const handleAddCategory = async (name: string, context?: string) => {
     await addCategory(name, context || selectedContext);
     await loadData();
@@ -165,22 +220,25 @@ export default function Dashboard({ session }: DashboardProps) {
 
   const handleRenameCategory = async (id: string, newName: string, oldName: string) => {
     await updateCategory(id, newName);
-    const agentsToUpdate = agents.filter((a) => a.category === oldName);
-    await Promise.all(agentsToUpdate.map((a) => updateAgent(a.id, { category: newName })));
+    // Atualizar agentes legados
+    const agentsToUpdate = agents.filter(a => a.category === oldName);
+    await Promise.all(agentsToUpdate.map(a => updateAgent(a.id, { category: newName })));
     if (selectedRoom === oldName) setSelectedRoom(newName);
     await loadData();
   };
 
   const handleDeleteCategory = async (id: string) => {
-    const cat = categories.find((c) => c.id === id);
+    const cat = categories.find(c => c.id === id);
     if (!cat) return;
-    const agentsInCat = agents.filter((a) => a.category === cat.name);
+    // Mover agentes legados
+    const agentsInCat = agents.filter(a => a.category === cat.name);
     if (agentsInCat.length > 0) {
-      const fallback = categories.find((c) => c.id !== id)?.name || "Geotecnologias";
-      await Promise.all(agentsInCat.map((a) => updateAgent(a.id, { category: fallback })));
+      const fallback = categories.find(c => c.id !== id)?.name || "Geotecnologias";
+      await Promise.all(agentsInCat.map(a => updateAgent(a.id, { category: fallback })));
     }
+    // Assignments serão deletados em cascata
     await deleteCategory(id);
-    if (selectedRoom === cat.name) setSelectedRoom(null);
+    if (selectedRoom === cat.name) { setSelectedRoom(null); setSelectedRoomId(null); }
     await loadData();
   };
 
@@ -189,12 +247,31 @@ export default function Dashboard({ session }: DashboardProps) {
     await loadData();
   };
 
-  const timeStr = currentTime.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  // ---- Quick-link handlers ----
+  const handleSaveQL = async () => {
+    if (!qlLabel || !qlUrl) return;
+    if (editingQL) {
+      await updateQuickLink(editingQL.id, { label: qlLabel, url: qlUrl, icon: qlIcon });
+    } else {
+      await addQuickLink({ label: qlLabel, url: qlUrl, icon: qlIcon, order: quickLinks.length });
+    }
+    setShowQLForm(false);
+    setQlLabel("");
+    setQlUrl("");
+    setQlIcon("🔗");
+    setEditingQL(null);
+    await loadData();
+  };
+
+  const handleDeleteQL = async (id: string) => {
+    await deleteQuickLink(id);
+    await loadData();
+  };
+
+  const timeStr = currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const weekday = currentTime.toLocaleDateString("pt-BR", { weekday: "long" });
   const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  const totalCount = useNewModel ? occupants.length : agents.length;
 
   if (loading) {
     return (
@@ -209,45 +286,14 @@ export default function Dashboard({ session }: DashboardProps) {
 
   return (
     <div className="h-screen flex flex-col md:flex-row bg-[var(--bg-primary)]">
-      {/* ===== SIDEBAR (desktop) / BOTTOM BAR (mobile) ===== */}
+      {/* ===== SIDEBAR ===== */}
       <aside className="order-2 md:order-none w-full md:w-16 bg-[var(--bg-secondary)] border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-2 shrink-0">
         <div className="hidden md:block text-2xl mb-4 cursor-default" title="Jarbas">⚡</div>
-
-        <button
-          onClick={() => setCurrentPage("office")}
-          className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${
-            currentPage === "office"
-              ? "bg-[var(--accent-soft)]"
-              : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"
-          }`}
-          title="Escritório"
-        >🏢</button>
-        <button
-          onClick={() => setCurrentPage("flows")}
-          className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${
-            currentPage === "flows"
-              ? "bg-[var(--accent-soft)]"
-              : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"
-          }`}
-          title="Fluxos"
-        >🔄</button>
-        <button
-          onClick={() => setCurrentPage("metrics")}
-          className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${
-            currentPage === "metrics"
-              ? "bg-[var(--accent-soft)]"
-              : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"
-          }`}
-          title="Métricas"
-        >📊</button>
-
+        <button onClick={() => setCurrentPage("office")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "office" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Escritório">🏢</button>
+        <button onClick={() => setCurrentPage("flows")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "flows" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Fluxos">🔄</button>
+        <button onClick={() => setCurrentPage("metrics")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "metrics" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Métricas">📊</button>
         <div className="hidden md:block flex-1" />
-
-        <button
-          onClick={handleLogout}
-          className="w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"
-          title="Sair"
-        >🚪</button>
+        <button onClick={handleLogout} className="w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100" title="Sair">🚪</button>
       </aside>
 
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
@@ -261,10 +307,9 @@ export default function Dashboard({ session }: DashboardProps) {
         {/* Header */}
         <header className="bg-[var(--bg-secondary)] border-b border-[var(--border)] flex flex-wrap items-center px-3 md:px-5 gap-2 md:gap-4 shrink-0 py-2 md:py-0 md:h-14">
           <h1 className="text-base md:text-lg font-semibold">Escritório</h1>
-
           <div className="hidden md:flex gap-4 ml-4 text-sm">
             <span className="text-[var(--text-secondary)]">
-              <span className="text-[var(--text-primary)] font-medium">{agents.length}</span> agentes
+              <span className="text-[var(--text-primary)] font-medium">{totalCount}</span> colaboradores
             </span>
             <span className="text-[var(--text-secondary)]">
               <span className="text-[var(--success)] font-medium">{todayCount}</span> execuções hoje
@@ -273,44 +318,27 @@ export default function Dashboard({ session }: DashboardProps) {
               <span className="text-[var(--text-primary)] font-medium">{executions.length}</span> total
             </span>
           </div>
-
           <div className="flex-1" />
-
           <div className="relative hidden lg:block">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">🔍</span>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar agente..."
-              className="input-modern !pl-10 !w-52 !py-2 text-sm"
-            />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar colaborador..." className="input-modern !pl-10 !w-52 !py-2 text-sm" />
           </div>
-
-          {/* Botão Gerenciar Setores e Agentes */}
-          <button
-            onClick={() => { setEditingCategoryObj(null); setShowCategoryModal(true); }}
-            className="btn-secondary !py-2 !px-3 md:!px-4 text-xs md:text-sm"
-          >
+          <button onClick={() => { setEditingCategoryObj(null); setShowCategoryModal(true); }} className="btn-secondary !py-2 !px-3 md:!px-4 text-xs md:text-sm">
             ⚙️ <span className="hidden sm:inline">Setores e Agentes</span>
           </button>
-
-          <button
-            onClick={() => { setEditingAgent(null); setShowModal(true); }}
-            className="btn-primary !py-2 !px-3 md:!px-4 text-xs md:text-sm"
-          >
-            + <span className="hidden sm:inline">Novo </span>Agente
+          <button onClick={() => { setEditingAssignment(null); setEditingCollaborator(null); setShowContratarModal(true); }} className="btn-primary !py-2 !px-3 md:!px-4 text-xs md:text-sm">
+            + <span className="hidden sm:inline">Contratar </span>Colaborador
           </button>
         </header>
 
-        {/* ===== JANELA WIN98 DO ESCRITÓRIO ===== */}
+        {/* ===== JANELA WIN98 ===== */}
         <div className="flex-1 p-2 md:p-4 overflow-hidden">
           <div className="win-border-outset flex flex-col h-full" style={{ background: "var(--win-surface)" }}>
             <div className="win-titlebar">
               <div className="flex items-center gap-2">
                 <span className="text-sm">🏢</span>
                 <span className="text-xs md:text-sm">
-                  Jarbas{selectedContext ? ` › ${selectedContext}` : ""}{selectedRoom ? ` › ${selectedRoom}` : ""} v{process.env.NEXT_PUBLIC_APP_VERSION || "1.9.0"}
+                  Jarbas{selectedContext ? ` › ${selectedContext}` : ""}{selectedRoom ? ` › ${selectedRoom}` : ""} v{process.env.NEXT_PUBLIC_APP_VERSION || "2.0.0"}
                 </span>
               </div>
               <div className="flex gap-0.5">
@@ -331,59 +359,64 @@ export default function Dashboard({ session }: DashboardProps) {
             {/* Context tabs */}
             <div style={{ background: "var(--win-surface)", padding: "4px 4px 0", borderBottom: "2px solid var(--win-border-dark)", display: "flex", gap: 2, overflowX: "auto" }}>
               {CONTEXTS.map((ctx) => (
-                <button
-                  key={ctx}
-                  className={`context-tab${selectedContext === ctx ? " active" : ""}`}
-                  onClick={() => { setSelectedContext(ctx); setSelectedRoom(null); }}
-                >
+                <button key={ctx} className={`context-tab${selectedContext === ctx ? " active" : ""}`}
+                  onClick={() => { setSelectedContext(ctx); setSelectedRoom(null); setSelectedRoomId(null); }}>
                   {ctx}
                 </button>
               ))}
             </div>
 
             <div className="flex-1 overflow-auto office-floor p-2 md:p-4">
-              {/* Parede do escritório */}
-              <div
-                className="w-full h-10 mb-3 relative"
-                style={{
-                  background: "linear-gradient(180deg, #b0b0b0 0%, #c0c0c0 60%, #cacaca 100%)",
-                  borderBottom: "3px solid #555",
-                }}
-              >
+              {/* Parede do escritório com Quick-links */}
+              <div className="w-full h-10 mb-3 relative" style={{ background: "linear-gradient(180deg, #b0b0b0 0%, #c0c0c0 60%, #cacaca 100%)", borderBottom: "3px solid #555" }}>
                 {selectedRoom ? (
                   <>
-                    {/* Dentro da sala: Voltar na esquerda, JARBAS na direita */}
-                    <button
-                      onClick={() => setSelectedRoom(null)}
+                    <button onClick={() => { setSelectedRoom(null); setSelectedRoomId(null); }}
                       className="absolute top-1.5 left-4 px-3 py-0.5 font-bold cursor-pointer hover:brightness-90 transition-all"
-                      style={{ background: "#c0c0c0", border: "1px solid #888", fontSize: 9, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}
-                    >
+                      style={{ background: "#c0c0c0", border: "1px solid #888", fontSize: 9, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}>
                       ← Voltar
                     </button>
-                    <a
-                      href="https://t.me/jarbas_af_bot"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute top-1.5 right-4 px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                      style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
-                      title="Abrir Jarbas no Telegram"
-                    >
-                      JARBAS
-                    </a>
+                    <div className="absolute top-1.5 right-4 flex gap-1 items-center">
+                      {quickLinks.map(ql => (
+                        <a key={ql.id} href={ql.url} target="_blank" rel="noopener noreferrer"
+                          className="px-2 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
+                          style={{ background: "#2c4a2c", border: "1px solid #4a7a4a", fontSize: 8, fontFamily: "'Segoe UI', Tahoma" }}
+                          title={ql.label}>
+                          {ql.icon} {ql.label}
+                        </a>
+                      ))}
+                      <a href="https://t.me/jarbas_af_bot" target="_blank" rel="noopener noreferrer"
+                        className="px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
+                        style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
+                        title="Abrir Jarbas no Telegram">
+                        JARBAS
+                      </a>
+                    </div>
                   </>
                 ) : (
                   <>
-                    {/* Visão geral: JARBAS na esquerda, SUCCESS na direita */}
-                    <a
-                      href="https://t.me/jarbas_af_bot"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="absolute top-1.5 left-4 px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
-                      style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
-                      title="Abrir Jarbas no Telegram"
-                    >
-                      JARBAS
-                    </a>
+                    <div className="absolute top-1.5 left-4 flex gap-1 items-center">
+                      <a href="https://t.me/jarbas_af_bot" target="_blank" rel="noopener noreferrer"
+                        className="px-3 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
+                        style={{ background: "#1a3a6a", border: "2px solid #FFD700", fontSize: 9, fontFamily: "'Segoe UI', Tahoma" }}
+                        title="Abrir Jarbas no Telegram">
+                        JARBAS
+                      </a>
+                      {quickLinks.map(ql => (
+                        <a key={ql.id} href={ql.url} target="_blank" rel="noopener noreferrer"
+                          className="px-2 py-0.5 text-white font-bold no-underline hover:brightness-125 transition-all cursor-pointer"
+                          style={{ background: "#2c4a2c", border: "1px solid #4a7a4a", fontSize: 8, fontFamily: "'Segoe UI', Tahoma" }}
+                          title={ql.label}>
+                          {ql.icon} {ql.label}
+                        </a>
+                      ))}
+                      <button onClick={() => { setEditingQL(null); setQlLabel(""); setQlUrl(""); setQlIcon("🔗"); setShowQLForm(true); }}
+                        className="px-1.5 py-0.5 cursor-pointer hover:brightness-90 transition-all"
+                        style={{ background: "#c0c0c0", border: "1px solid #888", fontSize: 8, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}
+                        title="Adicionar atalho">
+                        +
+                      </button>
+                    </div>
                     <div className="absolute top-1 right-4" style={{ width: 45, height: 30, background: "#1a3a1a", border: "2px solid #8B7355" }}>
                       <svg viewBox="0 0 45 35" width="45" height="30">
                         <text x="4" y="8" fill="#FFD700" fontSize="4.5" fontWeight="bold">SUCCESS</text>
@@ -398,34 +431,25 @@ export default function Dashboard({ session }: DashboardProps) {
               {!selectedRoom && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4 py-2">
                   {roomsInContext.length > 0 ? roomsInContext.map((cat) => {
-                    const roomAgents = agents.filter((a) => a.category === cat.name);
-                    const preview = roomAgents.slice(0, 6);
-                    const extra = roomAgents.length - preview.length;
+                    const count = countInRoom(cat.id, cat.name);
+                    const preview = previewInRoom(cat.id, cat.name);
+                    const extra = count - preview.length;
                     return (
-                      <div
-                        key={cat.id}
-                        className="room-card"
-                        onClick={() => setSelectedRoom(cat.name)}
-                        title={`Abrir ${cat.name}`}
-                      >
+                      <div key={cat.id} className="room-card" onClick={() => { setSelectedRoom(cat.name); setSelectedRoomId(cat.id); }} title={`Abrir ${cat.name}`}>
                         <div className="room-card-header">{cat.name}</div>
                         <div className="room-card-body">
-                          {roomAgents.length === 0 ? (
+                          {count === 0 ? (
                             <span className="room-empty">Sala vazia</span>
                           ) : (
-                            preview.map((a) => (
-                              <span key={a.id} className="room-agent-chip">
-                                {a.icon || "⚡"} {a.agent_name || a.name}
-                              </span>
+                            preview.map(a => (
+                              <span key={a.id} className="room-agent-chip">{a.icon} {a.name}</span>
                             ))
                           )}
                         </div>
-                        {extra > 0 && (
-                          <span className="room-count-badge">+{extra} mais</span>
-                        )}
-                        {roomAgents.length > 0 && (
+                        {extra > 0 && <span className="room-count-badge">+{extra} mais</span>}
+                        {count > 0 && (
                           <span className="room-count-badge" style={{ left: 6, right: "auto" }}>
-                            {roomAgents.length} agente{roomAgents.length !== 1 ? "s" : ""}
+                            {count} colaborador{count !== 1 ? "es" : ""}
                           </span>
                         )}
                       </div>
@@ -442,17 +466,17 @@ export default function Dashboard({ session }: DashboardProps) {
 
               {/* ===== VISTA EXPANDIDA DA SALA ===== */}
               {selectedRoom && (
-                agentsInRoom.length > 0 ? (
+                agentsForScene.length > 0 ? (
                   <OfficeScene
-                    agents={agentsInRoom}
+                    agents={agentsForScene}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                   />
                 ) : (
                   <div className="text-center py-16" style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
                     <p className="text-2xl mb-2">🪑</p>
-                    <p className="text-sm">{search ? "Nenhum agente encontrado" : "Sala vazia"}</p>
-                    <p className="text-xs mt-1">Adicione agentes clicando em + Novo Agente</p>
+                    <p className="text-sm">{search ? "Nenhum colaborador encontrado" : "Sala vazia"}</p>
+                    <p className="text-xs mt-1">Clique em + Contratar Colaborador para adicionar</p>
                   </div>
                 )
               )}
@@ -461,18 +485,12 @@ export default function Dashboard({ session }: DashboardProps) {
             <div className="win-statusbar text-[8px] md:text-xs">
               <div className="win-statusbar-section flex-1">
                 {selectedRoom
-                  ? `${agentsInRoom.length} agente(s) em ${selectedRoom}`
-                  : `${agents.length} Funcionários`}
+                  ? `${agentsForScene.length} colaborador(es) em ${selectedRoom}`
+                  : `${totalCount} Colaboradores`}
               </div>
-              <div className="win-statusbar-section hidden sm:block">
-                Exec: {todayCount}
-              </div>
-              <div className="win-statusbar-section">
-                {timeStr}
-              </div>
-              <div className="win-statusbar-section hidden sm:block">
-                {capitalizedWeekday}
-              </div>
+              <div className="win-statusbar-section hidden sm:block">Exec: {todayCount}</div>
+              <div className="win-statusbar-section">{timeStr}</div>
+              <div className="win-statusbar-section hidden sm:block">{capitalizedWeekday}</div>
             </div>
           </div>
         </div>
@@ -480,17 +498,36 @@ export default function Dashboard({ session }: DashboardProps) {
         )}
       </main>
 
-      {/* ===== MODAL AGENTE ===== */}
-      {showModal && (
-        <AgentModal
-          agent={editingAgent}
-          categories={availableCategories}
-          allCategories={categories}
+      {/* ===== MODAL CONTRATAR COLABORADOR ===== */}
+      {showContratarModal && (
+        <ContratarModal
+          collaborators={collaborators}
+          categories={categories}
           defaultContext={selectedContext}
-          onSave={handleSave}
+          defaultCategoryId={selectedRoomId || undefined}
+          editingAssignment={editingAssignment}
+          editingCollaborator={editingCollaborator}
+          onSaveCollaborator={async (data) => {
+            const c = await addCollaborator(data);
+            await loadData();
+            return c;
+          }}
+          onUpdateCollaborator={async (id, updates) => {
+            await updateCollaborator(id, updates);
+            await loadData();
+          }}
+          onSaveAssignment={async (data) => {
+            await addAssignment(data);
+            await loadData();
+          }}
+          onUpdateAssignment={async (id, updates) => {
+            await updateAssignment(id, updates);
+            await loadData();
+          }}
           onClose={() => {
-            setShowModal(false);
-            setEditingAgent(null);
+            setShowContratarModal(false);
+            setEditingAssignment(null);
+            setEditingCollaborator(null);
           }}
         />
       )}
@@ -519,6 +556,58 @@ export default function Dashboard({ session }: DashboardProps) {
             setEditingCategoryObj(null);
           }}
         />
+      )}
+
+      {/* ===== MODAL QUICK-LINK ===== */}
+      {showQLForm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowQLForm(false)}>
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl w-full max-w-xs p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold">{editingQL ? "Editar Atalho" : "Novo Atalho"}</h3>
+            <div>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">Ícone</label>
+              <div className="flex gap-1 flex-wrap">
+                {["🔗","📓","📅","📌","💡","🎯","📊","🔔","💬","🌐"].map(i => (
+                  <button key={i} type="button" onClick={() => setQlIcon(i)}
+                    className={`text-lg w-8 h-8 rounded cursor-pointer ${qlIcon === i ? "bg-[var(--accent-soft)] border border-[var(--accent)]" : "bg-[var(--bg-primary)] border border-[var(--border)]"}`}>
+                    {i}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">Nome</label>
+              <input type="text" value={qlLabel} onChange={e => setQlLabel(e.target.value)} className="input-modern" placeholder="Ex: 2° Cérebro" />
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1">URL</label>
+              <input type="url" value={qlUrl} onChange={e => setQlUrl(e.target.value)} className="input-modern" placeholder="https://..." />
+            </div>
+            <div className="flex gap-2">
+              {editingQL && (
+                <button type="button" onClick={async () => { await handleDeleteQL(editingQL.id); setShowQLForm(false); setEditingQL(null); }}
+                  className="btn-secondary !text-red-400 flex-1">Excluir</button>
+              )}
+              <button type="button" onClick={() => setShowQLForm(false)} className="btn-secondary flex-1">Cancelar</button>
+              <button type="button" onClick={handleSaveQL} disabled={!qlLabel || !qlUrl} className="btn-primary flex-1">Salvar</button>
+            </div>
+
+            {/* Lista de quick-links existentes para editar */}
+            {quickLinks.length > 0 && !editingQL && (
+              <div className="border-t border-[var(--border)] pt-3 mt-3">
+                <label className="block text-xs text-[var(--text-muted)] mb-2">Atalhos existentes (clique para editar)</label>
+                {quickLinks.map(ql => (
+                  <button key={ql.id} type="button"
+                    onClick={() => { setEditingQL(ql); setQlLabel(ql.label); setQlUrl(ql.url); setQlIcon(ql.icon); }}
+                    className="w-full text-left text-sm p-2 rounded hover:bg-[var(--bg-tertiary)] cursor-pointer flex items-center gap-2">
+                    <span>{ql.icon}</span>
+                    <span className="flex-1">{ql.label}</span>
+                    <span className="text-xs text-[var(--text-muted)] truncate max-w-[120px]">{ql.url}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

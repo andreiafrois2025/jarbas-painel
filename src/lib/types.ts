@@ -81,6 +81,77 @@ export interface Execution {
   user_id?: string;
 }
 
+// =============================================
+// Novo modelo: Colaborador + Atribuição
+// =============================================
+
+/** Colaborador — identidade visual (personagem no escritório) */
+export interface Collaborator {
+  id: string;
+  name: string;
+  gender: "male" | "female";
+  skin_tone: number;
+  hair_color: number;
+  shirt_color: number;
+  has_glasses: boolean;
+  icon: string;
+  user_id?: string;
+  created_at?: string;
+}
+
+/** Atribuição — o que o colaborador faz em uma sala específica */
+export interface Assignment {
+  id: string;
+  collaborator_id: string;
+  category_id: string;
+  tool_name: string;
+  link: string;
+  description?: string;
+  type: "manual" | "automatic";
+  sub_links?: SubLink[];
+  user_id?: string;
+  created_at?: string;
+  // Dados joined (para conveniência)
+  collaborator?: Collaborator;
+  category?: Category;
+}
+
+/** Quick-link — atalho global no cabeçalho */
+export interface QuickLink {
+  id: string;
+  label: string;
+  url: string;
+  icon: string;
+  order: number;
+  user_id?: string;
+}
+
+/** Ocupante da mesa — combina colaborador + atribuição para renderização */
+export interface DeskOccupant {
+  assignment: Assignment;
+  collaborator: Collaborator;
+}
+
+/** Converter DeskOccupant para Agent (adapter para OfficeScene) */
+export function occupantToAgent(occ: DeskOccupant): Agent {
+  return {
+    id: occ.assignment.id,
+    agent_name: occ.collaborator.name,
+    name: occ.assignment.tool_name,
+    link: occ.assignment.link,
+    category: occ.assignment.category?.name || "",
+    type: occ.assignment.type,
+    icon: occ.collaborator.icon,
+    description: occ.assignment.description,
+    gender: occ.collaborator.gender,
+    skin_tone: occ.collaborator.skin_tone,
+    hair_color: occ.collaborator.hair_color,
+    shirt_color: occ.collaborator.shirt_color,
+    has_glasses: occ.collaborator.has_glasses,
+    sub_links: occ.assignment.sub_links,
+  };
+}
+
 /** Categorias/Salas padrão para novos usuários */
 export const DEFAULT_CATEGORIES: { name: string; context: string; order: number }[] = [
   // IGAM
