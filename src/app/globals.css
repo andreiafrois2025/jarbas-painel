@@ -168,11 +168,10 @@ body {
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #FFFFFF;
   position: relative;
-  min-height: 140px;
-  min-width: 180px;
+  min-height: 180px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 2px 8px rgba(45,59,59,0.08);
@@ -186,32 +185,32 @@ body {
 .room-card-header {
   background: var(--af-teal);
   color: #fff;
-  font-size: 10px;
+  font-size: 13px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
   font-weight: bold;
-  padding: 3px 6px;
+  padding: 6px 10px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 .room-card-body {
   flex: 1;
-  padding: 8px;
+  padding: 10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   align-content: flex-start;
 }
 .room-agent-chip {
   background: var(--af-cream);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 2px 6px;
-  font-size: 10px;
+  padding: 3px 8px;
+  font-size: 12px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
   color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   white-space: nowrap;
 }
 .room-empty {

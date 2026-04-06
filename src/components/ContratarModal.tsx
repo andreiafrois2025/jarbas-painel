@@ -78,12 +78,15 @@ export default function ContratarModal({
     return categories.filter(c => (c.context || "IGAM") === selectedContext);
   }, [categories, selectedContext]);
 
-  // Auto-selecionar primeira categoria ao mudar contexto
+  // Auto-selecionar primeira categoria ao mudar contexto (ou resetar se inválida)
   useEffect(() => {
-    if (!editingAssignment && filteredCategories.length > 0) {
-      setCategoryId(filteredCategories[0].id);
+    if (filteredCategories.length > 0) {
+      const isValid = filteredCategories.some(c => c.id === categoryId);
+      if (!isValid) {
+        setCategoryId(filteredCategories[0].id);
+      }
     }
-  }, [selectedContext, filteredCategories, editingAssignment]);
+  }, [selectedContext, filteredCategories, categoryId]);
 
   // Preencher campos ao editar
   useEffect(() => {

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import type { Execution, Collaborator, Assignment, Category, Flow } from "@/lib/types";
+import type { Execution, Collaborator, Assignment, Category, Flow, Agent } from "@/lib/types";
 import {
   getExecutions, getCollaborators, getAssignments,
-  getCategories, getFlows,
+  getCategories, getFlows, getAgents,
 } from "@/lib/storage";
 
 // =============================================
@@ -31,21 +31,23 @@ export default function MetricsPage({ onNavigate }: MetricsPageProps) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [flows, setFlows] = useState<Flow[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"active" | "all" | "dismissed">("active");
   const [expandedCollab, setExpandedCollab] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [execs, collabs, asgs, cats, flws] = await Promise.all([
+      const [execs, collabs, asgs, cats, flws, agts] = await Promise.all([
         getExecutions(), getCollaborators(), getAssignments(),
-        getCategories(), getFlows(),
+        getCategories(), getFlows(), getAgents(),
       ]);
       setExecutions(execs);
       setCollaborators(collabs);
       setAssignments(asgs);
       setCategories(cats);
       setFlows(flws);
+      setAgents(agts);
     } catch (err) {
       console.error("Erro ao carregar métricas:", err);
     } finally {
@@ -61,19 +63,31 @@ export default function MetricsPage({ onNavigate }: MetricsPageProps) {
     return collaborators.filter(c => (c.status || "active") === statusFilter);
   }, [collaborators, statusFilter]);
 
-  // --- Map executions to assignments ---
+  // --- Map executions to assignments (com fallback para agents antigos) ---
   const execWithDetails = useMemo(() => {
     return executions.map(exec => {
-      const assignment = assignments.find(a => a.id === exec.agent_id);
+      let assignment = assignments.find(a => a.id === exec.agent_id);
+
+      // Fallback: exec.agent_id pode referenciar tabela agents (modelo legado)
+      if (!assignment && exec.agent_id) {
+        const oldAgent = agents.find(a => a.id === exec.agent_id);
+        if (oldAgent) {
+          assignment = assignments.find(a =>
+            a.tool_name === oldAgent.name &&
+            a.collaborator?.name === (oldAgent.agent_name || oldAgent.name)
+          );
+        }
+      }
+
       const collaborator = assignment
-        ? collaborators.find(c => c.id === assignment.collaborator_id)
+        ? collaborators.find(c => c.id === assignment!.collaborator_id)
         : null;
       const category = assignment
-        ? categories.find(c => c.id === assignment.category_id)
+        ? categories.find(c => c.id === assignment!.category_id)
         : null;
-      return { exec, assignment, collaborator, category };
+      return { exec, assignment: assignment || undefined, collaborator, category };
     });
-  }, [executions, assignments, collaborators, categories]);
+  }, [executions, assignments, collaborators, categories, agents]);
 
   // --- Time-based filters ---
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);

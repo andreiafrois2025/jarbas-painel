@@ -9,6 +9,9 @@ import {
   getCategories, addCategory, updateCategory, deleteCategory,
   getQuickLinks, addQuickLink, updateQuickLink, deleteQuickLink,
 } from "@/lib/storage";
+import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, rectSortingStrategy } from "@dnd-kit/sortable";
+import SortableItem from "./SortableItem";
 
 // =============================================
 // Appearance constants (shared with ContratarModal)
@@ -400,6 +403,37 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     } finally { setSaving(false); }
   };
 
+  // ---- DnD handlers ----
+  const handleDragEndSectors = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const list = sectorsForTab;
+    const oldIdx = list.findIndex(c => c.id === active.id);
+    const newIdx = list.findIndex(c => c.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    setSaving(true);
+    try {
+      // Swap orders
+      await updateCategory(list[oldIdx].id, { order: list[newIdx].order });
+      await updateCategory(list[newIdx].id, { order: list[oldIdx].order });
+      await reload();
+    } finally { setSaving(false); }
+  };
+
+  const handleDragEndQL = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = quickLinks.findIndex(ql => ql.id === active.id);
+    const newIdx = quickLinks.findIndex(ql => ql.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    setSaving(true);
+    try {
+      await updateQuickLink(quickLinks[oldIdx].id, { order: quickLinks[newIdx].order });
+      await updateQuickLink(quickLinks[newIdx].id, { order: quickLinks[oldIdx].order });
+      await reload();
+    } finally { setSaving(false); }
+  };
+
   // ---- Render ----
   if (loading) {
     return (
@@ -627,8 +661,8 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                               <p className="text-[10px] text-[var(--text-muted)] mt-0.5 line-clamp-1">{collab.bio}</p>
                             )}
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-xs text-[var(--text-muted)]">
-                                {collabAsgs.length} atribuição{collabAsgs.length !== 1 ? "ões" : ""}
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-bold">
+                                {collabAsgs.length} {collabAsgs.length !== 1 ? "funções" : "função"}
                               </span>
                               {ctxs.map(ctx => (
                                 <span key={ctx} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent)] font-medium">
@@ -692,8 +726,8 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                                           </span>
                                         )}
                                         {asg.sub_links && asg.sub_links.length > 0 && (
-                                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)]">
-                                            +{asg.sub_links.length} funções
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] truncate max-w-[250px]" title={asg.sub_links.map(sl => sl.label).join(", ")}>
+                                            {asg.sub_links.map(sl => sl.label).join(" · ")}
                                           </span>
                                         )}
                                       </div>
@@ -749,14 +783,16 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
               })}
             </div>
 
-            {/* Sector grid */}
+            {/* Sector grid (drag-and-drop) */}
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEndSectors}>
+            <SortableContext items={sectorsForTab.map(c => c.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {sectorsForTab.map(cat => {
                 const catAsgs = assignments.filter(a => a.category_id === cat.id);
                 const isEditingThis = editingSector?.id === cat.id;
 
                 return (
-                  <div key={cat.id} className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl overflow-hidden">
+                  <SortableItem key={cat.id} id={cat.id} className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl overflow-hidden">
                     {/* Header */}
                     <div className="bg-[var(--accent)] text-white px-4 py-2.5 flex items-center justify-between">
                       {isEditingThis ? (
@@ -812,12 +848,15 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                         {catAsgs.length} colaborador{catAsgs.length !== 1 ? "es" : ""}
                       </div>
                     </div>
-                  </div>
+                  </SortableItem>
                 );
               })}
+            </div>
+            </SortableContext>
+            </DndContext>
 
               {/* New sector card */}
-              <div className="border-2 border-dashed border-[var(--border)] rounded-xl p-4 flex flex-col items-center justify-center gap-3 min-h-[160px]">
+              <div className="border-2 border-dashed border-[var(--border)] rounded-xl p-4 flex flex-col items-center justify-center gap-3 min-h-[160px] mt-4">
                 <input type="text" value={newSectorName} onChange={e => setNewSectorName(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") handleCreateSector(); }}
                   className="input-modern text-center !py-2 text-sm w-full"
@@ -827,7 +866,6 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                   + Criar Setor
                 </button>
               </div>
-            </div>
           </div>
         )}
 
@@ -856,9 +894,11 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
               </div>
 
               {/* List */}
+              <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEndQL}>
+              <SortableContext items={quickLinks.map(ql => ql.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
                 {quickLinks.map((ql, idx) => (
-                  <div key={ql.id} className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-4 flex items-center gap-3 group hover:shadow-sm transition-all">
+                  <SortableItem key={ql.id} id={ql.id} className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-4 flex items-center gap-3 group hover:shadow-sm transition-all">
                     <span className="text-2xl">{ql.icon}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium">{ql.label}</div>
@@ -879,9 +919,11 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                       <button onClick={() => handleDeleteQL(ql.id)}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer hover:bg-[var(--danger)]/10 text-[var(--text-muted)] hover:text-[var(--danger)] transition-all">🗑️</button>
                     </div>
-                  </div>
+                  </SortableItem>
                 ))}
               </div>
+              </SortableContext>
+              </DndContext>
 
               {/* Add button */}
               <button onClick={() => { setShowNewQL(true); setEditingQL(null); setQlLabel(""); setQlUrl(""); setQlIcon("🔗"); }}

@@ -134,6 +134,20 @@ export interface QuickLink {
   user_id?: string;
 }
 
+/** Produto/entrega de uma área/setor */
+export interface Product {
+  id: string;
+  category_id: string;
+  title: string;
+  description?: string;
+  /** Link do projeto de criação (ex: Canva, Figma) */
+  creation_link?: string;
+  /** Link do produto final publicado (ex: dashboard, site) */
+  final_link?: string;
+  user_id?: string;
+  created_at?: string;
+}
+
 /** Ocupante da mesa — combina colaborador + atribuição para renderização */
 export interface DeskOccupant {
   assignment: Assignment;

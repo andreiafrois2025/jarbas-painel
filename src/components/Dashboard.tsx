@@ -32,6 +32,7 @@ import ContratarModal from "./ContratarModal";
 import HRPage from "./HRPage";
 import FlowsPage from "./FlowsPage";
 import MetricsPage from "./MetricsPage";
+import ProductsPanel from "./ProductsPanel";
 import type { Session } from "@supabase/supabase-js";
 
 interface DashboardProps {
@@ -62,6 +63,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics" | "hr">("office");
+  const [productsRoom, setProductsRoom] = useState<{ id: string; name: string } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -399,14 +401,22 @@ export default function Dashboard({ session }: DashboardProps) {
 
               {/* ===== VISTA DE SALAS ===== */}
               {!selectedRoom && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4 py-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5 py-2">
                   {roomsInContext.length > 0 ? roomsInContext.map((cat) => {
                     const count = countInRoom(cat.id, cat.name);
                     const preview = previewInRoom(cat.id, cat.name);
                     const extra = count - preview.length;
                     return (
                       <div key={cat.id} className="room-card" onClick={() => { setSelectedRoom(cat.name); setSelectedRoomId(cat.id); }} title={`Abrir ${cat.name}`}>
-                        <div className="room-card-header">{cat.name}</div>
+                        <div className="room-card-header flex items-center justify-between">
+                          <span>{cat.name}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setProductsRoom({ id: cat.id, name: cat.name }); }}
+                            className="text-white/70 hover:text-white hover:bg-white/20 rounded px-1.5 py-0.5 transition-all cursor-pointer"
+                            title="Produtos & Entregas"
+                            style={{ fontSize: 11 }}
+                          >📁</button>
+                        </div>
                         <div className="room-card-body">
                           {count === 0 ? (
                             <span className="room-empty">Sala vazia</span>
@@ -499,6 +509,15 @@ export default function Dashboard({ session }: DashboardProps) {
             setEditingAssignment(null);
             setEditingCollaborator(null);
           }}
+        />
+      )}
+
+      {/* ===== PAINEL DE PRODUTOS ===== */}
+      {productsRoom && (
+        <ProductsPanel
+          categoryId={productsRoom.id}
+          categoryName={productsRoom.name}
+          onClose={() => setProductsRoom(null)}
         />
       )}
     </div>

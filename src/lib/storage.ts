@@ -4,7 +4,7 @@
 // =============================================
 
 import { supabase } from "./supabase";
-import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant } from "./types";
+import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Product } from "./types";
 
 // ---- AUTH ----
 
@@ -280,18 +280,29 @@ export async function addCollaborator(
   collab: Omit<Collaborator, "id" | "user_id" | "created_at">
 ): Promise<Collaborator> {
   const user = await getUser();
+  // Remover campos que podem não existir no banco ainda
+  const { bio, status, ...safeFields } = collab as Record<string, unknown>;
+  const payload = { ...safeFields, user_id: user?.id } as Record<string, unknown>;
+  // Incluir bio/status apenas se tiverem valor (tentativa segura)
+  if (bio) payload.bio = bio;
+  if (status && status !== "active") payload.status = status;
   const { data, error } = await supabase
     .from("collaborators")
-    .insert({ ...collab, user_id: user?.id })
+    .insert(payload)
     .select()
     .single();
   if (error) throw error;
-  return data;
+  return data as Collaborator;
 }
 
 /** Atualizar colaborador */
 export async function updateCollaborator(id: string, updates: Partial<Collaborator>): Promise<void> {
-  const { error } = await supabase.from("collaborators").update(updates).eq("id", id);
+  // Remover campos que podem não existir no banco ainda
+  const { bio, status, ...safeUpdates } = updates;
+  const payload = { ...safeUpdates } as Record<string, unknown>;
+  if (bio !== undefined) payload.bio = bio;
+  if (status !== undefined) payload.status = status;
+  const { error } = await supabase.from("collaborators").update(payload).eq("id", id);
   if (error) throw error;
 }
 
@@ -320,9 +331,13 @@ export async function addAssignment(
   assignment: Omit<Assignment, "id" | "user_id" | "created_at" | "collaborator" | "category">
 ): Promise<Assignment> {
   const user = await getUser();
+  // Remover campos que podem não existir no banco ainda
+  const { time_saved_minutes, ...safeFields } = assignment;
+  const payload = { ...safeFields, user_id: user?.id } as Record<string, unknown>;
+  if (time_saved_minutes && time_saved_minutes !== 2) payload.time_saved_minutes = time_saved_minutes;
   const { data, error } = await supabase
     .from("assignments")
-    .insert({ ...assignment, user_id: user?.id })
+    .insert(payload)
     .select("*, collaborator:collaborators(*), category:categories(*)")
     .single();
   if (error) throw error;
@@ -331,10 +346,12 @@ export async function addAssignment(
 
 /** Atualizar atribuição */
 export async function updateAssignment(id: string, updates: Partial<Assignment>): Promise<void> {
-  // Remover campos joined para não enviar ao Supabase
-  const { collaborator, category, ...clean } = updates;
+  // Remover campos joined e campos que podem não existir no banco
+  const { collaborator, category, time_saved_minutes, ...clean } = updates;
   void collaborator; void category;
-  const { error } = await supabase.from("assignments").update(clean).eq("id", id);
+  const payload = { ...clean } as Record<string, unknown>;
+  if (time_saved_minutes !== undefined) payload.time_saved_minutes = time_saved_minutes;
+  const { error } = await supabase.from("assignments").update(payload).eq("id", id);
   if (error) throw error;
 }
 
@@ -389,6 +406,57 @@ export async function updateQuickLink(id: string, updates: Partial<QuickLink>): 
 /** Excluir quick-link */
 export async function deleteQuickLink(id: string): Promise<void> {
   const { error } = await supabase.from("quick_links").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// =============================================
+// PRODUCTS (Produtos/entregas por área)
+// =============================================
+
+/** Buscar todos os produtos */
+export async function getProducts(): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+/** Buscar produtos de uma categoria/sala */
+export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("category_id", categoryId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+/** Criar produto */
+export async function addProduct(
+  product: Omit<Product, "id" | "user_id" | "created_at">
+): Promise<Product> {
+  const user = await getUser();
+  const { data, error } = await supabase
+    .from("products")
+    .insert({ ...product, user_id: user?.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Atualizar produto */
+export async function updateProduct(id: string, updates: Partial<Product>): Promise<void> {
+  const { error } = await supabase.from("products").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+/** Excluir produto */
+export async function deleteProduct(id: string): Promise<void> {
+  const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) throw error;
 }
 
