@@ -97,6 +97,10 @@ export interface Collaborator {
   shirt_color: number;
   has_glasses: boolean;
   icon: string;
+  /** Detalhamento sobre o colaborador (bio/perfil) */
+  bio?: string;
+  /** Status: ativo ou desligado */
+  status?: "active" | "dismissed";
   user_id?: string;
   created_at?: string;
 }
@@ -111,6 +115,8 @@ export interface Assignment {
   description?: string;
   type: "manual" | "automatic";
   sub_links?: SubLink[];
+  /** Tempo economizado por execução em minutos */
+  time_saved_minutes?: number;
   user_id?: string;
   created_at?: string;
   // Dados joined (para conveniência)

@@ -99,15 +99,6 @@ export default function Dashboard({ session }: DashboardProps) {
         console.warn("Aviso: não foi possível criar quick-link JARBAS:", qlErr);
       }
 
-      // Debug: log de dados carregados
-      console.log("[Jarbas] Dados carregados:", {
-        agents: agentsData.length,
-        categories: categoriesData.length,
-        collaborators: collabData.length,
-        assignments: assignData.length,
-        occupants: buildOccupants(assignData).length,
-        quickLinks: qlData.length,
-      });
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
     } finally {
@@ -121,8 +112,16 @@ export default function Dashboard({ session }: DashboardProps) {
     return () => clearInterval(timer);
   }, [loadData]);
 
-  // Usar novo modelo
-  const useNewModel = occupants.length > 0 || collaborators.length > 0;
+  // Usar novo modelo — filtrando apenas colaboradores ativos
+  const activeCollaborators = useMemo(() =>
+    collaborators.filter(c => (c.status || "active") === "active"),
+  [collaborators]);
+
+  const activeOccupants = useMemo(() =>
+    occupants.filter(o => (o.collaborator.status || "active") === "active"),
+  [occupants]);
+
+  const useNewModel = activeOccupants.length > 0 || activeCollaborators.length > 0;
 
   // Salas do contexto selecionado (com busca global)
   const roomsInContext = useMemo(() => {
@@ -140,7 +139,7 @@ export default function Dashboard({ session }: DashboardProps) {
       const q = search.toLowerCase();
       rooms = rooms.filter(room => {
         if (room.name.toLowerCase().includes(q)) return true;
-        return occupants.some(o =>
+        return activeOccupants.some(o =>
           o.assignment.category_id === room.id && (
             o.collaborator.name.toLowerCase().includes(q) ||
             o.assignment.tool_name.toLowerCase().includes(q) ||
@@ -151,12 +150,12 @@ export default function Dashboard({ session }: DashboardProps) {
     }
 
     return rooms;
-  }, [categories, selectedContext, search, selectedRoom, occupants]);
+  }, [categories, selectedContext, search, selectedRoom, activeOccupants]);
 
-  // Ocupantes na sala expandida
+  // Ocupantes na sala expandida (apenas ativos)
   const occupantsInRoom = useMemo(() => {
     if (!selectedRoomId) return [];
-    let result = occupants.filter(o => o.assignment.category_id === selectedRoomId);
+    let result = activeOccupants.filter(o => o.assignment.category_id === selectedRoomId);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(o =>
@@ -166,7 +165,7 @@ export default function Dashboard({ session }: DashboardProps) {
       );
     }
     return result;
-  }, [occupants, selectedRoomId, search]);
+  }, [activeOccupants, selectedRoomId, search]);
 
   // Fallback: agentes antigos
   const agentsInRoom = useMemo(() => {
@@ -196,15 +195,15 @@ export default function Dashboard({ session }: DashboardProps) {
     return agentsInRoom;
   }, [useNewModel, occupantsInRoom, agentsInRoom, assignments]);
 
-  // Contar ocupantes por sala
+  // Contar ocupantes por sala (apenas ativos)
   const countInRoom = useCallback((catId: string, catName: string) => {
-    if (useNewModel) return occupants.filter(o => o.assignment.category_id === catId).length;
+    if (useNewModel) return activeOccupants.filter(o => o.assignment.category_id === catId).length;
     return agents.filter(a => a.category === catName).length;
-  }, [useNewModel, occupants, agents]);
+  }, [useNewModel, activeOccupants, agents]);
 
   const previewInRoom = useCallback((catId: string, catName: string) => {
     if (useNewModel) {
-      return occupants
+      return activeOccupants
         .filter(o => o.assignment.category_id === catId)
         .slice(0, 6)
         .map(o => ({ id: o.assignment.id, icon: o.collaborator.icon, name: o.collaborator.name }));
@@ -213,7 +212,7 @@ export default function Dashboard({ session }: DashboardProps) {
       .filter(a => a.category === catName)
       .slice(0, 6)
       .map(a => ({ id: a.id, icon: a.icon || "⚡", name: a.agent_name || a.name }));
-  }, [useNewModel, occupants, agents]);
+  }, [useNewModel, activeOccupants, agents]);
 
   // Handlers para editar/excluir no OfficeScene
   const handleEdit = (agent: Agent) => {
@@ -251,11 +250,11 @@ export default function Dashboard({ session }: DashboardProps) {
   const timeStr = currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const weekday = currentTime.toLocaleDateString("pt-BR", { weekday: "long" });
   const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
-  const totalCount = useNewModel ? occupants.length : agents.length;
+  const totalCount = useNewModel ? activeOccupants.length : agents.length;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+      <div className="min-h-screen flex items-center justify-center dashboard-bg">
         <div className="flex flex-col items-center gap-3">
           <span className="text-4xl animate-pulse">⚡</span>
           <span className="text-[var(--text-secondary)]">Carregando escritório...</span>
@@ -265,9 +264,9 @@ export default function Dashboard({ session }: DashboardProps) {
   }
 
   return (
-    <div className="h-screen flex flex-col md:flex-row bg-[var(--bg-primary)]">
+    <div className="h-screen flex flex-col md:flex-row dashboard-bg">
       {/* ===== SIDEBAR ===== */}
-      <aside className="order-2 md:order-none w-full md:w-16 bg-[var(--bg-secondary)] border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-2 shrink-0">
+      <aside className="order-2 md:order-none w-full md:w-16 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-2 shrink-0">
         <div className="hidden md:block text-2xl mb-4 cursor-default" title="Jarbas">⚡</div>
         <button onClick={() => setCurrentPage("office")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "office" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Escritório">🏢</button>
         <button onClick={() => setCurrentPage("hr")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "hr" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Gestão de RH">👥</button>
@@ -288,7 +287,7 @@ export default function Dashboard({ session }: DashboardProps) {
         ) : (
         <>
         {/* Header */}
-        <header className="bg-[var(--bg-secondary)] border-b border-[var(--border)] flex flex-wrap items-center px-3 md:px-5 gap-2 md:gap-4 shrink-0 py-2 md:py-0 md:h-14">
+        <header className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] flex flex-wrap items-center px-3 md:px-5 gap-2 md:gap-4 shrink-0 py-2 md:py-0 md:h-14">
           <h1 className="text-base md:text-lg font-semibold">Escritório</h1>
           <div className="hidden md:flex gap-4 ml-4 text-sm">
             <span className="text-[var(--text-secondary)]">

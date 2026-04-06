@@ -53,6 +53,8 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
 
   // Collaborator form
   const [collabName, setCollabName] = useState("");
+  const [collabBio, setCollabBio] = useState("");
+  const [collabStatus, setCollabStatus] = useState<"active" | "dismissed">("active");
   const [gender, setGender] = useState<"male" | "female">("female");
   const [skinTone, setSkinTone] = useState(0);
   const [hairColor, setHairColor] = useState(0);
@@ -60,6 +62,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   const [hasGlasses, setHasGlasses] = useState(false);
   const [icon, setIcon] = useState("⚡");
   const [showNewCollab, setShowNewCollab] = useState(false);
+  const [showDismissed, setShowDismissed] = useState(false);
 
   // Sector form
   const [sectorFilterCtx, setSectorFilterCtx] = useState("IGAM");
@@ -75,6 +78,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   const [asgLink, setAsgLink] = useState("");
   const [asgDesc, setAsgDesc] = useState("");
   const [asgType, setAsgType] = useState<"manual" | "automatic">("manual");
+  const [asgTimeSaved, setAsgTimeSaved] = useState(2);
   const [asgSubLinks, setAsgSubLinks] = useState<SubLink[]>([]);
   const [editingAsg, setEditingAsg] = useState<Assignment | null>(null);
 
@@ -107,11 +111,18 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   // ---- Derived data ----
   const filteredCollaborators = useMemo(() => {
     let result = collaborators;
+
+    // Status filter
+    if (!showDismissed) {
+      result = result.filter(c => (c.status || "active") === "active");
+    }
+
     const q = searchQuery.toLowerCase();
 
     if (q) {
       result = result.filter(c => {
         if (c.name.toLowerCase().includes(q)) return true;
+        if (c.bio?.toLowerCase().includes(q)) return true;
         // Search in assignments too
         return assignments.some(a =>
           a.collaborator_id === c.id && (
@@ -136,7 +147,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     }
 
     return result;
-  }, [collaborators, assignments, categories, searchQuery, filterContext, filterSector]);
+  }, [collaborators, assignments, categories, searchQuery, filterContext, filterSector, showDismissed]);
 
   const getCollabAssignments = useCallback((collabId: string) => {
     return assignments.filter(a => a.collaborator_id === collabId);
@@ -176,7 +187,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
       await addCollaborator({
         name: collabName.trim(), gender, skin_tone: skinTone,
         hair_color: hairColor, shirt_color: shirtColor,
-        has_glasses: hasGlasses, icon,
+        has_glasses: hasGlasses, icon, bio: collabBio, status: collabStatus,
       });
       setShowNewCollab(false);
       resetCollabForm();
@@ -191,7 +202,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
       await updateCollaborator(id, {
         name: collabName.trim(), gender, skin_tone: skinTone,
         hair_color: hairColor, shirt_color: shirtColor,
-        has_glasses: hasGlasses, icon,
+        has_glasses: hasGlasses, icon, bio: collabBio, status: collabStatus,
       });
       setEditingCollab(null);
       await reload();
@@ -214,6 +225,8 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
 
   const openEditCollab = (c: Collaborator) => {
     setCollabName(c.name);
+    setCollabBio(c.bio || "");
+    setCollabStatus(c.status || "active");
     setGender(c.gender);
     setSkinTone(c.skin_tone);
     setHairColor(c.hair_color);
@@ -224,7 +237,8 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   };
 
   const resetCollabForm = () => {
-    setCollabName(""); setGender("female"); setSkinTone(0);
+    setCollabName(""); setCollabBio(""); setCollabStatus("active");
+    setGender("female"); setSkinTone(0);
     setHairColor(0); setShirtColor(1); setHasGlasses(false); setIcon("⚡");
   };
 
@@ -233,7 +247,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     setShowNewAssignment(collabId);
     setEditingAsg(null);
     setAsgCtx("IGAM"); setAsgCatId(""); setAsgTool(""); setAsgLink("");
-    setAsgDesc(""); setAsgType("manual"); setAsgSubLinks([]);
+    setAsgDesc(""); setAsgType("manual"); setAsgTimeSaved(2); setAsgSubLinks([]);
   };
 
   const openEditAssignment = (a: Assignment) => {
@@ -243,6 +257,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     setAsgLink(a.link);
     setAsgDesc(a.description || "");
     setAsgType(a.type);
+    setAsgTimeSaved(a.time_saved_minutes ?? 2);
     setAsgSubLinks(a.sub_links || []);
     setAsgCatId(a.category_id);
     const cat = categories.find(c => c.id === a.category_id);
@@ -257,14 +272,14 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
         await updateAssignment(editingAsg.id, {
           collaborator_id: showNewAssignment,
           category_id: asgCatId, tool_name: asgTool, link: asgLink,
-          description: asgDesc, type: asgType,
+          description: asgDesc, type: asgType, time_saved_minutes: asgTimeSaved,
           sub_links: asgSubLinks.filter(sl => sl.label && sl.url),
         });
       } else {
         await addAssignment({
           collaborator_id: showNewAssignment,
           category_id: asgCatId, tool_name: asgTool, link: asgLink,
-          description: asgDesc, type: asgType,
+          description: asgDesc, type: asgType, time_saved_minutes: asgTimeSaved,
           sub_links: asgSubLinks.filter(sl => sl.label && sl.url),
         });
       }
@@ -520,6 +535,20 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                 </div>
               )}
 
+              {/* Status filter */}
+              <div>
+                <label className="block text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium mb-2">Status</label>
+                <button
+                  onClick={() => setShowDismissed(!showDismissed)}
+                  className={`w-full text-left text-xs px-3 py-2 rounded-lg cursor-pointer transition-all flex items-center justify-between ${
+                    showDismissed ? "bg-[var(--warning)]/10 text-[var(--warning)] font-medium" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                  }`}
+                >
+                  <span>Incluir desligados</span>
+                  <span className="text-[10px]">{showDismissed ? "✓" : ""}</span>
+                </button>
+              </div>
+
               {/* Actions */}
               <div className="mt-auto space-y-2">
                 <button
@@ -588,9 +617,15 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm">{collab.name}</span>
+                              <span className={`font-semibold text-sm ${collab.status === "dismissed" ? "opacity-60" : ""}`}>{collab.name}</span>
                               <span className="text-[10px] text-[var(--text-muted)]">{collab.gender === "female" ? "👩" : "👨"}</span>
+                              {collab.status === "dismissed" && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--danger)]/10 text-[var(--danger)] font-medium">Desligado</span>
+                              )}
                             </div>
+                            {collab.bio && (
+                              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 line-clamp-1">{collab.bio}</p>
+                            )}
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               <span className="text-xs text-[var(--text-muted)]">
                                 {collabAsgs.length} atribuição{collabAsgs.length !== 1 ? "ões" : ""}
@@ -651,6 +686,11 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                                       <div className="flex items-center gap-2 mt-1">
                                         <span className="text-sm font-medium">{asg.tool_name}</span>
                                         {asg.description && <span className="text-xs text-[var(--text-muted)]">· {asg.description}</span>}
+                                        {asg.time_saved_minutes && asg.time_saved_minutes !== 2 && (
+                                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--success)]/10 text-[var(--success)]">
+                                            {asg.time_saved_minutes}min/exec
+                                          </span>
+                                        )}
                                         {asg.sub_links && asg.sub_links.length > 0 && (
                                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)]">
                                             +{asg.sub_links.length} funções
@@ -960,6 +1000,14 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                 </div>
               </div>
 
+              {/* Time saved */}
+              <div>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Tempo economizado por execução (min)</label>
+                <input type="number" min={1} max={120} value={asgTimeSaved} onChange={e => setAsgTimeSaved(Number(e.target.value) || 2)}
+                  className="input-modern !w-24" />
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">Estimativa de minutos que cada uso dessa função economiza</p>
+              </div>
+
               {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <button onClick={() => { setShowNewAssignment(null); setEditingAsg(null); }} className="btn-secondary flex-1">Cancelar</button>
@@ -1020,6 +1068,33 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
           <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Nome</label>
           <input type="text" value={collabName} onChange={e => setCollabName(e.target.value)}
             className="input-modern" placeholder="Ex: Donna, Tony, Izzy..." autoFocus />
+        </div>
+
+        {/* Bio/Detalhamento */}
+        <div>
+          <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Detalhamento</label>
+          <textarea value={collabBio} onChange={e => setCollabBio(e.target.value)}
+            className="input-modern resize-none" rows={3}
+            placeholder="Descreva o perfil, habilidades, papel no escritório..." />
+        </div>
+
+        {/* Status */}
+        <div>
+          <label className="block text-sm text-[var(--text-secondary)] mb-2">Status</label>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setCollabStatus("active")}
+              className={`flex-1 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                collabStatus === "active" ? "bg-[var(--success)] text-white" : "bg-[var(--bg-primary)] border border-[var(--border)]"
+              }`}>
+              ✅ Ativo
+            </button>
+            <button type="button" onClick={() => setCollabStatus("dismissed")}
+              className={`flex-1 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                collabStatus === "dismissed" ? "bg-[var(--danger)] text-white" : "bg-[var(--bg-primary)] border border-[var(--border)]"
+              }`}>
+              Desligado
+            </button>
+          </div>
         </div>
 
         {/* Gender */}

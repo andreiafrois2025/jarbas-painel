@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <defs>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feBlend in="SourceGraphic" mode="multiply" result="blend"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.05"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1400" height="900" fill="#F5F0EA"/>
+
+  <!-- Subtle grid -->
+  <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+    <line x1="0" y1="0" x2="60" y2="0" stroke="#D8D0C8" stroke-width="0.3" opacity="0.4"/>
+    <line x1="0" y1="0" x2="0" y2="60" stroke="#D8D0C8" stroke-width="0.3" opacity="0.4"/>
+  </pattern>
+  <rect width="1400" height="900" fill="url(#grid)"/>
+
+  <!-- Top-left circuit traces -->
+  <g opacity="0.15">
+    <!-- Teal lines -->
+    <line x1="0" y1="120" x2="180" y2="120" stroke="#2D6B6B" stroke-width="1.5"/>
+    <line x1="0" y1="150" x2="120" y2="150" stroke="#2D6B6B" stroke-width="1"/>
+    <line x1="0" y1="180" x2="80" y2="180" stroke="#9BB8BE" stroke-width="1"/>
+    <line x1="0" y1="210" x2="150" y2="210" stroke="#9BB8BE" stroke-width="0.8"/>
+    <line x1="60" y1="240" x2="0" y2="240" stroke="#2D6B6B" stroke-width="1"/>
+    <!-- Vertical -->
+    <line x1="80" y1="180" x2="80" y2="260" stroke="#9BB8BE" stroke-width="1"/>
+    <line x1="80" y1="260" x2="40" y2="300" stroke="#9BB8BE" stroke-width="1"/>
+    <line x1="120" y1="120" x2="120" y2="150" stroke="#2D6B6B" stroke-width="1"/>
+    <line x1="150" y1="150" x2="150" y2="210" stroke="#C4A460" stroke-width="1"/>
+    <!-- Nodes -->
+    <circle cx="180" cy="120" r="3" fill="#2D6B6B"/>
+    <circle cx="120" cy="150" r="2.5" fill="#2D6B6B"/>
+    <circle cx="80" cy="180" r="2" fill="#9BB8BE"/>
+    <circle cx="150" cy="210" r="2.5" fill="#9BB8BE"/>
+    <circle cx="60" cy="240" r="2" fill="#2D6B6B"/>
+    <circle cx="120" cy="120" r="3.5" fill="none" stroke="#2D6B6B" stroke-width="1"/>
+    <circle cx="150" cy="150" r="2" fill="#C4A460"/>
+    <circle cx="40" cy="300" r="2.5" fill="#9BB8BE"/>
+  </g>
+
+  <!-- Top-right circuit traces -->
+  <g opacity="0.15">
+    <line x1="1400" y1="40" x2="1250" y2="40" stroke="#9BB8BE" stroke-width="1"/>
+    <line x1="1400" y1="60" x2="1300" y2="60" stroke="#2D6B6B" stroke-width="1.2"/>
+    <line x1="1300" y1="60" x2="1280" y2="80" stroke="#2D6B6B" stroke-width="1.2"/>
+    <line x1="1280" y1="80" x2="1200" y2="80" stroke="#2D6B6B" stroke-width="1.2"/>
+    <line x1="1350" y1="0" x2="1350" y2="60" stroke="#C4A460" stroke-width="1"/>
+    <line x1="1250" y1="0" x2="1250" y2="40" stroke="#C4A460" stroke-width="0.8"/>
+    <line x1="1250" y1="40" x2="1250" y2="120" stroke="#9BB8BE" stroke-width="0.8"/>
+    <line x1="1320" y1="0" x2="1320" y2="30" stroke="#9BB8BE" stroke-width="0.8"/>
+    <line x1="1320" y1="30" x2="1280" y2="30" stroke="#9BB8BE" stroke-width="0.8"/>
+    <!-- Angular paths -->
+    <polyline points="1400,100 1350,100 1350,140 1300,140" fill="none" stroke="#C4A460" stroke-width="1"/>
+    <polyline points="1400,130 1380,130 1380,160 1340,160 1340,200" fill="none" stroke="#9BB8BE" stroke-width="0.8"/>
+    <!-- Nodes -->
+    <circle cx="1250" cy="40" r="3" fill="#9BB8BE"/>
+    <circle cx="1200" cy="80" r="3" fill="#2D6B6B"/>
+    <circle cx="1350" cy="60" r="2.5" fill="#C4A460"/>
+    <circle cx="1300" cy="140" r="2.5" fill="#C4A460"/>
+    <circle cx="1280" cy="30" r="2" fill="#9BB8BE"/>
+    <circle cx="1340" cy="200" r="2.5" fill="#9BB8BE"/>
+    <circle cx="1250" cy="120" r="3.5" fill="none" stroke="#9BB8BE" stroke-width="1"/>
+    <circle cx="1300" cy="60" r="3" fill="none" stroke="#2D6B6B" stroke-width="1"/>
+  </g>
+
+  <!-- Bottom-right circuit traces -->
+  <g opacity="0.15">
+    <line x1="1400" y1="750" x2="1300" y2="750" stroke="#2D6B6B" stroke-width="1.5"/>
+    <line x1="1300" y1="750" x2="1280" y2="730" stroke="#2D6B6B" stroke-width="1.5"/>
+    <line x1="1280" y1="730" x2="1280" y2="650" stroke="#2D6B6B" stroke-width="1.5"/>
+    <line x1="1280" y1="650" x2="1320" y2="620" stroke="#2D6B6B" stroke-width="1.2"/>
+    <line x1="1320" y1="620" x2="1320" y2="550" stroke="#2D6B6B" stroke-width="1"/>
+    <line x1="1400" y1="780" x2="1350" y2="780" stroke="#C4A460" stroke-width="1"/>
+    <line x1="1350" y1="780" x2="1350" y2="820" stroke="#C4A460" stroke-width="1"/>
+    <line x1="1400" y1="810" x2="1380" y2="810" stroke="#9BB8BE" stroke-width="0.8"/>
+    <line x1="1380" y1="810" x2="1380" y2="860" stroke="#9BB8BE" stroke-width="0.8"/>
+    <line x1="1380" y1="860" x2="1340" y2="860" stroke="#9BB8BE" stroke-width="0.8"/>
+    <polyline points="1400,850 1360,850 1360,900" fill="none" stroke="#C4A460" stroke-width="0.8"/>
+    <polyline points="1300,900 1300,830 1260,800 1260,750" fill="none" stroke="#9BB8BE" stroke-width="1"/>
+    <polyline points="1240,900 1240,860 1220,840 1220,800" fill="none" stroke="#2D6B6B" stroke-width="1"/>
+    <!-- Nodes -->
+    <circle cx="1300" cy="750" r="3" fill="#2D6B6B"/>
+    <circle cx="1280" cy="650" r="2.5" fill="#2D6B6B"/>
+    <circle cx="1320" cy="550" r="3" fill="#2D6B6B"/>
+    <circle cx="1350" cy="820" r="2.5" fill="#C4A460"/>
+    <circle cx="1340" cy="860" r="2" fill="#9BB8BE"/>
+    <circle cx="1260" cy="750" r="3.5" fill="none" stroke="#9BB8BE" stroke-width="1"/>
+    <circle cx="1220" cy="800" r="2.5" fill="#2D6B6B"/>
+    <circle cx="1360" cy="850" r="2" fill="#C4A460"/>
+  </g>
+
+  <!-- Bottom-left circuit traces -->
+  <g opacity="0.12">
+    <line x1="0" y1="700" x2="60" y2="700" stroke="#C4A460" stroke-width="1"/>
+    <line x1="60" y1="700" x2="80" y2="720" stroke="#C4A460" stroke-width="1"/>
+    <line x1="80" y1="720" x2="80" y2="780" stroke="#C4A460" stroke-width="1"/>
+    <line x1="0" y1="750" x2="40" y2="750" stroke="#9BB8BE" stroke-width="0.8"/>
+    <line x1="40" y1="750" x2="40" y2="800" stroke="#9BB8BE" stroke-width="0.8"/>
+    <line x1="0" y1="800" x2="100" y2="800" stroke="#2D6B6B" stroke-width="1.2"/>
+    <line x1="100" y1="800" x2="120" y2="820" stroke="#2D6B6B" stroke-width="1.2"/>
+    <line x1="120" y1="820" x2="120" y2="900" stroke="#2D6B6B" stroke-width="1"/>
+    <polyline points="0,830 60,830 60,870 100,870 100,900" fill="none" stroke="#C4A460" stroke-width="0.8"/>
+    <polyline points="0,860 30,860 30,900" fill="none" stroke="#9BB8BE" stroke-width="0.8"/>
+    <polyline points="160,900 160,850 140,830 140,780 100,750" fill="none" stroke="#2D6B6B" stroke-width="1"/>
+    <!-- Nodes -->
+    <circle cx="60" cy="700" r="2.5" fill="#C4A460"/>
+    <circle cx="80" cy="780" r="2" fill="#C4A460"/>
+    <circle cx="40" cy="800" r="2" fill="#9BB8BE"/>
+    <circle cx="100" cy="800" r="3" fill="#2D6B6B"/>
+    <circle cx="100" cy="870" r="2" fill="#C4A460"/>
+    <circle cx="30" cy="860" r="2" fill="#9BB8BE"/>
+    <circle cx="100" cy="750" r="3" fill="none" stroke="#2D6B6B" stroke-width="1"/>
+    <circle cx="80" cy="720" r="2.5" fill="none" stroke="#C4A460" stroke-width="1"/>
+  </g>
+
+  <!-- Center subtle elements -->
+  <g opacity="0.06">
+    <circle cx="700" cy="450" r="2" fill="#2D6B6B"/>
+    <line x1="680" y1="450" x2="720" y2="450" stroke="#9BB8BE" stroke-width="0.5"/>
+    <circle cx="500" cy="600" r="1.5" fill="#C4A460"/>
+    <line x1="490" y1="600" x2="510" y2="600" stroke="#C4A460" stroke-width="0.5"/>
+    <circle cx="900" cy="350" r="1.5" fill="#9BB8BE"/>
+  </g>
+
+  <!-- Grain texture -->
+  <rect width="1400" height="900" filter="url(#grain)" opacity="0.3"/>
+</svg>

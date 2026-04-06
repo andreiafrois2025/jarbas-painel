@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { Flow, Agent } from "@/lib/types";
-import { getFlows, addFlow, updateFlow, deleteFlow, executeFlow, getAgents } from "@/lib/storage";
+import type { Flow, Agent, Assignment, Collaborator } from "@/lib/types";
+import { getFlows, addFlow, updateFlow, deleteFlow, executeFlow, getAssignments, getCollaborators } from "@/lib/storage";
 import FlowModal from "./FlowModal";
 
 // =============================================
@@ -36,6 +36,8 @@ interface FlowsPageProps {
 export default function FlowsPage({ onNavigate }: FlowsPageProps) {
   const [flows, setFlows] = useState<Flow[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingFlow, setEditingFlow] = useState<Flow | null>(null);
@@ -44,9 +46,30 @@ export default function FlowsPage({ onNavigate }: FlowsPageProps) {
 
   const loadData = useCallback(async () => {
     try {
-      const [flowsData, agentsData] = await Promise.all([getFlows(), getAgents()]);
+      const [flowsData, asgData, collabData] = await Promise.all([
+        getFlows(), getAssignments(), getCollaborators(),
+      ]);
       setFlows(flowsData);
-      setAgents(agentsData);
+      setAssignments(asgData);
+      setCollaborators(collabData);
+
+      // Converter assignments para Agent[] para compatibilidade com FlowModal/steps
+      const agentLike: Agent[] = asgData.map(a => {
+        const collab = collabData.find(c => c.id === a.collaborator_id);
+        return {
+          id: a.id,
+          agent_name: collab?.name || "?",
+          name: a.tool_name,
+          link: a.link,
+          category: a.category?.name || "",
+          type: a.type,
+          icon: collab?.icon || "⚡",
+          description: a.description,
+          gender: collab?.gender,
+          sub_links: a.sub_links,
+        };
+      });
+      setAgents(agentLike);
     } catch (err) {
       console.error("Erro ao carregar fluxos:", err);
     } finally {
@@ -180,7 +203,7 @@ export default function FlowsPage({ onNavigate }: FlowsPageProps) {
             <span className="text-[var(--text-primary)] font-medium">{flows.length}</span> fluxos
           </span>
           <span className="text-[var(--text-secondary)]">
-            <span className="text-[var(--text-primary)] font-medium">{agents.length}</span> agentes disponíveis
+            <span className="text-[var(--text-primary)] font-medium">{agents.length}</span> funções disponíveis
           </span>
         </div>
 

@@ -301,6 +301,15 @@ body {
 .input-modern:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,107,107,0.1); }
 .input-modern::placeholder { color: var(--text-muted); }
 
+/* Dashboard background with circuit pattern */
+.dashboard-bg {
+  background-image: url('/bg-dashboard.svg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
 /* ---- Office Scene (isometric view) ---- */
 .office-scene {
   cursor: default;

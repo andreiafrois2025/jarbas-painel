@@ -1,42 +1,50 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import type { Execution, Agent, Flow } from "@/lib/types";
-import { getExecutions, getAgents, getFlows } from "@/lib/storage";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import type { Execution, Collaborator, Assignment, Category, Flow } from "@/lib/types";
+import {
+  getExecutions, getCollaborators, getAssignments,
+  getCategories, getFlows,
+} from "@/lib/storage";
 
 // =============================================
-// Página de Métricas — Dashboard de produtividade
-// Exibe estatísticas, gráficos e "Funcionário do Mês"
+// Página de Métricas v3 — Dashboard de produtividade
+// Usa novo modelo (collaborators + assignments)
+// Tempo economizado calculado por função
 // =============================================
 
-interface FlowsPageProps {
+interface MetricsPageProps {
   onNavigate: (page: string) => void;
 }
 
-// Contagem de execuções por agente
-interface AgentStats {
-  agentId: string;
-  agentName: string;
-  icon: string;
-  gender: string;
-  count: number;
+interface CollabStats {
+  collaborator: Collaborator;
+  assignments: Assignment[];
+  totalExecs: number;
+  timeSaved: number;
+  functions: { toolName: string; description: string; count: number; timeSaved: number }[];
 }
 
-export default function MetricsPage({ onNavigate }: FlowsPageProps) {
+export default function MetricsPage({ onNavigate }: MetricsPageProps) {
   const [executions, setExecutions] = useState<Execution[]>([]);
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [flows, setFlows] = useState<Flow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"active" | "all" | "dismissed">("active");
+  const [expandedCollab, setExpandedCollab] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [execs, agts, flws] = await Promise.all([
-        getExecutions(),
-        getAgents(),
-        getFlows(),
+      const [execs, collabs, asgs, cats, flws] = await Promise.all([
+        getExecutions(), getCollaborators(), getAssignments(),
+        getCategories(), getFlows(),
       ]);
       setExecutions(execs);
-      setAgents(agts);
+      setCollaborators(collabs);
+      setAssignments(asgs);
+      setCategories(cats);
       setFlows(flws);
     } catch (err) {
       console.error("Erro ao carregar métricas:", err);
@@ -45,83 +53,107 @@ export default function MetricsPage({ onNavigate }: FlowsPageProps) {
     }
   }, []);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // --- Cálculos ---
+  // --- Filtered collaborators by status ---
+  const filteredCollabs = useMemo(() => {
+    if (statusFilter === "all") return collaborators;
+    return collaborators.filter(c => (c.status || "active") === statusFilter);
+  }, [collaborators, statusFilter]);
 
-  const todayCount = executions.filter((e) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return new Date(e.created_at || "").getTime() >= today.getTime();
-  }).length;
+  // --- Map executions to assignments ---
+  const execWithDetails = useMemo(() => {
+    return executions.map(exec => {
+      const assignment = assignments.find(a => a.id === exec.agent_id);
+      const collaborator = assignment
+        ? collaborators.find(c => c.id === assignment.collaborator_id)
+        : null;
+      const category = assignment
+        ? categories.find(c => c.id === assignment.category_id)
+        : null;
+      return { exec, assignment, collaborator, category };
+    });
+  }, [executions, assignments, collaborators, categories]);
 
-  const weekCount = executions.filter((e) => {
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    return new Date(e.created_at || "").getTime() >= weekAgo.getTime();
-  }).length;
+  // --- Time-based filters ---
+  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }, []);
+  const weekAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.getTime(); }, []);
+  const monthAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.getTime(); }, []);
 
-  const monthCount = executions.filter((e) => {
-    const monthAgo = new Date();
-    monthAgo.setDate(monthAgo.getDate() - 30);
-    return new Date(e.created_at || "").getTime() >= monthAgo.getTime();
-  }).length;
+  const todayCount = executions.filter(e => new Date(e.created_at || "").getTime() >= todayStart).length;
+  const weekCount = executions.filter(e => new Date(e.created_at || "").getTime() >= weekAgo).length;
+  const monthCount = executions.filter(e => new Date(e.created_at || "").getTime() >= monthAgo).length;
 
-  // Estatísticas por agente
-  const agentStats: AgentStats[] = agents
-    .map((agent) => ({
-      agentId: agent.id,
-      agentName: agent.agent_name || agent.name,
-      icon: agent.icon || "⚡",
-      gender: agent.gender || "male",
-      count: executions.filter((e) => e.agent_id === agent.id).length,
-    }))
-    .sort((a, b) => b.count - a.count);
+  // --- Time saved (per-function calculation) ---
+  const totalTimeSaved = useMemo(() => {
+    return execWithDetails.reduce((sum, { assignment }) => {
+      return sum + (assignment?.time_saved_minutes ?? 2);
+    }, 0);
+  }, [execWithDetails]);
 
-  // Funcionário do mês (agente com mais execuções nos últimos 30 dias)
-  const monthExecs = executions.filter((e) => {
-    const monthAgo = new Date();
-    monthAgo.setDate(monthAgo.getDate() - 30);
-    return new Date(e.created_at || "").getTime() >= monthAgo.getTime();
-  });
+  const hoursSaved = Math.floor(totalTimeSaved / 60);
+  const remainingMin = totalTimeSaved % 60;
 
-  const employeeOfMonth = agents
-    .map((agent) => ({
-      agent,
-      count: monthExecs.filter((e) => e.agent_id === agent.id).length,
-    }))
-    .sort((a, b) => b.count - a.count)[0];
+  // --- Collaborator stats with function breakdown ---
+  const collabStats: CollabStats[] = useMemo(() => {
+    return filteredCollabs.map(collab => {
+      const collabAsgs = assignments.filter(a => a.collaborator_id === collab.id);
+      const asgIds = new Set(collabAsgs.map(a => a.id));
+      const collabExecs = executions.filter(e => asgIds.has(e.agent_id || ""));
+      const timeSaved = collabExecs.reduce((sum, e) => {
+        const asg = collabAsgs.find(a => a.id === e.agent_id);
+        return sum + (asg?.time_saved_minutes ?? 2);
+      }, 0);
 
-  // Barra máxima para gráfico
-  const maxCount = Math.max(...agentStats.map((s) => s.count), 1);
+      // Breakdown per function/assignment
+      const functions = collabAsgs.map(asg => {
+        const fExecs = collabExecs.filter(e => e.agent_id === asg.id);
+        return {
+          toolName: asg.tool_name,
+          description: asg.description || "",
+          count: fExecs.length,
+          timeSaved: fExecs.length * (asg.time_saved_minutes ?? 2),
+        };
+      }).sort((a, b) => b.count - a.count);
 
-  // Execuções por dia (últimos 7 dias)
-  const dailyData = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - i));
-    date.setHours(0, 0, 0, 0);
-    const nextDay = new Date(date);
-    nextDay.setDate(nextDay.getDate() + 1);
+      return { collaborator: collab, assignments: collabAsgs, totalExecs: collabExecs.length, timeSaved, functions };
+    }).sort((a, b) => b.totalExecs - a.totalExecs);
+  }, [filteredCollabs, assignments, executions]);
 
-    const count = executions.filter((e) => {
-      const t = new Date(e.created_at || "").getTime();
-      return t >= date.getTime() && t < nextDay.getTime();
-    }).length;
+  // --- Employee of the Month ---
+  type EmpOfMonth = { collab: Collaborator; count: number };
+  const employeeOfMonth = useMemo<EmpOfMonth | null>(() => {
+    const monthExecs = executions.filter(e => new Date(e.created_at || "").getTime() >= monthAgo);
+    const map = new Map<string, EmpOfMonth>();
+    monthExecs.forEach(e => {
+      const asg = assignments.find(a => a.id === e.agent_id);
+      if (!asg) return;
+      const collab = collaborators.find(c => c.id === asg.collaborator_id);
+      if (!collab) return;
+      const existing = map.get(collab.id);
+      if (existing) existing.count++;
+      else map.set(collab.id, { collab, count: 1 });
+    });
+    let best: EmpOfMonth | null = null;
+    map.forEach(v => { if (!best || v.count > best.count) best = v; });
+    return best;
+  }, [executions, assignments, collaborators, monthAgo]);
 
-    return {
-      label: date.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""),
-      count,
-    };
-  });
+  // --- Daily chart data ---
+  const dailyData = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(); date.setDate(date.getDate() - (6 - i)); date.setHours(0, 0, 0, 0);
+      const next = new Date(date); next.setDate(next.getDate() + 1);
+      const count = executions.filter(e => {
+        const t = new Date(e.created_at || "").getTime();
+        return t >= date.getTime() && t < next.getTime();
+      }).length;
+      return { label: date.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""), count };
+    });
+  }, [executions]);
 
-  const maxDaily = Math.max(...dailyData.map((d) => d.count), 1);
-
-  // Tempo estimado economizado (2 min por execução manual)
-  const minutesSaved = executions.length * 2;
-  const hoursSaved = Math.floor(minutesSaved / 60);
-  const remainingMinutes = minutesSaved % 60;
+  const maxDaily = Math.max(...dailyData.map(d => d.count), 1);
+  const maxCount = Math.max(...collabStats.map(s => s.totalExecs), 1);
 
   if (loading) {
     return (
@@ -135,61 +167,77 @@ export default function MetricsPage({ onNavigate }: FlowsPageProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden dashboard-bg">
       {/* Header */}
-      <header className="h-14 bg-[var(--bg-secondary)] border-b border-[var(--border)] flex items-center px-5 gap-4 shrink-0">
+      <header className="h-14 bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] flex items-center px-5 gap-4 shrink-0">
         <h1 className="text-lg font-semibold">Métricas</h1>
         <span className="text-sm text-[var(--text-muted)]">Produtividade do escritório</span>
+        <div className="flex-1" />
+        {/* Status filter */}
+        <div className="flex gap-1 bg-[var(--bg-primary)] rounded-lg p-0.5 border border-[var(--border)]">
+          {([
+            { key: "active" as const, label: "Ativos" },
+            { key: "all" as const, label: "Todos" },
+            { key: "dismissed" as const, label: "Desligados" },
+          ]).map(opt => (
+            <button key={opt.key} onClick={() => setStatusFilter(opt.key)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-all ${
+                statusFilter === opt.key
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </header>
 
-      {/* Conteúdo */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-4 md:p-6">
+        <div className="max-w-7xl mx-auto space-y-5">
 
-          {/* Cards de resumo */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-4">
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-4">
               <p className="text-xs text-[var(--text-muted)] mb-1">Hoje</p>
               <p className="text-2xl font-bold text-[var(--success)]">{todayCount}</p>
               <p className="text-xs text-[var(--text-muted)]">execuções</p>
             </div>
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-4">
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-4">
               <p className="text-xs text-[var(--text-muted)] mb-1">Esta semana</p>
               <p className="text-2xl font-bold text-[var(--accent)]">{weekCount}</p>
               <p className="text-xs text-[var(--text-muted)]">execuções</p>
             </div>
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-4">
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-4">
               <p className="text-xs text-[var(--text-muted)] mb-1">Este mês</p>
               <p className="text-2xl font-bold text-[var(--text-primary)]">{monthCount}</p>
               <p className="text-xs text-[var(--text-muted)]">execuções</p>
             </div>
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-4">
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-4">
               <p className="text-xs text-[var(--text-muted)] mb-1">Tempo economizado</p>
               <p className="text-2xl font-bold text-[var(--warning)]">
-                {hoursSaved > 0 ? `${hoursSaved}h${remainingMinutes > 0 ? remainingMinutes : ""}` : `${minutesSaved}min`}
+                {hoursSaved > 0 ? `${hoursSaved}h${remainingMin > 0 ? remainingMin : ""}` : `${totalTimeSaved}min`}
               </p>
-              <p className="text-xs text-[var(--text-muted)]">estimado</p>
+              <p className="text-xs text-[var(--text-muted)]">baseado no uso real</p>
             </div>
           </div>
 
-          {/* Funcionário do Mês + Resumo */}
+          {/* Employee of the Month + Daily Chart */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Funcionário do mês */}
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-5 flex flex-col items-center text-center">
+            {/* Employee of the month */}
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-5 flex flex-col items-center text-center">
               <p className="text-xs text-[var(--text-muted)] mb-3 uppercase tracking-wider font-medium">
-                Funcionário do Mês
+                Colaborador do Mês
               </p>
-              {employeeOfMonth && employeeOfMonth.count > 0 ? (
+              {employeeOfMonth !== null ? (
                 <>
                   <div className="relative mb-3">
-                    <span className="text-5xl">{employeeOfMonth.agent.icon || "⚡"}</span>
+                    <span className="text-5xl">{employeeOfMonth.collab.icon || "⚡"}</span>
                     <span className="absolute -top-1 -right-2 text-2xl">🏆</span>
                   </div>
-                  <p className="font-semibold text-base">
-                    {employeeOfMonth.agent.agent_name || employeeOfMonth.agent.name}
-                  </p>
+                  <p className="font-semibold text-base">{employeeOfMonth.collab.name}</p>
                   <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                    {employeeOfMonth.agent.name} · {employeeOfMonth.agent.description}
+                    {employeeOfMonth.collab.bio || `${assignments.filter(a => a.collaborator_id === employeeOfMonth.collab.id).length} funções`}
                   </p>
                   <div className="mt-3 bg-[var(--accent-soft)] rounded-full px-3 py-1">
                     <span className="text-sm font-bold text-[var(--accent)]">
@@ -201,13 +249,13 @@ export default function MetricsPage({ onNavigate }: FlowsPageProps) {
                 <>
                   <span className="text-4xl mb-2 opacity-30">🏆</span>
                   <p className="text-sm text-[var(--text-muted)]">Nenhuma execução ainda</p>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">Use seus agentes para eleger o funcionário do mês!</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Use seus colaboradores para eleger o destaque do mês!</p>
                 </>
               )}
             </div>
 
-            {/* Gráfico diário */}
-            <div className="md:col-span-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-5">
+            {/* Daily chart */}
+            <div className="md:col-span-2 bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-5">
               <p className="text-xs text-[var(--text-muted)] mb-4 uppercase tracking-wider font-medium">
                 Últimos 7 dias
               </p>
@@ -232,92 +280,141 @@ export default function MetricsPage({ onNavigate }: FlowsPageProps) {
             </div>
           </div>
 
-          {/* Ranking de agentes */}
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-5">
+          {/* Ranking de Colaboradores com funções */}
+          <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-5">
             <p className="text-xs text-[var(--text-muted)] mb-4 uppercase tracking-wider font-medium">
-              Ranking de Agentes
+              Ranking de Colaboradores
             </p>
-            {agentStats.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)] text-center py-4">Nenhum agente cadastrado</p>
+            {collabStats.length === 0 ? (
+              <p className="text-sm text-[var(--text-muted)] text-center py-4">
+                {statusFilter === "dismissed" ? "Nenhum colaborador desligado" : "Nenhum colaborador cadastrado"}
+              </p>
             ) : (
-              <div className="space-y-3">
-                {agentStats.map((stat, i) => (
-                  <div key={stat.agentId} className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-[var(--text-muted)] w-5 text-right">
-                      {i + 1}
-                    </span>
-                    <span className="text-lg w-7 text-center">{stat.icon}</span>
-                    <span className="text-sm font-medium w-28 truncate">{stat.agentName}</span>
-                    <div className="flex-1 h-6 bg-[var(--bg-primary)] rounded-full overflow-hidden">
+              <div className="space-y-2">
+                {collabStats.map((stat, i) => {
+                  const isExpanded = expandedCollab === stat.collaborator.id;
+                  const isDismissed = stat.collaborator.status === "dismissed";
+                  return (
+                    <div key={stat.collaborator.id}>
                       <div
-                        className="h-full rounded-full transition-all flex items-center justify-end pr-2"
-                        style={{
-                          width: `${Math.max((stat.count / maxCount) * 100, 2)}%`,
-                          backgroundColor: i === 0 && stat.count > 0
-                            ? "var(--accent)"
-                            : i === 1 && stat.count > 0
-                            ? "var(--accent-hover)"
-                            : "var(--bg-tertiary)",
-                          minWidth: stat.count > 0 ? "32px" : "8px",
-                        }}
+                        className={`flex items-center gap-3 py-2 px-3 rounded-xl cursor-pointer transition-all hover:bg-[var(--bg-primary)] ${isDismissed ? "opacity-60" : ""}`}
+                        onClick={() => setExpandedCollab(isExpanded ? null : stat.collaborator.id)}
                       >
-                        {stat.count > 0 && (
-                          <span className="text-[10px] font-bold text-white">{stat.count}</span>
-                        )}
+                        <span className="text-sm font-bold text-[var(--text-muted)] w-5 text-right">{i + 1}</span>
+                        <span className="text-lg w-7 text-center">{stat.collaborator.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium truncate">{stat.collaborator.name}</span>
+                            {isDismissed && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--danger)]/10 text-[var(--danger)] font-medium">Desligado</span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-[var(--text-muted)]">
+                            {stat.assignments.length} função{stat.assignments.length !== 1 ? "ões" : ""} · {stat.timeSaved}min economizados
+                          </span>
+                        </div>
+                        <div className="flex-1 max-w-xs h-6 bg-[var(--bg-primary)] rounded-full overflow-hidden hidden sm:block">
+                          <div
+                            className="h-full rounded-full transition-all flex items-center justify-end pr-2"
+                            style={{
+                              width: `${Math.max((stat.totalExecs / maxCount) * 100, 2)}%`,
+                              backgroundColor: i === 0 && stat.totalExecs > 0 ? "var(--accent)" : i === 1 && stat.totalExecs > 0 ? "var(--accent-hover)" : "var(--bg-tertiary)",
+                              minWidth: stat.totalExecs > 0 ? "32px" : "8px",
+                            }}
+                          >
+                            {stat.totalExecs > 0 && <span className="text-[10px] font-bold text-white">{stat.totalExecs}</span>}
+                          </div>
+                        </div>
+                        <span className="sm:hidden text-sm font-bold text-[var(--accent)]">{stat.totalExecs}</span>
+                        <span className={`text-xs transition-transform ${isExpanded ? "rotate-180" : ""}`}>▼</span>
                       </div>
+
+                      {/* Expanded: function breakdown */}
+                      {isExpanded && stat.functions.length > 0 && (
+                        <div className="ml-14 mr-3 mb-2 mt-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border)] divide-y divide-[var(--border)]">
+                          {stat.functions.map((fn, fi) => (
+                            <div key={fi} className="flex items-center gap-3 px-4 py-2.5">
+                              <div className="flex-1 min-w-0">
+                                <span className="text-xs font-medium">{fn.toolName}</span>
+                                {fn.description && <span className="text-[10px] text-[var(--text-muted)]"> · {fn.description}</span>}
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-medium">
+                                {fn.count} exec{fn.count !== 1 ? "." : "."}
+                              </span>
+                              <span className="text-[10px] text-[var(--text-muted)]">
+                                {fn.timeSaved}min
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {isExpanded && stat.functions.length === 0 && (
+                        <div className="ml-14 mr-3 mb-2 mt-1 text-xs text-[var(--text-muted)] text-center py-3">
+                          Nenhuma execução registrada
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* Histórico de execuções recentes */}
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-5">
+          {/* Execuções Recentes (com detalhes de função) */}
+          <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-5">
             <p className="text-xs text-[var(--text-muted)] mb-4 uppercase tracking-wider font-medium">
               Execuções Recentes
             </p>
             {executions.length === 0 ? (
               <p className="text-sm text-[var(--text-muted)] text-center py-4">Nenhuma execução registrada</p>
             ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {executions.slice(0, 20).map((exec) => {
-                  const agent = agents.find((a) => a.id === exec.agent_id);
-                  const flow = flows.find((f) => f.id === exec.flow_id);
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                {execWithDetails.slice(0, 30).map(({ exec, assignment, collaborator, category }) => {
+                  const flow = flows.find(f => f.id === exec.flow_id);
                   return (
-                    <div
-                      key={exec.id}
-                      className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-[var(--bg-primary)] transition-all"
-                    >
-                      <span className="text-lg">{agent?.icon || "⚡"}</span>
+                    <div key={exec.id} className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-[var(--bg-primary)] transition-all">
+                      <span className="text-lg">{collaborator?.icon || "⚡"}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {agent?.agent_name || agent?.name || "Agente removido"}
-                        </p>
-                        {flow && (
-                          <p className="text-[10px] text-[var(--text-muted)]">
-                            Fluxo: {flow.name}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium truncate">
+                            {collaborator?.name || "Colaborador removido"}
+                          </span>
+                          {assignment && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent)] font-medium shrink-0">
+                              {assignment.tool_name}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {assignment?.description && (
+                            <span className="text-[10px] text-[var(--text-muted)]">{assignment.description}</span>
+                          )}
+                          {category && (
+                            <span className="text-[10px] text-[var(--text-muted)]">· {category.context} › {category.name}</span>
+                          )}
+                          {flow && (
+                            <span className="text-[10px] text-[var(--text-muted)]">· Fluxo: {flow.name}</span>
+                          )}
+                        </div>
                       </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
                         exec.status === "completed"
                           ? "bg-[var(--success)]/10 text-[var(--success)]"
                           : exec.status === "failed"
                           ? "bg-[var(--danger)]/10 text-[var(--danger)]"
                           : "bg-[var(--warning)]/10 text-[var(--warning)]"
                       }`}>
-                        {exec.status === "completed" ? "Concluído" : exec.status === "failed" ? "Falhou" : "Em andamento"}
+                        {exec.status === "completed" ? "OK" : exec.status === "failed" ? "Falha" : "..."}
                       </span>
-                      <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap">
-                        {exec.created_at
-                          ? new Date(exec.created_at).toLocaleDateString("pt-BR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : ""}
+                      {assignment?.time_saved_minutes && (
+                        <span className="text-[10px] text-[var(--warning)] font-medium shrink-0">
+                          +{assignment.time_saved_minutes}min
+                        </span>
+                      )}
+                      <span className="text-[10px] text-[var(--text-muted)] whitespace-nowrap shrink-0">
+                        {exec.created_at ? new Date(exec.created_at).toLocaleDateString("pt-BR", {
+                          day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                        }) : ""}
                       </span>
                     </div>
                   );
@@ -326,17 +423,21 @@ export default function MetricsPage({ onNavigate }: FlowsPageProps) {
             )}
           </div>
 
-          {/* Info geral */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-4 text-center">
-              <p className="text-2xl font-bold">{agents.length}</p>
-              <p className="text-xs text-[var(--text-muted)]">Agentes ativos</p>
+          {/* Info cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-4 text-center">
+              <p className="text-2xl font-bold">{collaborators.filter(c => (c.status || "active") === "active").length}</p>
+              <p className="text-xs text-[var(--text-muted)]">Colaboradores ativos</p>
             </div>
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-4 text-center">
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-4 text-center">
+              <p className="text-2xl font-bold">{assignments.length}</p>
+              <p className="text-xs text-[var(--text-muted)]">Funções cadastradas</p>
+            </div>
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-4 text-center">
               <p className="text-2xl font-bold">{flows.length}</p>
               <p className="text-xs text-[var(--text-muted)]">Fluxos criados</p>
             </div>
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-4 text-center">
+            <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border border-[var(--border)] rounded-2xl p-4 text-center">
               <p className="text-2xl font-bold">{executions.length}</p>
               <p className="text-xs text-[var(--text-muted)]">Total execuções</p>
             </div>
