@@ -6,6 +6,7 @@
 export interface SubLink {
   label: string;  // Nome da função ex: "Atendimento", "RH", "Folha"
   url: string;    // Link do GPT/ferramenta
+  tool_name?: string; // IA/ferramenta específica desta função (ex: "Claude", "GPT")
 }
 
 /** Agente de IA — representa um funcionário do escritório */

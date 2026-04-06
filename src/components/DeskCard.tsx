@@ -352,13 +352,8 @@ export default function DeskCard({ agent, onEdit, onDelete }: DeskCardProps) {
         <rect x="32" y="153" width="116" height="3" rx="1.5" fill="rgba(255,255,255,0.03)" />
 
         <text x="90" y="164" textAnchor="middle" fill="#FFD700" fontSize="10" fontWeight="bold" fontFamily="'Segoe UI',Tahoma,sans-serif">
-          {agent.name.length > 16 ? agent.name.slice(0, 15) + "…" : agent.name}
+          {(agent.description || agent.agent_name || "").length > 16 ? (agent.description || agent.agent_name || "").slice(0, 15) + "…" : (agent.description || agent.agent_name || "")}
         </text>
-        {agent.description && (
-          <text x="90" y="172" textAnchor="middle" fill="#999" fontSize="7.5" fontFamily="'Segoe UI',Tahoma,sans-serif">
-            {agent.description.length > 22 ? agent.description.slice(0, 21) + "…" : agent.description}
-          </text>
-        )}
       </svg>
     </div>
   );

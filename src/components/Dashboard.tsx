@@ -63,7 +63,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics" | "hr">("office");
-  const [productsRoom, setProductsRoom] = useState<{ id: string; name: string } | null>(null);
+  const [productsRoom, setProductsRoom] = useState<{ id: string; name: string; categoryIds?: string[] } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -341,13 +341,24 @@ export default function Dashboard({ session }: DashboardProps) {
             </div>
 
             {/* Context tabs */}
-            <div style={{ background: "var(--win-surface)", padding: "4px 4px 0", borderBottom: "2px solid var(--win-border-dark)", display: "flex", gap: 2, overflowX: "auto" }}>
+            <div style={{ background: "var(--win-surface)", padding: "4px 4px 0", borderBottom: "2px solid var(--win-border-dark)", display: "flex", gap: 2, overflowX: "auto", alignItems: "center" }}>
               {CONTEXTS.map((ctx) => (
                 <button key={ctx} className={`context-tab${selectedContext === ctx ? " active" : ""}`}
                   onClick={() => { setSelectedContext(ctx); setSelectedRoom(null); setSelectedRoomId(null); }}>
                   {ctx}
                 </button>
               ))}
+              <div style={{ marginLeft: "auto", paddingRight: 4 }}>
+                <button
+                  onClick={() => {
+                    const ctxCatIds = categories.filter(c => c.context === selectedContext).map(c => c.id);
+                    setProductsRoom({ id: ctxCatIds[0] || "", name: `Entregas — ${selectedContext}`, categoryIds: ctxCatIds });
+                  }}
+                  className="text-[10px] px-2.5 py-1 rounded cursor-pointer font-bold transition-all hover:brightness-110"
+                  style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)" }}
+                  title={`Entregas da área ${selectedContext}`}
+                >📦 Entregas</button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto office-floor p-2 md:p-4">
@@ -516,6 +527,7 @@ export default function Dashboard({ session }: DashboardProps) {
       {productsRoom && (
         <ProductsPanel
           categoryId={productsRoom.id}
+          categoryIds={productsRoom.categoryIds}
           categoryName={productsRoom.name}
           onClose={() => setProductsRoom(null)}
         />

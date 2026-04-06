@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { Flow, FlowStep, Agent } from "@/lib/types";
 
 // =============================================
 // Modal de criação/edição de Fluxo
 // Permite encadear agentes com ações em sequência
+// Agentes agrupados por colaborador — cada um aparece 1x
 // =============================================
 
 interface FlowModalProps {
@@ -15,9 +16,32 @@ interface FlowModalProps {
   onClose: () => void;
 }
 
+/** Agrupa agents por collaborator (agent_name) */
+interface CollaboratorGroup {
+  name: string;
+  icon: string;
+  functions: { id: string; label: string; toolName: string }[];
+}
+
 export default function FlowModal({ flow, agents, onSave, onClose }: FlowModalProps) {
   const [name, setName] = useState("");
   const [steps, setSteps] = useState<FlowStep[]>([]);
+
+  // Agrupar agents por collaborator
+  const collabGroups = useMemo<CollaboratorGroup[]>(() => {
+    const map = new Map<string, CollaboratorGroup>();
+    for (const a of agents) {
+      const collabName = a.agent_name || a.name;
+      if (!map.has(collabName)) {
+        map.set(collabName, { name: collabName, icon: a.icon || "⚡", functions: [] });
+      }
+      const group = map.get(collabName)!;
+      // Main function
+      const mainLabel = a.description || a.name;
+      group.functions.push({ id: a.id, label: mainLabel, toolName: a.name });
+    }
+    return Array.from(map.values());
+  }, [agents]);
 
   useEffect(() => {
     if (flow) {
@@ -42,7 +66,6 @@ export default function FlowModal({ flow, agents, onSave, onClose }: FlowModalPr
 
   const removeStep = (index: number) => {
     const updated = steps.filter((_, i) => i !== index);
-    // Reordenar
     setSteps(updated.map((s, i) => ({ ...s, order: i + 1 })));
   };
 
@@ -61,9 +84,8 @@ export default function FlowModal({ flow, agents, onSave, onClose }: FlowModalPr
     onSave({ name: name.trim(), steps });
   };
 
-  const getAgentName = (agentId: string) => {
-    const agent = agents.find((a) => a.id === agentId);
-    return agent ? `${agent.icon || "⚡"} ${agent.agent_name || agent.name}` : "???";
+  const getAgentInfo = (agentId: string) => {
+    return agents.find((a) => a.id === agentId);
   };
 
   return (
@@ -129,7 +151,12 @@ export default function FlowModal({ flow, agents, onSave, onClose }: FlowModalPr
               </div>
             ) : (
               <div className="space-y-2">
-                {steps.map((step, index) => (
+                {steps.map((step, index) => {
+                  const agentInfo = getAgentInfo(step.agentId);
+                  // Encontrar grupo do colaborador
+                  const currentCollabName = agentInfo?.agent_name || agentInfo?.name || "";
+
+                  return (
                   <div
                     key={index}
                     className="flex items-start gap-2 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]"
@@ -139,7 +166,6 @@ export default function FlowModal({ flow, agents, onSave, onClose }: FlowModalPr
                       <span className="w-6 h-6 rounded-full bg-[var(--accent)] text-white text-xs font-bold flex items-center justify-center">
                         {index + 1}
                       </span>
-                      {/* Setas mover */}
                       <div className="flex flex-col gap-0.5">
                         <button
                           type="button"
@@ -158,20 +184,31 @@ export default function FlowModal({ flow, agents, onSave, onClose }: FlowModalPr
 
                     {/* Campos */}
                     <div className="flex-1 space-y-2">
-                      {/* Agente */}
+                      {/* Colaborador + Função agrupados */}
                       <select
                         value={step.agentId}
                         onChange={(e) => updateStep(index, "agentId", e.target.value)}
                         className="input-modern !py-1.5 text-sm cursor-pointer"
                       >
-                        {agents.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.icon || "⚡"} {a.agent_name || a.name} — {a.name}
-                          </option>
+                        {collabGroups.map((group) => (
+                          <optgroup key={group.name} label={`${group.icon} ${group.name}`}>
+                            {group.functions.map((fn) => (
+                              <option key={fn.id} value={fn.id}>
+                                {fn.label} ({fn.toolName})
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
 
-                      {/* Prompt — o que digitar no agente */}
+                      {/* Info do selecionado */}
+                      {agentInfo && (
+                        <div className="text-[10px] text-[var(--text-muted)] px-1">
+                          {agentInfo.icon} {currentCollabName} · {agentInfo.name} · {agentInfo.description || ""}
+                        </div>
+                      )}
+
+                      {/* Prompt */}
                       <textarea
                         value={step.action}
                         onChange={(e) => updateStep(index, "action", e.target.value)}
@@ -189,9 +226,9 @@ export default function FlowModal({ flow, agents, onSave, onClose }: FlowModalPr
                       title="Remover etapa"
                     >✕</button>
                   </div>
-                ))}
+                  );
+                })}
 
-                {/* Linha de conexão visual */}
                 {steps.length >= 2 && (
                   <p className="text-xs text-[var(--text-muted)] text-center py-1">
                     Cada agente recebe o prompt + resultado do anterior automaticamente

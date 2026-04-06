@@ -329,3 +329,10 @@ body {
   opacity: 1;
   pointer-events: auto;
 }
+.office-scene .func-btn rect {
+  transition: fill 0.15s, filter 0.15s;
+}
+.office-scene .func-btn:hover rect {
+  fill: #3b82f6 !important;
+  filter: brightness(1.2) drop-shadow(0 1px 3px rgba(37,99,235,0.5));
+}

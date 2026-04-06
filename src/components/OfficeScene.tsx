@@ -580,25 +580,29 @@ function IsometricDesk({
         </g>
       </g>
 
-      {/* Name plaque on desk */}
-      <rect x={x - 18} y={y + 22} width="36" height="8" rx="1" fill="#141430" />
-      <text x={x} y={y + 28} textAnchor="middle" fill="#FFD700" fontSize="5" fontWeight="bold" fontFamily="'Segoe UI',Tahoma,sans-serif">
-        {agent.name.length > 10 ? agent.name.slice(0, 9) + "…" : agent.name}
-      </text>
+      {/* Name plaque on desk — shows description (main function) instead of tool name */}
+      {agent.description && (
+        <>
+          <rect x={x - 18} y={y + 22} width="36" height="8" rx="1" fill="#141430" />
+          <text x={x} y={y + 28} textAnchor="middle" fill="#FFD700" fontSize="4.5" fontWeight="bold" fontFamily="'Segoe UI',Tahoma,sans-serif">
+            {agent.description.length > 12 ? agent.description.slice(0, 11) + "…" : agent.description}
+          </text>
+        </>
+      )}
 
       {/* === ALL FUNCTIONS AS BUTTONS below desk === */}
       {(() => {
         // Build list of all buttons: main description + sub_links
-        const buttons: { label: string; url: string }[] = [];
+        const buttons: { label: string; url: string; toolName?: string }[] = [];
         if (agent.description) {
-          buttons.push({ label: agent.description, url: agent.link });
+          buttons.push({ label: agent.description, url: agent.link, toolName: agent.name });
         }
         if (agent.sub_links) {
-          agent.sub_links.forEach(sl => { if (sl.label && sl.url) buttons.push(sl); });
+          agent.sub_links.forEach(sl => { if (sl.label && sl.url) buttons.push({ label: sl.label, url: sl.url, toolName: sl.tool_name || agent.name }); });
         }
         // If no description and no sub_links, show link as single button
         if (buttons.length === 0 && agent.link) {
-          buttons.push({ label: agent.name, url: agent.link });
+          buttons.push({ label: agent.name, url: agent.link, toolName: agent.name });
         }
 
         const btnH = 13;
@@ -608,10 +612,12 @@ function IsometricDesk({
           const btnW = Math.max(label.length * 4.5 + 12, 40);
           const btnX = x - btnW / 2;
           const btnY = y + 56 + bi * (btnH + gap);
+          const tooltipText = btn.toolName ? `${btn.toolName} – ${btn.label}` : btn.label;
           return (
-            <g key={bi} onClick={(e) => { e.stopPropagation(); window.open(btn.url, "_blank"); recordExecution(agent.id); }} style={{ cursor: "pointer" }}>
+            <g key={bi} className="func-btn" onClick={(e) => { e.stopPropagation(); window.open(btn.url, "_blank"); recordExecution(agent.id); }} style={{ cursor: "pointer" }}>
+              <title>{tooltipText}</title>
               <rect x={btnX} y={btnY} width={btnW} height={btnH} rx="3" fill="#2563eb" />
-              <text x={x} y={btnY + 9.5} textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" fontFamily="'Segoe UI',Tahoma,sans-serif">
+              <text x={x} y={btnY + 9.5} textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold" fontFamily="'Segoe UI',Tahoma,sans-serif" style={{ pointerEvents: "none" }}>
                 {label}
               </text>
             </g>

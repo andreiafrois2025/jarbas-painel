@@ -85,6 +85,11 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   const [asgSubLinks, setAsgSubLinks] = useState<SubLink[]>([]);
   const [editingAsg, setEditingAsg] = useState<Assignment | null>(null);
 
+  // Duplicate assignment
+  const [duplicatingAsg, setDuplicatingAsg] = useState<Assignment | null>(null);
+  const [dupContext, setDupContext] = useState("IGAM");
+  const [dupCatId, setDupCatId] = useState("");
+
   // Quick-link form
   const [showNewQL, setShowNewQL] = useState(false);
   const [editingQL, setEditingQL] = useState<QuickLink | null>(null);
@@ -251,6 +256,32 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     setEditingAsg(null);
     setAsgCtx("IGAM"); setAsgCatId(""); setAsgTool(""); setAsgLink("");
     setAsgDesc(""); setAsgType("manual"); setAsgTimeSaved(2); setAsgSubLinks([]);
+  };
+
+  const openDuplicateAssignment = (a: Assignment) => {
+    setDuplicatingAsg(a);
+    setDupContext("IGAM");
+    const igamCats = categories.filter(c => c.context === "IGAM");
+    setDupCatId(igamCats.length > 0 ? igamCats[0].id : "");
+  };
+
+  const handleDuplicateAssignment = async () => {
+    if (!duplicatingAsg || !dupCatId || saving) return;
+    setSaving(true);
+    try {
+      await addAssignment({
+        collaborator_id: duplicatingAsg.collaborator_id,
+        category_id: dupCatId,
+        tool_name: duplicatingAsg.tool_name,
+        link: duplicatingAsg.link,
+        description: duplicatingAsg.description,
+        type: duplicatingAsg.type,
+        time_saved_minutes: duplicatingAsg.time_saved_minutes,
+        sub_links: duplicatingAsg.sub_links,
+      });
+      setDuplicatingAsg(null);
+      await reload();
+    } finally { setSaving(false); }
   };
 
   const openEditAssignment = (a: Assignment) => {
@@ -737,6 +768,9 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                                       </a>
                                     </div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                      <button onClick={() => openDuplicateAssignment(asg)}
+                                        className="w-7 h-7 rounded flex items-center justify-center text-[10px] cursor-pointer hover:bg-[var(--accent)]/10 text-[var(--text-muted)]"
+                                        title="Duplicar para outra área">📋</button>
                                       <button onClick={() => openEditAssignment(asg)}
                                         className="w-7 h-7 rounded flex items-center justify-center text-[10px] cursor-pointer hover:bg-[var(--bg-primary)] text-[var(--text-muted)]"
                                         title="Editar">✏️</button>
@@ -1015,18 +1049,38 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
               {/* Sub-links */}
               <div>
                 <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Funções extras</label>
+                <DndContext collisionDetection={closestCenter} onDragEnd={(event: DragEndEvent) => {
+                  const { active, over } = event;
+                  if (!over || active.id === over.id) return;
+                  const oldIdx = asgSubLinks.findIndex((_, i) => `asl-${i}` === active.id);
+                  const newIdx = asgSubLinks.findIndex((_, i) => `asl-${i}` === over.id);
+                  if (oldIdx < 0 || newIdx < 0) return;
+                  const reordered = [...asgSubLinks];
+                  const [moved] = reordered.splice(oldIdx, 1);
+                  reordered.splice(newIdx, 0, moved);
+                  setAsgSubLinks(reordered);
+                }}>
+                <SortableContext items={asgSubLinks.map((_, i) => `asl-${i}`)} strategy={verticalListSortingStrategy}>
                 {asgSubLinks.map((sl, idx) => (
-                  <div key={idx} className="flex gap-2 mb-2">
-                    <input type="text" value={sl.label}
-                      onChange={e => { const u = [...asgSubLinks]; u[idx] = { ...u[idx], label: e.target.value }; setAsgSubLinks(u); }}
-                      className="input-modern flex-1" placeholder="Nome" />
+                  <SortableItem key={`asl-${idx}`} id={`asl-${idx}`} className="space-y-1 mb-3 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)]">
+                    <div className="flex gap-2">
+                      <span className="text-[var(--text-muted)] cursor-grab text-sm self-center">⠿</span>
+                      <input type="text" value={sl.tool_name || ""}
+                        onChange={e => { const u = [...asgSubLinks]; u[idx] = { ...u[idx], tool_name: e.target.value }; setAsgSubLinks(u); }}
+                        className="input-modern w-24" placeholder="IA/Ferramenta" />
+                      <input type="text" value={sl.label}
+                        onChange={e => { const u = [...asgSubLinks]; u[idx] = { ...u[idx], label: e.target.value }; setAsgSubLinks(u); }}
+                        className="input-modern flex-1" placeholder="Nome da função" />
+                      <button onClick={() => setAsgSubLinks(asgSubLinks.filter((_, i) => i !== idx))}
+                        className="text-[var(--danger)] px-2 cursor-pointer">✕</button>
+                    </div>
                     <input type="url" value={sl.url}
                       onChange={e => { const u = [...asgSubLinks]; u[idx] = { ...u[idx], url: e.target.value }; setAsgSubLinks(u); }}
-                      className="input-modern flex-[2]" placeholder="https://..." />
-                    <button onClick={() => setAsgSubLinks(asgSubLinks.filter((_, i) => i !== idx))}
-                      className="text-[var(--danger)] px-2 cursor-pointer">✕</button>
-                  </div>
+                      className="input-modern w-full" placeholder="https://..." />
+                  </SortableItem>
                 ))}
+                </SortableContext>
+                </DndContext>
                 <button onClick={() => setAsgSubLinks([...asgSubLinks, { label: "", url: "" }])}
                   className="text-xs text-[var(--accent)] hover:underline cursor-pointer">+ Adicionar função extra</button>
               </div>
@@ -1095,6 +1149,47 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
               <button onClick={() => { setShowNewQL(false); setEditingQL(null); }} className="btn-secondary flex-1">Cancelar</button>
               <button onClick={handleSaveQL} disabled={!qlLabel || !qlUrl || saving}
                 className="btn-primary flex-1 disabled:opacity-50">Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL: Duplicate Assignment ===== */}
+      {duplicatingAsg && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDuplicatingAsg(null)}>
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold">Duplicar Atribuição</h3>
+            <p className="text-xs text-[var(--text-muted)]">
+              Duplicar <strong>{duplicatingAsg.description || duplicatingAsg.tool_name}</strong> para outra área:
+            </p>
+            <div>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Contexto</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {CONTEXTS.map(ctx => (
+                  <button key={ctx} onClick={() => {
+                    setDupContext(ctx);
+                    const ctxCats = categories.filter(c => c.context === ctx);
+                    setDupCatId(ctxCats.length > 0 ? ctxCats[0].id : "");
+                  }}
+                    className={`px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-all ${
+                      dupContext === ctx ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-primary)] border border-[var(--border)]"
+                    }`}>{ctx}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Setor destino</label>
+              <select value={dupCatId} onChange={e => setDupCatId(e.target.value)}
+                className="input-modern w-full">
+                {categories.filter(c => c.context === dupContext).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setDuplicatingAsg(null)} className="btn-secondary flex-1">Cancelar</button>
+              <button onClick={handleDuplicateAssignment} disabled={!dupCatId || saving}
+                className="btn-primary flex-1 disabled:opacity-50">Duplicar</button>
             </div>
           </div>
         </div>

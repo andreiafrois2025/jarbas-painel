@@ -10,11 +10,13 @@ import { getProductsByCategory, addProduct, updateProduct, deleteProduct } from 
 
 interface ProductsPanelProps {
   categoryId: string;
+  /** Múltiplos IDs para exibir entregas de área inteira */
+  categoryIds?: string[];
   categoryName: string;
   onClose: () => void;
 }
 
-export default function ProductsPanel({ categoryId, categoryName, onClose }: ProductsPanelProps) {
+export default function ProductsPanel({ categoryId, categoryIds, categoryName, onClose }: ProductsPanelProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,16 +29,20 @@ export default function ProductsPanel({ categoryId, categoryName, onClose }: Pro
   const [creationLink, setCreationLink] = useState("");
   const [finalLink, setFinalLink] = useState("");
 
+  // Which IDs to load from
+  const allIds = categoryIds && categoryIds.length > 0 ? categoryIds : [categoryId];
+
   const loadProducts = useCallback(async () => {
     try {
-      const data = await getProductsByCategory(categoryId);
-      setProducts(data);
+      const results = await Promise.all(allIds.map(id => getProductsByCategory(id)));
+      setProducts(results.flat());
     } catch (err) {
       console.error("Erro ao carregar produtos:", err);
     } finally {
       setLoading(false);
     }
-  }, [categoryId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryId, categoryIds?.join(",")]);
 
   useEffect(() => { loadProducts(); }, [loadProducts]);
 

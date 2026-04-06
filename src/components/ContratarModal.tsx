@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Collaborator, Assignment, Category, SubLink, CONTEXTS } from "@/lib/types";
+import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import SortableItem from "./SortableItem";
 
 interface ContratarModalProps {
   collaborators: Collaborator[];
@@ -414,16 +417,35 @@ export default function ContratarModal({
               {/* Sub-links */}
               <div>
                 <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Funções extras</label>
+                <DndContext collisionDetection={closestCenter} onDragEnd={(event: DragEndEvent) => {
+                  const { active, over } = event;
+                  if (!over || active.id === over.id) return;
+                  const oldIdx = subLinks.findIndex((_, i) => `sl-${i}` === active.id);
+                  const newIdx = subLinks.findIndex((_, i) => `sl-${i}` === over.id);
+                  if (oldIdx < 0 || newIdx < 0) return;
+                  const reordered = [...subLinks];
+                  const [moved] = reordered.splice(oldIdx, 1);
+                  reordered.splice(newIdx, 0, moved);
+                  setSubLinks(reordered);
+                }}>
+                <SortableContext items={subLinks.map((_, i) => `sl-${i}`)} strategy={verticalListSortingStrategy}>
                 {subLinks.map((sl, idx) => (
-                  <div key={idx} className="flex gap-2 mb-2">
-                    <input type="text" value={sl.label} onChange={e => { const u = [...subLinks]; u[idx] = { ...u[idx], label: e.target.value }; setSubLinks(u); }}
-                      className="input-modern flex-1" placeholder="Nome" />
+                  <SortableItem key={`sl-${idx}`} id={`sl-${idx}`} className="space-y-1 mb-3 p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)]">
+                    <div className="flex gap-2">
+                      <span className="text-[var(--text-muted)] cursor-grab text-sm self-center">⠿</span>
+                      <input type="text" value={sl.tool_name || ""} onChange={e => { const u = [...subLinks]; u[idx] = { ...u[idx], tool_name: e.target.value }; setSubLinks(u); }}
+                        className="input-modern w-24" placeholder="IA/Ferramenta" />
+                      <input type="text" value={sl.label} onChange={e => { const u = [...subLinks]; u[idx] = { ...u[idx], label: e.target.value }; setSubLinks(u); }}
+                        className="input-modern flex-1" placeholder="Nome da função" />
+                      <button type="button" onClick={() => setSubLinks(subLinks.filter((_, i) => i !== idx))}
+                        className="text-red-400 hover:text-red-300 px-2 cursor-pointer">✕</button>
+                    </div>
                     <input type="url" value={sl.url} onChange={e => { const u = [...subLinks]; u[idx] = { ...u[idx], url: e.target.value }; setSubLinks(u); }}
-                      className="input-modern flex-[2]" placeholder="https://..." />
-                    <button type="button" onClick={() => setSubLinks(subLinks.filter((_, i) => i !== idx))}
-                      className="text-red-400 hover:text-red-300 px-2 cursor-pointer">✕</button>
-                  </div>
+                      className="input-modern w-full" placeholder="https://..." />
+                  </SortableItem>
                 ))}
+                </SortableContext>
+                </DndContext>
                 <button type="button" onClick={() => setSubLinks([...subLinks, { label: "", url: "" }])}
                   className="text-xs text-[var(--accent)] hover:underline cursor-pointer">+ Adicionar função extra</button>
               </div>
