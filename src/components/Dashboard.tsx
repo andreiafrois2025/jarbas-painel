@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Agent, CONTEXTS, Collaborator, Assignment, QuickLink, DeskOccupant, occupantToAgent } from "@/lib/types";
+import { Agent, CONTEXTS, Collaborator, Assignment, QuickLink, DeskOccupant, occupantToAgent, Squad } from "@/lib/types";
 import {
   getAgents,
   updateAgent,
@@ -25,6 +25,7 @@ import {
   getQuickLinks,
   addQuickLink,
   migrateFromAgents,
+  getSquads,
 } from "@/lib/storage";
 import type { Execution, Category as CategoryType } from "@/lib/types";
 import OfficeScene from "./OfficeScene";
@@ -52,6 +53,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [quickLinks, setQuickLinks] = useState<QuickLink[]>([]);
   const [occupants, setOccupants] = useState<DeskOccupant[]>([]);
+  const [squads, setSquads] = useState<Squad[]>([]);
 
   // UI State
   const [selectedContext, setSelectedContext] = useState("IGAM");
@@ -72,7 +74,7 @@ export default function Dashboard({ session }: DashboardProps) {
         await seedDefaultData(session.user.id);
         await migrateFromAgents(session.user.id);
       }
-      const [agentsData, categoriesData, executionsData, todayData, collabData, assignData, qlData] =
+      const [agentsData, categoriesData, executionsData, todayData, collabData, assignData, qlData, squadsData] =
         await Promise.all([
           getAgents(),
           getCategories(),
@@ -81,6 +83,7 @@ export default function Dashboard({ session }: DashboardProps) {
           getCollaborators(),
           getAssignments(),
           getQuickLinks(),
+          getSquads(),
         ]);
       setAgents(agentsData);
       setCategories(categoriesData);
@@ -90,6 +93,7 @@ export default function Dashboard({ session }: DashboardProps) {
       setAssignments(assignData);
       setQuickLinks(qlData);
       setOccupants(buildOccupants(assignData));
+      setSquads(squadsData);
 
       // Auto-migrar JARBAS para quick_links se não existir
       try {
@@ -197,6 +201,10 @@ export default function Dashboard({ session }: DashboardProps) {
     }
     return agentsInRoom;
   }, [useNewModel, occupantsInRoom, agentsInRoom, assignments]);
+
+  const squadsInContext = useMemo(() =>
+    squads.filter(s => (s.status || "active") === "active" && (s.contexts || []).includes(selectedContext)),
+  [squads, selectedContext]);
 
   // Contar ocupantes por sala (apenas ativos)
   const countInRoom = useCallback((catId: string, catName: string) => {
@@ -365,9 +373,9 @@ export default function Dashboard({ session }: DashboardProps) {
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto office-floor p-2 md:p-4">
+            <div className="flex-1 flex flex-col overflow-hidden office-floor p-2 md:p-4">
               {/* Parede do escritório com Quick-links UNIFICADOS */}
-              <div className="w-full h-10 mb-3 relative" style={{ background: "linear-gradient(180deg, #E8E2DA 0%, #DDD6CC 60%, #D5CEC4 100%)", borderBottom: "2px solid #B0A898" }}>
+              <div className="w-full h-10 mb-2 relative shrink-0" style={{ background: "linear-gradient(180deg, #E8E2DA 0%, #DDD6CC 60%, #D5CEC4 100%)", borderBottom: "2px solid #B0A898" }}>
                 {selectedRoom ? (
                   <>
                     <button onClick={() => { setSelectedRoom(null); setSelectedRoomId(null); }}
@@ -414,66 +422,132 @@ export default function Dashboard({ session }: DashboardProps) {
                 )}
               </div>
 
-              {/* ===== VISTA DE SALAS ===== */}
+              {/* ===== VISTA DE SALAS — split layout ===== */}
               {!selectedRoom && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5 py-2">
-                  {roomsInContext.length > 0 ? roomsInContext.map((cat) => {
-                    const count = countInRoom(cat.id, cat.name);
-                    const preview = previewInRoom(cat.id, cat.name);
-                    const extra = count - preview.length;
-                    return (
-                      <div key={cat.id} className="room-card" onClick={() => { setSelectedRoom(cat.name); setSelectedRoomId(cat.id); }} title={`Abrir ${cat.name}`}>
-                        <div className="room-card-header flex items-center justify-between">
-                          <span>{cat.name}</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setProductsRoom({ id: cat.id, name: cat.name }); }}
-                            className="text-white/70 hover:text-white hover:bg-white/20 rounded px-1.5 py-0.5 transition-all cursor-pointer"
-                            title="Produtos & Entregas"
-                            style={{ fontSize: 11 }}
-                          >📁</button>
+                <div className="flex-1 flex min-h-0 overflow-hidden gap-0">
+
+                  {/* Esquerda — Setores/Salas */}
+                  <div className="flex-1 overflow-auto py-1 pr-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-1">
+                      {roomsInContext.length > 0 ? roomsInContext.map((cat) => {
+                        const count = countInRoom(cat.id, cat.name);
+                        const preview = previewInRoom(cat.id, cat.name);
+                        const extra = count - preview.length;
+                        return (
+                          <div key={cat.id} className="room-card" onClick={() => { setSelectedRoom(cat.name); setSelectedRoomId(cat.id); }} title={`Abrir ${cat.name}`}>
+                            <div className="room-card-header flex items-center justify-between">
+                              <span>{cat.name}</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setProductsRoom({ id: cat.id, name: cat.name }); }}
+                                className="text-white/70 hover:text-white hover:bg-white/20 rounded px-1.5 py-0.5 transition-all cursor-pointer"
+                                title="Produtos & Entregas"
+                                style={{ fontSize: 11 }}
+                              >📁</button>
+                            </div>
+                            <div className="room-card-body">
+                              {count === 0 ? (
+                                <span className="room-empty">Sala vazia</span>
+                              ) : (
+                                preview.map(a => (
+                                  <span key={a.id} className="room-agent-chip">{a.icon} {a.name}</span>
+                                ))
+                              )}
+                            </div>
+                            {extra > 0 && <span className="room-count-badge">+{extra} mais</span>}
+                            {count > 0 && (
+                              <span className="room-count-badge" style={{ left: 6, right: "auto" }}>
+                                {count} colaborador{count !== 1 ? "es" : ""}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }) : (
+                        <div className="text-center py-16 col-span-2" style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
+                          <p className="text-2xl mb-2">🏢</p>
+                          <p className="text-sm">{search ? "Nenhuma sala encontrada" : `Nenhuma sala em ${selectedContext}`}</p>
+                          <p className="text-xs mt-1">Clique em 👥 Gestão de RH para criar setores</p>
                         </div>
-                        <div className="room-card-body">
-                          {count === 0 ? (
-                            <span className="room-empty">Sala vazia</span>
-                          ) : (
-                            preview.map(a => (
-                              <span key={a.id} className="room-agent-chip">{a.icon} {a.name}</span>
-                            ))
-                          )}
-                        </div>
-                        {extra > 0 && <span className="room-count-badge">+{extra} mais</span>}
-                        {count > 0 && (
-                          <span className="room-count-badge" style={{ left: 6, right: "auto" }}>
-                            {count} colaborador{count !== 1 ? "es" : ""}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  }) : (
-                    <div className="text-center py-16 w-full" style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
-                      <p className="text-2xl mb-2">🏢</p>
-                      <p className="text-sm">{search ? "Nenhuma sala encontrada" : `Nenhuma sala em ${selectedContext}`}</p>
-                      <p className="text-xs mt-1">Clique em 👥 Gestão de RH para criar setores</p>
+                      )}
                     </div>
-                  )}
+                  </div>
+
+                  {/* Divisor */}
+                  <div className="shrink-0" style={{ width: 2, background: "var(--win-border-dark)" }} />
+
+                  {/* Direita — Squads */}
+                  <div className="shrink-0 flex flex-col overflow-hidden" style={{ width: "45%" }}>
+                    {/* Header do painel de squads */}
+                    <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b"
+                      style={{ background: "var(--win-surface)", borderColor: "var(--win-border-dark)", fontFamily: "'Segoe UI', Tahoma", fontSize: 10 }}>
+                      <span className="font-bold" style={{ color: "#000" }}>🤖 Squads — {selectedContext}</span>
+                      <button
+                        onClick={() => setCurrentPage("squads")}
+                        className="cursor-pointer hover:brightness-90 transition-all px-2 py-0.5 font-bold"
+                        style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)", fontSize: 9 }}>
+                        + Gerenciar
+                      </button>
+                    </div>
+                    {/* Lista de squads */}
+                    <div className="flex-1 overflow-auto p-2 flex flex-col gap-2">
+                      {squadsInContext.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full gap-2 text-center"
+                          style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
+                          <span className="text-3xl opacity-30">🤖</span>
+                          <p style={{ fontSize: 11 }}>Nenhum squad em {selectedContext}</p>
+                          <button onClick={() => setCurrentPage("squads")}
+                            className="cursor-pointer hover:brightness-90 px-2 py-1 font-bold"
+                            style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)", fontSize: 9 }}>
+                            + Criar Squad
+                          </button>
+                        </div>
+                      ) : (
+                        squadsInContext.map(sq => (
+                          <div key={sq.id} className="room-card" style={{ cursor: "default" }}>
+                            <div className="room-card-header flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <span>{sq.icon || "🤖"}</span>
+                                <span className="truncate text-xs">{sq.name}</span>
+                              </span>
+                            </div>
+                            <div className="room-card-body flex-col !items-start gap-1 !py-1.5">
+                              {sq.description && (
+                                <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed line-clamp-2">{sq.description}</p>
+                              )}
+                            </div>
+                            {sq.link && (
+                              <div className="px-2 pb-1.5">
+                                <a href={sq.link} target="_blank" rel="noopener noreferrer"
+                                  className="block text-center font-bold no-underline hover:brightness-110 transition-all"
+                                  style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)", fontSize: 9, padding: "2px 0" }}>
+                                  ▶ Abrir Squad
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
               {/* ===== VISTA EXPANDIDA DA SALA ===== */}
               {selectedRoom && (
-                agentsForScene.length > 0 ? (
-                  <OfficeScene
-                    agents={agentsForScene}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                ) : (
-                  <div className="text-center py-16" style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
-                    <p className="text-2xl mb-2">🪑</p>
-                    <p className="text-sm">{search ? "Nenhum colaborador encontrado" : "Sala vazia"}</p>
-                    <p className="text-xs mt-1">Clique em + Contratar Colaborador para adicionar</p>
-                  </div>
-                )
+                <div className="flex-1 overflow-auto">
+                  {agentsForScene.length > 0 ? (
+                    <OfficeScene
+                      agents={agentsForScene}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ) : (
+                    <div className="text-center py-16" style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
+                      <p className="text-2xl mb-2">🪑</p>
+                      <p className="text-sm">{search ? "Nenhum colaborador encontrado" : "Sala vazia"}</p>
+                      <p className="text-xs mt-1">Clique em + Contratar Colaborador para adicionar</p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
