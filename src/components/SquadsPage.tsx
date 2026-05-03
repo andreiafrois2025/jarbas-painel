@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Squad, CONTEXTS } from "@/lib/types";
-import { getSquads, addSquad, updateSquad, deleteSquad } from "@/lib/storage";
+import { Squad, Collaborator, CONTEXTS } from "@/lib/types";
+import { getSquads, addSquad, updateSquad, deleteSquad, getCollaborators } from "@/lib/storage";
 
 interface SquadsPageProps {
   onNavigate: (page: string) => void;
@@ -15,49 +15,67 @@ const CONTEXT_ICONS: Record<string, string> = {
   "Família": "🏠",
 };
 
+function PipelineView({ collaboratorIds, collaborators }: { collaboratorIds: string[]; collaborators: Collaborator[] }) {
+  if (!collaboratorIds?.length) return null;
+  const members = collaboratorIds.map(id => collaborators.find(c => c.id === id)).filter(Boolean) as Collaborator[];
+  if (!members.length) return null;
+  return (
+    <div className="flex items-center gap-1 flex-wrap mt-2">
+      {members.map((c, i) => (
+        <div key={c.id} className="flex items-center gap-1">
+          <div className="flex flex-col items-center">
+            <span className="text-base">{c.icon}</span>
+            <span className="text-[9px] text-[var(--text-secondary)] max-w-[48px] truncate text-center">{c.name}</span>
+          </div>
+          {i < members.length - 1 && (
+            <span className="text-[var(--text-muted)] text-xs mx-0.5">→</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   const [squads, setSquads] = useState<Squad[]>([]);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedContext, setSelectedContext] = useState<string>(CONTEXTS[1]); // AndréIA padrão
+  const [selectedContext, setSelectedContext] = useState<string>(CONTEXTS[1]);
   const [showForm, setShowForm] = useState(false);
   const [editingSquad, setEditingSquad] = useState<Squad | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Form state
   const [form, setForm] = useState({
     name: "",
     description: "",
     icon: "📸",
     link: "",
     contexts: [] as string[],
+    collaborator_ids: [] as string[],
     status: "active" as "active" | "inactive",
   });
 
-  const loadSquads = async () => {
+  const loadData = async () => {
     try {
-      const data = await getSquads();
-      setSquads(data);
+      const [squadsData, collabData] = await Promise.all([getSquads(), getCollaborators()]);
+      setSquads(squadsData);
+      setCollaborators(collabData.filter(c => (c.status || "active") === "active"));
     } catch (err) {
-      console.error("Erro ao carregar squads:", err);
+      console.error("Erro ao carregar dados:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadSquads();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const squadsInContext = useMemo(() =>
-    squads.filter(s =>
-      (s.status || "active") === "active" &&
-      (s.contexts || []).includes(selectedContext)
-    ),
+    squads.filter(s => (s.status || "active") === "active" && (s.contexts || []).includes(selectedContext)),
   [squads, selectedContext]);
 
   const openAdd = () => {
     setEditingSquad(null);
-    setForm({ name: "", description: "", icon: "📸", link: "", contexts: [selectedContext], status: "active" });
+    setForm({ name: "", description: "", icon: "📸", link: "", contexts: [selectedContext], collaborator_ids: [], status: "active" });
     setShowForm(true);
   };
 
@@ -69,6 +87,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       icon: squad.icon || "📸",
       link: squad.link || "",
       contexts: squad.contexts || [],
+      collaborator_ids: squad.collaborator_ids || [],
       status: squad.status || "active",
     });
     setShowForm(true);
@@ -83,7 +102,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       } else {
         await addSquad(form);
       }
-      await loadSquads();
+      await loadData();
       setShowForm(false);
     } catch (err) {
       console.error("Erro ao salvar squad:", err);
@@ -96,7 +115,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
     if (!confirm("Excluir este squad?")) return;
     try {
       await deleteSquad(id);
-      await loadSquads();
+      await loadData();
     } catch (err) {
       console.error("Erro ao excluir squad:", err);
     }
@@ -105,10 +124,29 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   const toggleContext = (ctx: string) => {
     setForm(f => ({
       ...f,
-      contexts: f.contexts.includes(ctx)
-        ? f.contexts.filter(c => c !== ctx)
-        : [...f.contexts, ctx],
+      contexts: f.contexts.includes(ctx) ? f.contexts.filter(c => c !== ctx) : [...f.contexts, ctx],
     }));
+  };
+
+  const toggleCollaborator = (id: string) => {
+    setForm(f => ({
+      ...f,
+      collaborator_ids: f.collaborator_ids.includes(id)
+        ? f.collaborator_ids.filter(c => c !== id)
+        : [...f.collaborator_ids, id],
+    }));
+  };
+
+  const moveCollaborator = (id: string, dir: -1 | 1) => {
+    setForm(f => {
+      const arr = [...f.collaborator_ids];
+      const idx = arr.indexOf(id);
+      if (idx < 0) return f;
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= arr.length) return f;
+      [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+      return { ...f, collaborator_ids: arr };
+    });
   };
 
   if (loading) {
@@ -147,15 +185,12 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
               {CONTEXTS.map(ctx => {
                 const count = squads.filter(s => s.status !== "inactive" && (s.contexts || []).includes(ctx)).length;
                 return (
-                  <button
-                    key={ctx}
-                    onClick={() => setSelectedContext(ctx)}
+                  <button key={ctx} onClick={() => setSelectedContext(ctx)}
                     className={`w-full flex items-center gap-2 px-3 py-2.5 text-left transition-all text-sm cursor-pointer ${
                       selectedContext === ctx
                         ? "bg-[var(--accent-soft)] text-[var(--text-primary)] font-semibold"
                         : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-                    }`}
-                  >
+                    }`}>
                     <span>{CONTEXT_ICONS[ctx] || "📁"}</span>
                     <span className="flex-1 truncate">{ctx}</span>
                     {count > 0 && (
@@ -202,6 +237,8 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                         {squad.description && (
                           <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">{squad.description}</p>
                         )}
+                        {/* Pipeline de colaboradores */}
+                        <PipelineView collaboratorIds={squad.collaborator_ids || []} collaborators={collaborators} />
                         {/* Badge dos contextos */}
                         <div className="flex flex-wrap gap-1 mt-1">
                           {(squad.contexts || []).map(ctx => (
@@ -212,7 +249,6 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                           ))}
                         </div>
                       </div>
-                      {/* Botão abrir */}
                       {squad.link && (
                         <div className="px-3 pb-2">
                           <a href={squad.link} target="_blank" rel="noopener noreferrer"
@@ -234,12 +270,12 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       {/* Modal — Criar/Editar Squad */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border)]">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border)] shrink-0">
               <h2 className="font-semibold">{editingSquad ? "Editar Squad" : "Novo Squad"}</h2>
               <button onClick={() => setShowForm(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none cursor-pointer">×</button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="overflow-y-auto flex-1 p-6 space-y-4">
               {/* Nome + Ícone */}
               <div className="flex gap-3">
                 <div className="shrink-0">
@@ -283,8 +319,58 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                   ))}
                 </div>
               </div>
+              {/* Colaboradores do pipeline */}
+              {collaborators.length > 0 && (
+                <div>
+                  <label className="block text-xs text-[var(--text-secondary)] mb-2">Colaboradores do pipeline <span className="text-[var(--text-muted)]">(em ordem)</span></label>
+                  {/* Pipeline preview */}
+                  {form.collaborator_ids.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap mb-3 p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)]">
+                      {form.collaborator_ids.map((id, i) => {
+                        const c = collaborators.find(x => x.id === id);
+                        if (!c) return null;
+                        return (
+                          <div key={id} className="flex items-center gap-1">
+                            <div className="flex flex-col items-center">
+                              <span className="text-lg">{c.icon}</span>
+                              <span className="text-[9px] text-[var(--text-muted)]">{c.name}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5 ml-0.5">
+                              <button type="button" onClick={() => moveCollaborator(id, -1)} disabled={i === 0}
+                                className="text-[8px] leading-none text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-30 cursor-pointer">▲</button>
+                              <button type="button" onClick={() => moveCollaborator(id, 1)} disabled={i === form.collaborator_ids.length - 1}
+                                className="text-[8px] leading-none text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-30 cursor-pointer">▼</button>
+                            </div>
+                            {i < form.collaborator_ids.length - 1 && (
+                              <span className="text-[var(--text-muted)] text-xs mx-0.5">→</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Seletor */}
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {collaborators.map(c => {
+                      const selected = form.collaborator_ids.includes(c.id);
+                      return (
+                        <button key={c.id} type="button" onClick={() => toggleCollaborator(c.id)}
+                          className={`flex flex-col items-center gap-0.5 p-2 rounded-lg text-center cursor-pointer transition-all border text-xs ${
+                            selected
+                              ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                              : "border-[var(--border)] hover:border-[var(--accent)] bg-[var(--bg-primary)]"
+                          }`}>
+                          <span className="text-lg">{c.icon}</span>
+                          <span className="text-[10px] truncate w-full">{c.name}</span>
+                          {selected && <span className="text-green-400 text-[9px]">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex gap-3 px-6 pb-5">
+            <div className="flex gap-3 px-6 pb-5 shrink-0 border-t border-[var(--border)] pt-4">
               <button onClick={() => setShowForm(false)} className="btn-secondary flex-1">Cancelar</button>
               <button onClick={handleSave} disabled={saving || !form.name.trim() || form.contexts.length === 0}
                 className="btn-primary flex-1 disabled:opacity-50">

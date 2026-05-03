@@ -477,9 +477,9 @@ export default function Dashboard({ session }: DashboardProps) {
                   {/* Direita — Squads */}
                   <div className="shrink-0 flex flex-col overflow-hidden" style={{ width: "45%" }}>
                     {/* Header do painel de squads */}
-                    <div className="shrink-0 flex items-center justify-between px-3 py-1.5 border-b"
-                      style={{ background: "var(--win-surface)", borderColor: "var(--win-border-dark)", fontFamily: "'Segoe UI', Tahoma", fontSize: 10 }}>
-                      <span className="font-bold" style={{ color: "#000" }}>🤖 Squads — {selectedContext}</span>
+                    <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b"
+                      style={{ background: "var(--win-surface)", borderColor: "var(--win-border-dark)", fontFamily: "'Segoe UI', Tahoma" }}>
+                      <span className="font-bold text-sm" style={{ color: "#000" }}>🤖 Squads — {selectedContext}</span>
                       <button
                         onClick={() => setCurrentPage("squads")}
                         className="cursor-pointer hover:brightness-90 transition-all px-2 py-0.5 font-bold"
@@ -488,7 +488,7 @@ export default function Dashboard({ session }: DashboardProps) {
                       </button>
                     </div>
                     {/* Lista de squads */}
-                    <div className="flex-1 overflow-auto p-2 flex flex-col gap-2">
+                    <div className="flex-1 overflow-auto p-1.5 flex flex-col gap-1.5">
                       {squadsInContext.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full gap-2 text-center"
                           style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
@@ -501,30 +501,51 @@ export default function Dashboard({ session }: DashboardProps) {
                           </button>
                         </div>
                       ) : (
-                        squadsInContext.map(sq => (
-                          <div key={sq.id} className="room-card" style={{ cursor: "default" }}>
-                            <div className="room-card-header flex items-center justify-between">
-                              <span className="flex items-center gap-1.5">
-                                <span>{sq.icon || "🤖"}</span>
-                                <span className="truncate text-xs">{sq.name}</span>
-                              </span>
-                            </div>
-                            <div className="room-card-body flex-col !items-start gap-1 !py-1.5">
-                              {sq.description && (
-                                <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed line-clamp-2">{sq.description}</p>
+                        squadsInContext.map(sq => {
+                          const members = (sq.collaborator_ids || [])
+                            .map(id => collaborators.find(c => c.id === id))
+                            .filter(Boolean) as typeof collaborators;
+                          return (
+                            <div key={sq.id} className="room-card" style={{ cursor: "default" }}>
+                              <div className="room-card-header flex items-center justify-between !py-1.5 !px-2">
+                                <span className="flex items-center gap-1">
+                                  <span className="text-sm">{sq.icon || "🤖"}</span>
+                                  <span className="truncate text-xs font-semibold">{sq.name}</span>
+                                </span>
+                              </div>
+                              <div className="px-2 pb-1">
+                                {sq.description && (
+                                  <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed line-clamp-1 mb-1">{sq.description}</p>
+                                )}
+                                {/* Pipeline de colaboradores */}
+                                {members.length > 0 && (
+                                  <div className="flex items-center gap-0.5 flex-wrap">
+                                    {members.map((c, i) => (
+                                      <div key={c.id} className="flex items-center gap-0.5">
+                                        <div className="flex flex-col items-center">
+                                          <span className="text-sm">{c.icon}</span>
+                                          <span className="text-[8px] text-[var(--text-muted)] max-w-[36px] truncate text-center leading-none">{c.name}</span>
+                                        </div>
+                                        {i < members.length - 1 && (
+                                          <span className="text-[var(--text-muted)] text-[10px]">→</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              {sq.link && (
+                                <div className="px-2 pb-1.5">
+                                  <a href={sq.link} target="_blank" rel="noopener noreferrer"
+                                    className="block text-center font-bold no-underline hover:brightness-110 transition-all"
+                                    style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)", fontSize: 9, padding: "2px 0" }}>
+                                    ▶ Abrir Squad
+                                  </a>
+                                </div>
                               )}
                             </div>
-                            {sq.link && (
-                              <div className="px-2 pb-1.5">
-                                <a href={sq.link} target="_blank" rel="noopener noreferrer"
-                                  className="block text-center font-bold no-underline hover:brightness-110 transition-all"
-                                  style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)", fontSize: 9, padding: "2px 0" }}>
-                                  ▶ Abrir Squad
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>

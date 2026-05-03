@@ -141,6 +141,8 @@ export interface Squad {
   link?: string;
   /** Contextos onde este squad aparece (ex: ["AndréIA", "IGAM"]) */
   contexts: string[];
+  /** IDs dos colaboradores envolvidos, em ordem de pipeline */
+  collaborator_ids?: string[];
   status?: "active" | "inactive";
   user_id?: string;
   created_at?: string;

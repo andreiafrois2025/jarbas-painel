@@ -142,7 +142,7 @@ export default function ContratarModal({
 
   // Salvar atribuição
   const handleSaveAssignment = async () => {
-    if (!selectedCollab || !toolName || !link || !categoryId) return;
+    if (!selectedCollab || !categoryId) return;
 
     // Se estava editando aparência do colaborador, salvar
     if (editingCollab && selectedCollab) {
@@ -395,9 +395,9 @@ export default function ContratarModal({
 
               {/* Ferramenta */}
               <div>
-                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">IA / Ferramenta * <span className="text-[var(--text-muted)]">(plaquinha da mesa)</span></label>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">IA / Ferramenta <span className="text-[var(--text-muted)]">(opcional — plaquinha da mesa)</span></label>
                 <input type="text" value={toolName} onChange={e => setToolName(e.target.value)}
-                  className="input-modern" placeholder="Ex: Claude, ChatGPT, Midjourney..." required />
+                  className="input-modern" placeholder="Ex: Claude, ChatGPT, Midjourney..." />
               </div>
 
               {/* Função */}
@@ -409,9 +409,9 @@ export default function ContratarModal({
 
               {/* Link */}
               <div>
-                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Link *</label>
+                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Link <span className="text-[var(--text-muted)]">(opcional)</span></label>
                 <input type="url" value={link} onChange={e => setLink(e.target.value)}
-                  className="input-modern" placeholder="https://..." required />
+                  className="input-modern" placeholder="https://..." />
               </div>
 
               {/* Sub-links */}
@@ -466,7 +466,7 @@ export default function ContratarModal({
                   <button type="button" onClick={() => { setSelectedCollab(null); setStep("select"); }} className="btn-secondary flex-1">Voltar</button>
                 )}
                 <button type="button" onClick={onClose} className={`btn-secondary ${editingAssignment ? "flex-1" : ""}`}>Cancelar</button>
-                <button type="button" onClick={handleSaveAssignment} disabled={!toolName || !link || !categoryId}
+                <button type="button" onClick={handleSaveAssignment} disabled={!categoryId}
                   className="btn-primary flex-1">{editingAssignment ? "Salvar" : "Contratar"}</button>
               </div>
             </div>
