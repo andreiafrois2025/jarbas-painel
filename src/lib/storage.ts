@@ -281,11 +281,14 @@ export async function addCollaborator(
 ): Promise<Collaborator> {
   const user = await getUser();
   // Remover campos que podem não existir no banco ainda
-  const { bio, status, ...safeFields } = collab as Record<string, unknown>;
+  const { bio, status, specialization, skills, personality, ...safeFields } = collab as Record<string, unknown>;
   const payload = { ...safeFields, user_id: user?.id } as Record<string, unknown>;
-  // Incluir bio/status apenas se tiverem valor (tentativa segura)
+  // Incluir campos opcionais apenas se tiverem valor (tentativa segura)
   if (bio) payload.bio = bio;
   if (status && status !== "active") payload.status = status;
+  if (specialization) payload.specialization = specialization;
+  if (skills) payload.skills = skills;
+  if (personality) payload.personality = personality;
   const { data, error } = await supabase
     .from("collaborators")
     .insert(payload)
@@ -298,10 +301,13 @@ export async function addCollaborator(
 /** Atualizar colaborador */
 export async function updateCollaborator(id: string, updates: Partial<Collaborator>): Promise<void> {
   // Remover campos que podem não existir no banco ainda
-  const { bio, status, ...safeUpdates } = updates;
+  const { bio, status, specialization, skills, personality, ...safeUpdates } = updates;
   const payload = { ...safeUpdates } as Record<string, unknown>;
   if (bio !== undefined) payload.bio = bio;
   if (status !== undefined) payload.status = status;
+  if (specialization !== undefined) payload.specialization = specialization;
+  if (skills !== undefined) payload.skills = skills;
+  if (personality !== undefined) payload.personality = personality;
   const { error } = await supabase.from("collaborators").update(payload).eq("id", id);
   if (error) throw error;
 }

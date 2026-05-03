@@ -57,6 +57,9 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   // Collaborator form
   const [collabName, setCollabName] = useState("");
   const [collabBio, setCollabBio] = useState("");
+  const [collabSpecialization, setCollabSpecialization] = useState("");
+  const [collabSkills, setCollabSkills] = useState("");
+  const [collabPersonality, setCollabPersonality] = useState("");
   const [collabStatus, setCollabStatus] = useState<"active" | "dismissed">("active");
   const [gender, setGender] = useState<"male" | "female">("female");
   const [skinTone, setSkinTone] = useState(0);
@@ -195,7 +198,9 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
       await addCollaborator({
         name: collabName.trim(), gender, skin_tone: skinTone,
         hair_color: hairColor, shirt_color: shirtColor,
-        has_glasses: hasGlasses, icon, bio: collabBio, status: collabStatus,
+        has_glasses: hasGlasses, icon, bio: collabBio,
+        specialization: collabSpecialization, skills: collabSkills, personality: collabPersonality,
+        status: collabStatus,
       });
       setShowNewCollab(false);
       resetCollabForm();
@@ -210,7 +215,9 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
       await updateCollaborator(id, {
         name: collabName.trim(), gender, skin_tone: skinTone,
         hair_color: hairColor, shirt_color: shirtColor,
-        has_glasses: hasGlasses, icon, bio: collabBio, status: collabStatus,
+        has_glasses: hasGlasses, icon, bio: collabBio,
+        specialization: collabSpecialization, skills: collabSkills, personality: collabPersonality,
+        status: collabStatus,
       });
       setEditingCollab(null);
       await reload();
@@ -234,6 +241,9 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   const openEditCollab = (c: Collaborator) => {
     setCollabName(c.name);
     setCollabBio(c.bio || "");
+    setCollabSpecialization(c.specialization || "");
+    setCollabSkills(c.skills || "");
+    setCollabPersonality(c.personality || "");
     setCollabStatus(c.status || "active");
     setGender(c.gender);
     setSkinTone(c.skin_tone);
@@ -245,8 +255,8 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   };
 
   const resetCollabForm = () => {
-    setCollabName(""); setCollabBio(""); setCollabStatus("active");
-    setGender("female"); setSkinTone(0);
+    setCollabName(""); setCollabBio(""); setCollabSpecialization(""); setCollabSkills(""); setCollabPersonality("");
+    setCollabStatus("active"); setGender("female"); setSkinTone(0);
     setHairColor(0); setShirtColor(1); setHasGlasses(false); setIcon("⚡");
   };
 
@@ -688,7 +698,10 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--danger)]/10 text-[var(--danger)] font-medium">Desligado</span>
                               )}
                             </div>
-                            {collab.bio && (
+                            {collab.specialization && (
+                              <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 line-clamp-1 font-medium">{collab.specialization}</p>
+                            )}
+                            {collab.bio && !collab.specialization && (
                               <p className="text-[10px] text-[var(--text-muted)] mt-0.5 line-clamp-1">{collab.bio}</p>
                             )}
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -728,9 +741,38 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                           </div>
                         )}
 
-                        {/* Expanded: assignments */}
+                        {/* Expanded: profile + assignments */}
                         {isExpanded && !isEditing && (
                           <div className="border-t border-[var(--border)]" onClick={e => e.stopPropagation()}>
+                            {/* Profile details */}
+                            {(collab.specialization || collab.skills || collab.personality || collab.bio) && (
+                              <div className="px-4 py-3 bg-[var(--bg-tertiary)]/50 space-y-2">
+                                {collab.specialization && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">🎓 Especialização</span>
+                                    <p className="text-xs text-[var(--text-primary)] mt-0.5">{collab.specialization}</p>
+                                  </div>
+                                )}
+                                {collab.skills && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">🛠️ Habilidades</span>
+                                    <p className="text-xs text-[var(--text-primary)] mt-0.5">{collab.skills}</p>
+                                  </div>
+                                )}
+                                {collab.personality && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">🧠 Personalidade</span>
+                                    <p className="text-xs text-[var(--text-primary)] mt-0.5">{collab.personality}</p>
+                                  </div>
+                                )}
+                                {collab.bio && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">📋 Bio</span>
+                                    <p className="text-xs text-[var(--text-muted)] mt-0.5">{collab.bio}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             {collabAsgs.length === 0 ? (
                               <div className="p-4 text-center text-xs text-[var(--text-muted)]">
                                 Nenhuma atribuição. <button onClick={() => openNewAssignment(collab.id)} className="text-[var(--accent)] hover:underline cursor-pointer">Criar uma</button>
@@ -1213,6 +1255,30 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
           <textarea value={collabBio} onChange={e => setCollabBio(e.target.value)}
             className="input-modern resize-none" rows={3}
             placeholder="Descreva o perfil, habilidades, papel no escritório..." />
+        </div>
+
+        {/* Formação & Especialização */}
+        <div>
+          <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Formação & Especialização</label>
+          <textarea value={collabSpecialization} onChange={e => setCollabSpecialization(e.target.value)}
+            className="input-modern resize-none" rows={2}
+            placeholder="Ex: Geógrafo com especialização em Geoprocessamento e Engenharia de Dados" />
+        </div>
+
+        {/* Habilidades */}
+        <div>
+          <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Habilidades</label>
+          <textarea value={collabSkills} onChange={e => setCollabSkills(e.target.value)}
+            className="input-modern resize-none" rows={2}
+            placeholder="Ex: ArcGIS, QGIS, Sensoriamento Remoto, Python, SQL, Banco de Dados..." />
+        </div>
+
+        {/* Personalidade */}
+        <div>
+          <label className="block text-sm text-[var(--text-secondary)] mb-1.5">Personalidade</label>
+          <textarea value={collabPersonality} onChange={e => setCollabPersonality(e.target.value)}
+            className="input-modern resize-none" rows={2}
+            placeholder="Ex: Metódico, analítico, detalhista, perfeccionista com dados..." />
         </div>
 
         {/* Status */}

@@ -100,6 +100,12 @@ export interface Collaborator {
   icon: string;
   /** Detalhamento sobre o colaborador (bio/perfil) */
   bio?: string;
+  /** Formação e especialização profissional */
+  specialization?: string;
+  /** Habilidades e ferramentas que domina */
+  skills?: string;
+  /** Traços de personalidade e jeito de trabalhar */
+  personality?: string;
   /** Status: ativo ou desligado */
   status?: "active" | "dismissed";
   user_id?: string;
