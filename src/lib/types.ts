@@ -131,6 +131,21 @@ export interface Assignment {
   category?: Category;
 }
 
+/** Squad — pipeline multi-agente que pode atuar em múltiplos contextos */
+export interface Squad {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  /** URL para abrir/acessar o squad */
+  link?: string;
+  /** Contextos onde este squad aparece (ex: ["AndréIA", "IGAM"]) */
+  contexts: string[];
+  status?: "active" | "inactive";
+  user_id?: string;
+  created_at?: string;
+}
+
 /** Quick-link — atalho global no cabeçalho */
 export interface QuickLink {
   id: string;

@@ -33,6 +33,7 @@ import HRPage from "./HRPage";
 import FlowsPage from "./FlowsPage";
 import MetricsPage from "./MetricsPage";
 import ProductsPanel from "./ProductsPanel";
+import SquadsPage from "./SquadsPage";
 import type { Session } from "@supabase/supabase-js";
 
 interface DashboardProps {
@@ -62,7 +63,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics" | "hr">("office");
+  const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics" | "hr" | "squads">("office");
   const [productsRoom, setProductsRoom] = useState<{ id: string; name: string; categoryIds?: string[] } | null>(null);
 
   const loadData = useCallback(async () => {
@@ -274,6 +275,7 @@ export default function Dashboard({ session }: DashboardProps) {
         <button onClick={() => setCurrentPage("hr")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "hr" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Gestão de RH">👥</button>
         <button onClick={() => setCurrentPage("flows")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "flows" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Fluxos">🔄</button>
         <button onClick={() => setCurrentPage("metrics")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "metrics" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Métricas">📊</button>
+        <button onClick={() => setCurrentPage("squads")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "squads" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Squads">🤖</button>
         <div className="hidden md:block flex-1" />
         <button onClick={handleLogout} className="w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100" title="Sair">🚪</button>
       </aside>
@@ -281,11 +283,13 @@ export default function Dashboard({ session }: DashboardProps) {
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
       <main className="flex-1 flex flex-col overflow-hidden order-1 md:order-none min-h-0">
         {currentPage === "hr" ? (
-          <HRPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr")} onDataChanged={loadData} />
+          <HRPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} onDataChanged={loadData} />
         ) : currentPage === "flows" ? (
-          <FlowsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr")} />
+          <FlowsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} />
         ) : currentPage === "metrics" ? (
-          <MetricsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr")} />
+          <MetricsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} />
+        ) : currentPage === "squads" ? (
+          <SquadsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} />
         ) : (
         <>
         {/* Header */}

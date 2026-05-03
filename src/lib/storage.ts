@@ -4,7 +4,7 @@
 // =============================================
 
 import { supabase } from "./supabase";
-import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Product } from "./types";
+import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Product, Squad } from "./types";
 
 // ---- AUTH ----
 
@@ -463,6 +463,50 @@ export async function updateProduct(id: string, updates: Partial<Product>): Prom
 /** Excluir produto */
 export async function deleteProduct(id: string): Promise<void> {
   const { error } = await supabase.from("products").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// =============================================
+// SQUADS (pipelines multi-agente)
+// =============================================
+
+/** Buscar squads do usuário */
+export async function getSquads(): Promise<Squad[]> {
+  const { data, error } = await supabase
+    .from("squads")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) {
+    // Tabela pode não existir ainda — retornar vazio sem quebrar
+    console.warn("squads table not ready:", error.message);
+    return [];
+  }
+  return data || [];
+}
+
+/** Criar squad */
+export async function addSquad(
+  squad: Omit<Squad, "id" | "user_id" | "created_at">
+): Promise<Squad> {
+  const user = await getUser();
+  const { data, error } = await supabase
+    .from("squads")
+    .insert({ ...squad, user_id: user?.id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Atualizar squad */
+export async function updateSquad(id: string, updates: Partial<Squad>): Promise<void> {
+  const { error } = await supabase.from("squads").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+/** Excluir squad */
+export async function deleteSquad(id: string): Promise<void> {
+  const { error } = await supabase.from("squads").delete().eq("id", id);
   if (error) throw error;
 }
 
