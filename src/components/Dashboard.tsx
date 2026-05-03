@@ -252,7 +252,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const timeStr = currentTime.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   const weekday = currentTime.toLocaleDateString("pt-BR", { weekday: "long" });
   const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
-  const totalCount = useNewModel ? activeOccupants.length : agents.length;
+  const totalCount = useNewModel ? activeCollaborators.length : agents.length;
 
   if (loading) {
     return (
