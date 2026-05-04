@@ -50,6 +50,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
     description: "",
     icon: "📸",
     link: "",
+    office_link: "",
     contexts: [] as string[],
     collaborator_ids: [] as string[],
     status: "active" as "active" | "inactive",
@@ -75,7 +76,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
 
   const openAdd = () => {
     setEditingSquad(null);
-    setForm({ name: "", description: "", icon: "📸", link: "", contexts: [selectedContext], collaborator_ids: [], status: "active" });
+    setForm({ name: "", description: "", icon: "📸", link: "", office_link: "", contexts: [selectedContext], collaborator_ids: [], status: "active" });
     setShowForm(true);
   };
 
@@ -86,6 +87,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       description: squad.description || "",
       icon: squad.icon || "📸",
       link: squad.link || "",
+      office_link: squad.office_link || "",
       contexts: squad.contexts || [],
       collaborator_ids: squad.collaborator_ids || [],
       status: squad.status || "active",
@@ -229,9 +231,9 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                           <span className="truncate">{squad.name}</span>
                         </span>
                         <div className="flex items-center gap-1 shrink-0 ml-2">
-                          {squad.link && (
+                          {squad.office_link && (
                             <a
-                              href={squad.link}
+                              href={squad.office_link}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={e => e.stopPropagation()}
@@ -301,11 +303,17 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                   className="input-modern resize-none" rows={2}
                   placeholder="Pipeline: Mike pesquisa → Izzy escreve → Felipe design" />
               </div>
-              {/* Link */}
+              {/* Link Runner */}
               <div>
-                <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Link (opcional)</label>
+                <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Link do Squad Runner (opcional)</label>
                 <input value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
-                  className="input-modern" placeholder="https://..." />
+                  className="input-modern" placeholder="https://squad.srv1536795.hstgr.cloud/runner/..." />
+              </div>
+              {/* Link Escritório Virtual */}
+              <div>
+                <label className="block text-xs text-[var(--text-secondary)] mb-1.5">🏢 Link do Escritório Virtual (bonequinhos)</label>
+                <input value={form.office_link} onChange={e => setForm(f => ({ ...f, office_link: e.target.value }))}
+                  className="input-modern" placeholder="https://squad.srv1536795.hstgr.cloud/fabrica-carrosseis" />
               </div>
               {/* Setores */}
               <div>

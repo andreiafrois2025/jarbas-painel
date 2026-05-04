@@ -137,8 +137,10 @@ export interface Squad {
   name: string;
   description?: string;
   icon?: string;
-  /** URL para abrir/acessar o squad */
+  /** URL do Squad Runner */
   link?: string;
+  /** URL do Escritório Virtual (bonequinhos) */
+  office_link?: string;
   /** Contextos onde este squad aparece (ex: ["AndréIA", "IGAM"]) */
   contexts: string[];
   /** IDs dos colaboradores envolvidos, em ordem de pipeline */
