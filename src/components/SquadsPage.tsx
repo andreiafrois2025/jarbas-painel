@@ -50,7 +50,6 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
     description: "",
     icon: "📸",
     link: "",
-    office_link: "",
     contexts: [] as string[],
     collaborator_ids: [] as string[],
     status: "active" as "active" | "inactive",
@@ -76,7 +75,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
 
   const openAdd = () => {
     setEditingSquad(null);
-    setForm({ name: "", description: "", icon: "📸", link: "", office_link: "", contexts: [selectedContext], collaborator_ids: [], status: "active" });
+    setForm({ name: "", description: "", icon: "📸", link: "", contexts: [selectedContext], collaborator_ids: [], status: "active" });
     setShowForm(true);
   };
 
@@ -87,7 +86,6 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       description: squad.description || "",
       icon: squad.icon || "📸",
       link: squad.link || "",
-      office_link: squad.office_link || "",
       contexts: squad.contexts || [],
       collaborator_ids: squad.collaborator_ids || [],
       status: squad.status || "active",
@@ -231,18 +229,16 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                           <span className="truncate">{squad.name}</span>
                         </span>
                         <div className="flex items-center gap-1 shrink-0 ml-2">
-                          {squad.office_link && (
-                            <a
-                              href={squad.office_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              title="Abrir Escritório Virtual"
-                              className="flex items-center gap-1 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 px-2 py-0.5 rounded text-[10px] font-semibold transition-all no-underline whitespace-nowrap"
-                            >
-                              🏢 Escritório
-                            </a>
-                          )}
+                          <a
+                            href="https://squad.srv1536795.hstgr.cloud/office"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            title="Abrir Escritório Virtual"
+                            className="flex items-center gap-1 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 px-2 py-0.5 rounded text-[10px] font-semibold transition-all no-underline whitespace-nowrap"
+                          >
+                            🏢 Escritório
+                          </a>
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => openEdit(squad)} className="text-white/70 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer" title="Editar">✏️</button>
                             <button onClick={() => handleDelete(squad.id)} className="text-white/70 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer" title="Excluir">🗑️</button>
@@ -303,17 +299,11 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                   className="input-modern resize-none" rows={2}
                   placeholder="Pipeline: Mike pesquisa → Izzy escreve → Felipe design" />
               </div>
-              {/* Link Runner */}
+              {/* Link */}
               <div>
-                <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Link do Squad Runner (opcional)</label>
+                <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Link (opcional)</label>
                 <input value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
-                  className="input-modern" placeholder="https://squad.srv1536795.hstgr.cloud/runner/..." />
-              </div>
-              {/* Link Escritório Virtual */}
-              <div>
-                <label className="block text-xs text-[var(--text-secondary)] mb-1.5">🏢 Link do Escritório Virtual (bonequinhos)</label>
-                <input value={form.office_link} onChange={e => setForm(f => ({ ...f, office_link: e.target.value }))}
-                  className="input-modern" placeholder="https://squad.srv1536795.hstgr.cloud/fabrica-carrosseis" />
+                  className="input-modern" placeholder="https://..." />
               </div>
               {/* Setores */}
               <div>
