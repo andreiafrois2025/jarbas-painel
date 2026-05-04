@@ -508,10 +508,18 @@ export default function Dashboard({ session }: DashboardProps) {
                           return (
                             <div key={sq.id} className="room-card" style={{ cursor: "default" }}>
                               <div className="room-card-header flex items-center justify-between !py-1.5 !px-2">
-                                <span className="flex items-center gap-1">
+                                <span className="flex items-center gap-1 min-w-0 flex-1">
                                   <span className="text-sm">{sq.icon || "🤖"}</span>
                                   <span className="truncate text-xs font-semibold">{sq.name}</span>
                                 </span>
+                                {sq.link && (
+                                  <a href={sq.link} target="_blank" rel="noopener noreferrer"
+                                    onClick={e => e.stopPropagation()}
+                                    title="Escritório Virtual"
+                                    className="shrink-0 ml-1 flex items-center gap-0.5 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 px-1.5 py-0.5 rounded text-[9px] font-bold transition-all no-underline whitespace-nowrap">
+                                    🏢 Escritório
+                                  </a>
+                                )}
                               </div>
                               <div className="px-2 pb-1">
                                 {sq.description && (
@@ -534,15 +542,6 @@ export default function Dashboard({ session }: DashboardProps) {
                                   </div>
                                 )}
                               </div>
-                              {sq.link && (
-                                <div className="px-2 pb-1.5">
-                                  <a href={sq.link} target="_blank" rel="noopener noreferrer"
-                                    className="block text-center font-bold no-underline hover:brightness-110 transition-all"
-                                    style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)", fontSize: 9, padding: "2px 0" }}>
-                                    ▶ Abrir Squad
-                                  </a>
-                                </div>
-                              )}
                             </div>
                           );
                         })
