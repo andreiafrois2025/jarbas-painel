@@ -224,13 +224,27 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                   {squadsInContext.map(squad => (
                     <div key={squad.id} className="room-card group relative" style={{ cursor: "default" }}>
                       <div className="room-card-header flex items-center justify-between">
-                        <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 min-w-0 flex-1">
                           <span>{squad.icon || "📸"}</span>
                           <span className="truncate">{squad.name}</span>
                         </span>
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openEdit(squad)} className="text-white/70 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer" title="Editar">✏️</button>
-                          <button onClick={() => handleDelete(squad.id)} className="text-white/70 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer" title="Excluir">🗑️</button>
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          {squad.link && (
+                            <a
+                              href={squad.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              title="Abrir Escritório Virtual"
+                              className="flex items-center gap-1 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 px-2 py-0.5 rounded text-[10px] font-semibold transition-all no-underline whitespace-nowrap"
+                            >
+                              🏢 Escritório
+                            </a>
+                          )}
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => openEdit(squad)} className="text-white/70 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer" title="Editar">✏️</button>
+                            <button onClick={() => handleDelete(squad.id)} className="text-white/70 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer" title="Excluir">🗑️</button>
+                          </div>
                         </div>
                       </div>
                       <div className="room-card-body flex-col !items-start gap-2">
@@ -249,15 +263,6 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                           ))}
                         </div>
                       </div>
-                      {squad.link && (
-                        <div className="px-3 pb-2">
-                          <a href={squad.link} target="_blank" rel="noopener noreferrer"
-                            className="block text-center text-[10px] font-bold py-1 rounded transition-all hover:brightness-110 no-underline"
-                            style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)" }}>
-                            ▶ Abrir Squad
-                          </a>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
