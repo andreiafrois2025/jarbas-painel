@@ -55,6 +55,14 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
     status: "active" as "active" | "inactive",
   });
 
+  // --- Estado do modal "Iniciar Squad" ---
+  const [showRunModal, setShowRunModal] = useState(false);
+  const [runningSquad, setRunningSquad] = useState<Squad | null>(null);
+  const [runTopic, setRunTopic] = useState("");
+  const [runStarting, setRunStarting] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [runSuccess, setRunSuccess] = useState<{ jobId: string; squadCode: string } | null>(null);
+
   const loadData = async () => {
     try {
       const [squadsData, collabData] = await Promise.all([getSquads(), getCollaborators()]);
@@ -118,6 +126,61 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       await loadData();
     } catch (err) {
       console.error("Erro ao excluir squad:", err);
+    }
+  };
+
+  // --- Helpers para "Iniciar Squad" ---
+
+  /** Extrai o código da squad da URL do campo link (ex: /office?squad=licitacao-igam → "licitacao-igam") */
+  const extractSquadCode = (link: string | undefined): string | null => {
+    if (!link) return null;
+    try {
+      const url = new URL(link);
+      const code = url.searchParams.get("squad");
+      if (code) return code;
+      // Fallback: tenta extrair do path (ex: /runner/squad-X)
+      const match = url.pathname.match(/(?:runner|office)\/([\w-]+)/);
+      return match ? match[1] : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /** Abre o modal de "Iniciar Squad" */
+  const openRunModal = (squad: Squad) => {
+    setRunningSquad(squad);
+    setRunTopic("");
+    setRunError(null);
+    setRunSuccess(null);
+    setShowRunModal(true);
+  };
+
+  /** Dispara o POST /api/run no squad-api da VPS */
+  const handleRunSquad = async () => {
+    if (!runningSquad || !runTopic.trim()) return;
+    const code = extractSquadCode(runningSquad.link);
+    if (!code) {
+      setRunError("Não consegui descobrir o código da squad pelo link cadastrado. Edite o squad e adicione um link no formato https://squad.srv1536795.hstgr.cloud/office?squad=NOMEDOCODIGO");
+      return;
+    }
+    setRunStarting(true);
+    setRunError(null);
+    try {
+      const res = await fetch("https://squad.srv1536795.hstgr.cloud/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ squad: code, topic: runTopic.trim() }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Servidor respondeu ${res.status}: ${txt}`);
+      }
+      const data = await res.json();
+      setRunSuccess({ jobId: data.jobId || "?", squadCode: code });
+    } catch (err) {
+      setRunError(err instanceof Error ? err.message : "Erro desconhecido ao iniciar a squad.");
+    } finally {
+      setRunStarting(false);
     }
   };
 
@@ -229,8 +292,15 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                           <span className="truncate">{squad.name}</span>
                         </span>
                         <div className="flex items-center gap-1 shrink-0 ml-2">
+                          <button
+                            onClick={e => { e.stopPropagation(); openRunModal(squad); }}
+                            title="Iniciar squad com um tópico"
+                            className="flex items-center gap-1 text-white/95 hover:text-white bg-emerald-500/30 hover:bg-emerald-500/50 px-2 py-0.5 rounded text-[10px] font-semibold transition-all whitespace-nowrap cursor-pointer"
+                          >
+                            ▶️ Iniciar
+                          </button>
                           <a
-                            href="https://squad.srv1536795.hstgr.cloud/office"
+                            href={squad.link || "https://squad.srv1536795.hstgr.cloud/office"}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
@@ -379,6 +449,104 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                 className="btn-primary flex-1 disabled:opacity-50">
                 {saving ? "Salvando..." : editingSquad ? "Salvar" : "Criar Squad"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal — Iniciar Squad com tópico */}
+      {showRunModal && runningSquad && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-[var(--border)]">
+              <h2 className="font-semibold flex items-center gap-2">
+                <span>{runningSquad.icon || "▶️"}</span>
+                <span>Iniciar {runningSquad.name}</span>
+              </h2>
+              <button
+                onClick={() => setShowRunModal(false)}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none cursor-pointer"
+              >×</button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {!runSuccess ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                      Tópico / instrução inicial
+                    </label>
+                    <textarea
+                      value={runTopic}
+                      onChange={e => setRunTopic(e.target.value)}
+                      placeholder="Ex.: contratar ArcGIS por inexigibilidade. SEI 2240.01.0004530/2025-12. Modalidade: inexigibilidade. Valor estimado R$ 377 mil. Empresa: Imagem Geosistemas."
+                      className="w-full min-h-[120px] px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                      autoFocus
+                    />
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                      Os agentes recebem esse texto como contexto inicial. Quanto mais detalhe, melhor.
+                    </p>
+                  </div>
+
+                  {runningSquad.description && (
+                    <div className="text-[11px] text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg">
+                      <strong className="text-[var(--text-primary)]">Sobre essa squad:</strong> {runningSquad.description}
+                    </div>
+                  )}
+
+                  {runError && (
+                    <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/30 p-3 rounded-lg whitespace-pre-wrap">
+                      {runError}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="text-emerald-400 text-2xl text-center">✅</div>
+                  <p className="text-sm text-center font-medium">
+                    Squad iniciada com sucesso!
+                  </p>
+                  <div className="text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg space-y-1">
+                    <div><strong>Job ID:</strong> <code className="text-[var(--accent)]">{runSuccess.jobId}</code></div>
+                    <div><strong>Squad:</strong> <code className="text-[var(--accent)]">{runSuccess.squadCode}</code></div>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-muted)] text-center">
+                    Abra o Escritório Virtual para acompanhar a execução em tempo real.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 px-6 pb-5 border-t border-[var(--border)] pt-4">
+              {!runSuccess ? (
+                <>
+                  <button
+                    onClick={() => setShowRunModal(false)}
+                    className="btn-secondary flex-1"
+                    disabled={runStarting}
+                  >Cancelar</button>
+                  <button
+                    onClick={handleRunSquad}
+                    disabled={runStarting || !runTopic.trim()}
+                    className="btn-primary flex-1 disabled:opacity-50"
+                  >
+                    {runStarting ? "Iniciando..." : "▶️ Iniciar agora"}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setShowRunModal(false)}
+                    className="btn-secondary flex-1"
+                  >Fechar</button>
+                  <a
+                    href={runningSquad.link || `https://squad.srv1536795.hstgr.cloud/office?squad=${runSuccess.squadCode}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-primary flex-1 text-center no-underline"
+                  >🏢 Abrir Escritório</a>
+                </>
+              )}
             </div>
           </div>
         </div>
