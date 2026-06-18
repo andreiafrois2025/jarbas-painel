@@ -70,6 +70,12 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   const [runError, setRunError] = useState<string | null>(null);
   const [runSuccess, setRunSuccess] = useState<{ jobId: string; squadCode: string } | null>(null);
 
+  // --- Documentos da execução (modal Iniciar Squad) ---
+  const [runDocuments, setRunDocuments] = useState<SquadDocument[]>([]);
+  const [runUploading, setRunUploading] = useState(false);
+  const [runUploadError, setRunUploadError] = useState<string | null>(null);
+  const runFileInputRef = useRef<HTMLInputElement>(null);
+
   const loadData = async () => {
     try {
       const [squadsData, collabData] = await Promise.all([getSquads(), getCollaborators()]);
@@ -218,9 +224,61 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   const openRunModal = (squad: Squad) => {
     setRunningSquad(squad);
     setRunTopic("");
+    setRunDocuments([]);
+    setRunUploadError(null);
     setRunError(null);
     setRunSuccess(null);
     setShowRunModal(true);
+  };
+
+  /** Upload de documentos PARA ESTA EXECUÇÃO (não fica na squad — vai pro job) */
+  const handleRunFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !runningSquad) return;
+    setRunUploading(true);
+    setRunUploadError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Você precisa estar logada para subir arquivos.");
+      // Pasta separada para job (vai virar a pasta do jobId quando a squad-api receber)
+      const jobFolder = `run-${Date.now()}`;
+      const uploaded: SquadDocument[] = [];
+      for (const file of Array.from(files)) {
+        const timestamp = Date.now();
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${user.id}/${runningSquad.id}/jobs/${jobFolder}/${timestamp}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("squad-documents")
+          .upload(path, file, { cacheControl: "3600", upsert: false });
+        if (upErr) throw new Error(`Erro ao subir ${file.name}: ${upErr.message}`);
+        const { data: pub } = supabase.storage.from("squad-documents").getPublicUrl(path);
+        uploaded.push({
+          name: file.name,
+          url: pub.publicUrl,
+          path,
+          size: file.size,
+          mime_type: file.type,
+          uploaded_at: new Date().toISOString(),
+        });
+      }
+      setRunDocuments(d => [...d, ...uploaded]);
+      if (runFileInputRef.current) runFileInputRef.current.value = "";
+    } catch (err) {
+      setRunUploadError(err instanceof Error ? err.message : "Erro desconhecido no upload.");
+    } finally {
+      setRunUploading(false);
+    }
+  };
+
+  /** Remove documento da execução (e do Storage) */
+  const handleRemoveRunDocument = async (doc: SquadDocument) => {
+    if (!confirm(`Remover "${doc.name}"?`)) return;
+    try {
+      await supabase.storage.from("squad-documents").remove([doc.path]);
+    } catch (err) {
+      console.warn("Erro ao deletar do storage:", err);
+    }
+    setRunDocuments(d => d.filter(x => x.path !== doc.path));
   };
 
   /** Dispara o POST /api/run no squad-api da VPS */
@@ -237,7 +295,11 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       const res = await fetch("https://squad.srv1536795.hstgr.cloud/api/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ squad: code, topic: runTopic.trim() }),
+        body: JSON.stringify({
+          squad: code,
+          topic: runTopic.trim(),
+          documents: runDocuments,  // squad-api baixa pra output/{jobId}/uploads/
+        }),
       });
       if (!res.ok) {
         const txt = await res.text();
@@ -443,11 +505,11 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                 <input value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
                   className="input-modern" placeholder="https://..." />
               </div>
-              {/* Documentos anexados */}
+              {/* Modelos / templates fixos da squad */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs text-[var(--text-secondary)]">
-                    📎 Documentos anexados ({form.documents.length})
+                    📚 Modelos / templates fixos ({form.documents.length})
                   </label>
                   <button
                     type="button"
@@ -455,7 +517,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                     disabled={uploading}
                     className="text-[11px] px-2 py-1 rounded bg-[var(--accent-soft)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    {uploading ? "Enviando..." : "+ Anexar arquivo"}
+                    {uploading ? "Enviando..." : "+ Anexar modelo"}
                   </button>
                   <input
                     ref={fileInputRef}
@@ -467,7 +529,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                   />
                 </div>
                 <p className="text-[10px] text-[var(--text-muted)] mb-2 leading-tight">
-                  Anexe propostas, cartas de exclusividade, modelos de referência etc. Os agentes leem esses arquivos antes de começar.
+                  Arquivos que valem para <strong>todas as execuções</strong> desta squad: modelos institucionais, manuais, padrões SEPLAG, exemplos de referência. Documentos específicos de cada processo (proposta da empresa, carta de exclusividade) vão na hora de iniciar.
                 </p>
                 {uploadError && (
                   <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded mb-2 whitespace-pre-wrap">
@@ -622,9 +684,82 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                     </p>
                   </div>
 
+                  {/* Documentos desta execução */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-medium text-[var(--text-primary)]">
+                        📎 Documentos desta execução ({runDocuments.length})
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => runFileInputRef.current?.click()}
+                        disabled={runUploading}
+                        className="text-[11px] px-2 py-1 rounded bg-[var(--accent-soft)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {runUploading ? "Enviando..." : "+ Anexar arquivo"}
+                      </button>
+                      <input
+                        ref={runFileInputRef}
+                        type="file"
+                        multiple
+                        onChange={handleRunFileUpload}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.zip"
+                      />
+                    </div>
+                    <p className="text-[10px] text-[var(--text-muted)] mb-2 leading-tight">
+                      Arquivos específicos deste processo: proposta da empresa, carta de exclusividade, ETP de processo similar, notas fiscais comparativas. Os agentes leem esses arquivos antes de começar.
+                    </p>
+                    {runUploadError && (
+                      <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded mb-2 whitespace-pre-wrap">
+                        {runUploadError}
+                      </div>
+                    )}
+                    {runDocuments.length > 0 && (
+                      <ul className="space-y-1 max-h-32 overflow-auto bg-[var(--bg-tertiary)] rounded-lg p-2">
+                        {runDocuments.map((doc) => (
+                          <li key={doc.path} className="flex items-center gap-2 text-[11px] group">
+                            <span className="text-base shrink-0">
+                              {doc.mime_type?.startsWith("image/") ? "🖼️"
+                                : doc.mime_type === "application/pdf" ? "📕"
+                                : doc.mime_type?.includes("word") ? "📘"
+                                : doc.mime_type?.includes("sheet") || doc.mime_type?.includes("excel") ? "📗"
+                                : doc.mime_type === "application/zip" ? "🗜️"
+                                : "📄"}
+                            </span>
+                            <a
+                              href={doc.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 truncate text-[var(--text-primary)] hover:text-[var(--accent)] no-underline"
+                              title={doc.name}
+                            >
+                              {doc.name}
+                            </a>
+                            <span className="text-[var(--text-muted)] shrink-0 text-[10px]">{formatBytes(doc.size)}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRunDocument(doc)}
+                              className="text-[var(--text-muted)] hover:text-red-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                              title="Remover"
+                            >
+                              🗑️
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
                   {runningSquad.description && (
                     <div className="text-[11px] text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg">
                       <strong className="text-[var(--text-primary)]">Sobre essa squad:</strong> {runningSquad.description}
+                    </div>
+                  )}
+
+                  {(runningSquad.documents && runningSquad.documents.length > 0) && (
+                    <div className="text-[11px] text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-3 rounded-lg">
+                      <strong className="text-[var(--text-primary)]">📚 Modelos fixos desta squad:</strong> {runningSquad.documents.length} arquivo(s) — serão lidos junto com os desta execução.
                     </div>
                   )}
 
