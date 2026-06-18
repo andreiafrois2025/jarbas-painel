@@ -131,6 +131,22 @@ export interface Assignment {
   category?: Category;
 }
 
+/** Documento anexado a um squad — fica disponível para os agentes lerem antes/durante a execução */
+export interface SquadDocument {
+  /** Nome original do arquivo enviado pela Andréia */
+  name: string;
+  /** URL pública (Supabase Storage) ou caminho dentro do bucket */
+  url: string;
+  /** Caminho dentro do bucket (para deletar) */
+  path: string;
+  /** Tamanho em bytes */
+  size: number;
+  /** Tipo MIME (ex: application/pdf) */
+  mime_type?: string;
+  /** Quando foi enviado */
+  uploaded_at: string;
+}
+
 /** Squad — pipeline multi-agente que pode atuar em múltiplos contextos */
 export interface Squad {
   id: string;
@@ -143,6 +159,8 @@ export interface Squad {
   contexts: string[];
   /** IDs dos colaboradores envolvidos, em ordem de pipeline */
   collaborator_ids?: string[];
+  /** Documentos anexados (proposta comercial, carta de exclusividade, ETP de referência, etc) */
+  documents?: SquadDocument[];
   status?: "active" | "inactive";
   user_id?: string;
   created_at?: string;

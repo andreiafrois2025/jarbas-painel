@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Squad, Collaborator, CONTEXTS } from "@/lib/types";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Squad, SquadDocument, Collaborator, CONTEXTS } from "@/lib/types";
 import { getSquads, addSquad, updateSquad, deleteSquad, getCollaborators } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
 
 interface SquadsPageProps {
   onNavigate: (page: string) => void;
@@ -52,8 +53,14 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
     link: "",
     contexts: [] as string[],
     collaborator_ids: [] as string[],
+    documents: [] as SquadDocument[],
     status: "active" as "active" | "inactive",
   });
+
+  // --- Estado do upload de documentos ---
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Estado do modal "Iniciar Squad" ---
   const [showRunModal, setShowRunModal] = useState(false);
@@ -83,7 +90,8 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
 
   const openAdd = () => {
     setEditingSquad(null);
-    setForm({ name: "", description: "", icon: "📸", link: "", contexts: [selectedContext], collaborator_ids: [], status: "active" });
+    setForm({ name: "", description: "", icon: "📸", link: "", contexts: [selectedContext], collaborator_ids: [], documents: [], status: "active" });
+    setUploadError(null);
     setShowForm(true);
   };
 
@@ -96,9 +104,69 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       link: squad.link || "",
       contexts: squad.contexts || [],
       collaborator_ids: squad.collaborator_ids || [],
+      documents: squad.documents || [],
       status: squad.status || "active",
     });
+    setUploadError(null);
     setShowForm(true);
+  };
+
+  // --- Upload de documentos ---
+
+  /** Faz upload dos arquivos selecionados para o Supabase Storage (bucket squad-documents) */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Você precisa estar logada para subir arquivos.");
+      const squadFolder = editingSquad?.id || `temp-${Date.now()}`;
+      const uploaded: SquadDocument[] = [];
+      for (const file of Array.from(files)) {
+        const timestamp = Date.now();
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${user.id}/${squadFolder}/${timestamp}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from("squad-documents")
+          .upload(path, file, { cacheControl: "3600", upsert: false });
+        if (upErr) throw new Error(`Erro ao subir ${file.name}: ${upErr.message}`);
+        const { data: pub } = supabase.storage.from("squad-documents").getPublicUrl(path);
+        uploaded.push({
+          name: file.name,
+          url: pub.publicUrl,
+          path,
+          size: file.size,
+          mime_type: file.type,
+          uploaded_at: new Date().toISOString(),
+        });
+      }
+      setForm(f => ({ ...f, documents: [...f.documents, ...uploaded] }));
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Erro desconhecido no upload.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  /** Remove documento do form (e tenta deletar do Storage) */
+  const handleRemoveDocument = async (doc: SquadDocument) => {
+    if (!confirm(`Remover o arquivo "${doc.name}"?`)) return;
+    try {
+      await supabase.storage.from("squad-documents").remove([doc.path]);
+    } catch (err) {
+      console.warn("Erro ao deletar do storage (vou remover só do form):", err);
+    }
+    setForm(f => ({ ...f, documents: f.documents.filter(d => d.path !== doc.path) }));
+  };
+
+  /** Formata bytes para texto legível */
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const handleSave = async () => {
@@ -374,6 +442,72 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                 <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Link (opcional)</label>
                 <input value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
                   className="input-modern" placeholder="https://..." />
+              </div>
+              {/* Documentos anexados */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs text-[var(--text-secondary)]">
+                    📎 Documentos anexados ({form.documents.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="text-[11px] px-2 py-1 rounded bg-[var(--accent-soft)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {uploading ? "Enviando..." : "+ Anexar arquivo"}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv,.png,.jpg,.jpeg,.webp,.zip"
+                  />
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)] mb-2 leading-tight">
+                  Anexe propostas, cartas de exclusividade, modelos de referência etc. Os agentes leem esses arquivos antes de começar.
+                </p>
+                {uploadError && (
+                  <div className="text-[11px] text-red-400 bg-red-500/10 border border-red-500/30 p-2 rounded mb-2 whitespace-pre-wrap">
+                    {uploadError}
+                  </div>
+                )}
+                {form.documents.length > 0 && (
+                  <ul className="space-y-1 max-h-32 overflow-auto bg-[var(--bg-tertiary)] rounded-lg p-2">
+                    {form.documents.map((doc) => (
+                      <li key={doc.path} className="flex items-center gap-2 text-[11px] group">
+                        <span className="text-base shrink-0">
+                          {doc.mime_type?.startsWith("image/") ? "🖼️"
+                            : doc.mime_type === "application/pdf" ? "📕"
+                            : doc.mime_type?.includes("word") ? "📘"
+                            : doc.mime_type?.includes("sheet") || doc.mime_type?.includes("excel") ? "📗"
+                            : doc.mime_type === "application/zip" ? "🗜️"
+                            : "📄"}
+                        </span>
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 truncate text-[var(--text-primary)] hover:text-[var(--accent)] no-underline"
+                          title={doc.name}
+                        >
+                          {doc.name}
+                        </a>
+                        <span className="text-[var(--text-muted)] shrink-0 text-[10px]">{formatBytes(doc.size)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDocument(doc)}
+                          className="text-[var(--text-muted)] hover:text-red-400 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          title="Remover"
+                        >
+                          🗑️
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               {/* Setores */}
               <div>
