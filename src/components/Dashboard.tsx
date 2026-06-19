@@ -35,6 +35,7 @@ import FlowsPage from "./FlowsPage";
 import MetricsPage from "./MetricsPage";
 import ProductsPanel from "./ProductsPanel";
 import SquadsPage from "./SquadsPage";
+import JobsMonitor from "./JobsMonitor";
 import type { Session } from "@supabase/supabase-js";
 
 interface DashboardProps {
@@ -290,6 +291,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
       <main className="flex-1 flex flex-col overflow-hidden order-1 md:order-none min-h-0">
+        <JobsMonitor />
         {currentPage === "hr" ? (
           <HRPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} onDataChanged={loadData} />
         ) : currentPage === "flows" ? (
