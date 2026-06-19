@@ -36,6 +36,7 @@ import MetricsPage from "./MetricsPage";
 import ProductsPanel from "./ProductsPanel";
 import SquadsPage from "./SquadsPage";
 import JobsMonitor from "./JobsMonitor";
+import StartSquadModal from "./StartSquadModal";
 import type { Session } from "@supabase/supabase-js";
 
 interface DashboardProps {
@@ -68,6 +69,8 @@ export default function Dashboard({ session }: DashboardProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics" | "hr" | "squads">("office");
   const [productsRoom, setProductsRoom] = useState<{ id: string; name: string; categoryIds?: string[] } | null>(null);
+  const [runningSquad, setRunningSquad] = useState<Squad | null>(null);
+  const [showRunModal, setShowRunModal] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -514,12 +517,20 @@ export default function Dashboard({ session }: DashboardProps) {
                                   <span className="text-sm">{sq.icon || "🤖"}</span>
                                   <span className="truncate text-xs font-semibold">{sq.name}</span>
                                 </span>
-                                <a href="https://squad.srv1536795.hstgr.cloud/office" target="_blank" rel="noopener noreferrer"
-                                  onClick={e => e.stopPropagation()}
-                                  title="Escritório Virtual"
-                                  className="shrink-0 ml-1 flex items-center gap-0.5 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 px-1.5 py-0.5 rounded text-[9px] font-bold transition-all no-underline whitespace-nowrap">
-                                  🏢 Escritório
-                                </a>
+                                <div className="shrink-0 ml-1 flex items-center gap-1">
+                                  <button
+                                    onClick={e => { e.stopPropagation(); setRunningSquad(sq); setShowRunModal(true); }}
+                                    title="Iniciar Squad"
+                                    className="flex items-center gap-0.5 text-white/90 hover:text-white bg-green-600/70 hover:bg-green-600 px-1.5 py-0.5 rounded text-[9px] font-bold transition-all whitespace-nowrap cursor-pointer">
+                                    ▶️ Iniciar
+                                  </button>
+                                  <a href={sq.link || "https://squad.srv1536795.hstgr.cloud/office"} target="_blank" rel="noopener noreferrer"
+                                    onClick={e => e.stopPropagation()}
+                                    title="Escritório Virtual"
+                                    className="flex items-center gap-0.5 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 px-1.5 py-0.5 rounded text-[9px] font-bold transition-all no-underline whitespace-nowrap">
+                                    🏢 Escritório
+                                  </a>
+                                </div>
                               </div>
                               <div className="px-2 pb-1">
                                 {sq.description && (
@@ -630,6 +641,13 @@ export default function Dashboard({ session }: DashboardProps) {
           onClose={() => setProductsRoom(null)}
         />
       )}
+
+      {/* ===== MODAL INICIAR SQUAD (a partir dos cards) ===== */}
+      <StartSquadModal
+        squad={runningSquad}
+        open={showRunModal}
+        onClose={() => setShowRunModal(false)}
+      />
     </div>
   );
 }
