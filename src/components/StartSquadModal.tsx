@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Squad, SquadDocument } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
+import { SQUAD_API_BASE } from "@/lib/config";
 
 interface StartSquadModalProps {
   squad: Squad | null;
@@ -103,13 +104,13 @@ export default function StartSquadModal({ squad, open, onClose }: StartSquadModa
     if (!topic.trim()) return;
     const code = extractSquadCode(squad.link);
     if (!code) {
-      setError("Não consegui descobrir o código da squad pelo link cadastrado. Edite o squad e adicione um link no formato https://squad.srv1536795.hstgr.cloud/office?squad=NOMEDOCODIGO");
+      setError(`Não consegui descobrir o código da squad pelo link cadastrado. Edite o squad e adicione um link no formato ${SQUAD_API_BASE}/office?squad=NOMEDOCODIGO`);
       return;
     }
     setStarting(true);
     setError(null);
     try {
-      const res = await fetch("https://squad.srv1536795.hstgr.cloud/api/run", {
+      const res = await fetch(`${SQUAD_API_BASE}/api/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -288,7 +289,7 @@ export default function StartSquadModal({ squad, open, onClose }: StartSquadModa
                 className="btn-secondary flex-1"
               >Fechar</button>
               <a
-                href={squad.link || `https://squad.srv1536795.hstgr.cloud/office?squad=${success.squadCode}`}
+                href={squad.link || `${SQUAD_API_BASE}/office?squad=${success.squadCode}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-primary flex-1 text-center no-underline"

@@ -38,6 +38,7 @@ import SquadsPage from "./SquadsPage";
 import JobsMonitor from "./JobsMonitor";
 import StartSquadModal from "./StartSquadModal";
 import type { Session } from "@supabase/supabase-js";
+import { SQUAD_API_BASE } from "@/lib/config";
 
 interface DashboardProps {
   session: Session;
@@ -524,7 +525,7 @@ export default function Dashboard({ session }: DashboardProps) {
                                     className="flex items-center gap-0.5 text-white/90 hover:text-white bg-green-600/70 hover:bg-green-600 px-1.5 py-0.5 rounded text-[9px] font-bold transition-all whitespace-nowrap cursor-pointer">
                                     ▶️ Iniciar
                                   </button>
-                                  <a href={sq.link || "https://squad.srv1536795.hstgr.cloud/office"} target="_blank" rel="noopener noreferrer"
+                                  <a href={sq.link || `${SQUAD_API_BASE}/office`} target="_blank" rel="noopener noreferrer"
                                     onClick={e => e.stopPropagation()}
                                     title="Escritório Virtual"
                                     className="flex items-center gap-0.5 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 px-1.5 py-0.5 rounded text-[9px] font-bold transition-all no-underline whitespace-nowrap">

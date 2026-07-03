@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { Squad, SquadDocument, Collaborator, CONTEXTS } from "@/lib/types";
 import { getSquads, addSquad, updateSquad, deleteSquad, getCollaborators } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
+import { SQUAD_API_BASE } from "@/lib/config";
 import StartSquadModal from "./StartSquadModal";
 
 interface SquadsPageProps {
@@ -316,7 +317,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                             ▶️ Iniciar
                           </button>
                           <a
-                            href={squad.link || "https://squad.srv1536795.hstgr.cloud/office"}
+                            href={squad.link || `${SQUAD_API_BASE}/office`}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}

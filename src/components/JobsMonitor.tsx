@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-const SQUAD_API_BASE = "https://squad.srv1536795.hstgr.cloud";
+import { SQUAD_API_BASE } from "@/lib/config";
 const POLL_INTERVAL_MS = 5000;
 
 interface JobError {
