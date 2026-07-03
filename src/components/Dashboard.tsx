@@ -39,6 +39,7 @@ import JobsMonitor from "./JobsMonitor";
 import StartSquadModal from "./StartSquadModal";
 import type { Session } from "@supabase/supabase-js";
 import { SQUAD_API_BASE } from "@/lib/config";
+import StatusSemaforo from "./StatusSemaforo";
 
 interface DashboardProps {
   session: Session;
@@ -321,6 +322,7 @@ export default function Dashboard({ session }: DashboardProps) {
             </span>
           </div>
           <div className="flex-1" />
+          <StatusSemaforo />
           <div className="relative hidden lg:block">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">🔍</span>
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar colaborador..." className="input-modern !pl-10 !w-52 !py-2 text-sm" />
