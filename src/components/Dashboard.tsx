@@ -31,10 +31,9 @@ import type { Execution, Category as CategoryType } from "@/lib/types";
 import OfficeScene from "./OfficeScene";
 import ContratarModal from "./ContratarModal";
 import HRPage from "./HRPage";
-import FlowsPage from "./FlowsPage";
-import MetricsPage from "./MetricsPage";
 import ProductsPanel from "./ProductsPanel";
-import SquadsPage from "./SquadsPage";
+import ProducaoPage from "./ProducaoPage";
+import ConfigPage from "./ConfigPage";
 import JobsMonitor from "./JobsMonitor";
 import StartSquadModal from "./StartSquadModal";
 import type { Session } from "@supabase/supabase-js";
@@ -69,7 +68,7 @@ export default function Dashboard({ session }: DashboardProps) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [currentPage, setCurrentPage] = useState<"office" | "flows" | "metrics" | "hr" | "squads">("office");
+  const [currentPage, setCurrentPage] = useState<"inicio" | "equipe" | "producao" | "config">("inicio");
   const [productsRoom, setProductsRoom] = useState<{ id: string; name: string; categoryIds?: string[] } | null>(null);
   const [runningSquad, setRunningSquad] = useState<Squad | null>(null);
   const [showRunModal, setShowRunModal] = useState(false);
@@ -285,11 +284,10 @@ export default function Dashboard({ session }: DashboardProps) {
       {/* ===== SIDEBAR ===== */}
       <aside className="order-2 md:order-none w-full md:w-16 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-2 shrink-0">
         <div className="hidden md:block text-2xl mb-4 cursor-default" title="Jarbas">⚡</div>
-        <button onClick={() => setCurrentPage("office")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "office" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Escritório">🏢</button>
-        <button onClick={() => setCurrentPage("hr")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "hr" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Gestão de RH">👥</button>
-        <button onClick={() => setCurrentPage("flows")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "flows" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Fluxos">🔄</button>
-        <button onClick={() => setCurrentPage("metrics")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "metrics" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Métricas">📊</button>
-        <button onClick={() => setCurrentPage("squads")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "squads" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Squads">🤖</button>
+        <button onClick={() => setCurrentPage("inicio")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "inicio" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Início">🏠</button>
+        <button onClick={() => setCurrentPage("equipe")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "equipe" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Equipe">👥</button>
+        <button onClick={() => setCurrentPage("producao")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "producao" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Produção (Squads + Fluxos)">🚀</button>
+        <button onClick={() => setCurrentPage("config")} className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${currentPage === "config" ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"}`} title="Config (Integrações + Métricas)">⚙️</button>
         <div className="hidden md:block flex-1" />
         <button onClick={handleLogout} className="w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100" title="Sair">🚪</button>
       </aside>
@@ -297,14 +295,12 @@ export default function Dashboard({ session }: DashboardProps) {
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
       <main className="flex-1 flex flex-col overflow-hidden order-1 md:order-none min-h-0">
         <JobsMonitor />
-        {currentPage === "hr" ? (
-          <HRPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} onDataChanged={loadData} />
-        ) : currentPage === "flows" ? (
-          <FlowsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} />
-        ) : currentPage === "metrics" ? (
-          <MetricsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} />
-        ) : currentPage === "squads" ? (
-          <SquadsPage onNavigate={(p) => setCurrentPage(p as "office" | "flows" | "metrics" | "hr" | "squads")} />
+        {currentPage === "equipe" ? (
+          <HRPage onNavigate={(p) => setCurrentPage(p as "inicio" | "equipe" | "producao" | "config")} onDataChanged={loadData} />
+        ) : currentPage === "producao" ? (
+          <ProducaoPage onNavigate={(p) => setCurrentPage(p as "inicio" | "equipe" | "producao" | "config")} />
+        ) : currentPage === "config" ? (
+          <ConfigPage onNavigate={(p) => setCurrentPage(p as "inicio" | "equipe" | "producao" | "config")} />
         ) : (
         <>
         {/* Header */}
@@ -327,7 +323,7 @@ export default function Dashboard({ session }: DashboardProps) {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">🔍</span>
             <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar colaborador..." className="input-modern !pl-10 !w-52 !py-2 text-sm" />
           </div>
-          <button onClick={() => setCurrentPage("hr")} className="btn-secondary !py-2 !px-3 md:!px-4 text-xs md:text-sm">
+          <button onClick={() => setCurrentPage("equipe")} className="btn-secondary !py-2 !px-3 md:!px-4 text-xs md:text-sm">
             👥 <span className="hidden sm:inline">Gestão de RH</span>
           </button>
           <button onClick={() => { setEditingAssignment(null); setEditingCollaborator(null); setShowContratarModal(true); }} className="btn-primary !py-2 !px-3 md:!px-4 text-xs md:text-sm">
@@ -413,7 +409,7 @@ export default function Dashboard({ session }: DashboardProps) {
                           {ql.icon} {ql.label}
                         </a>
                       ))}
-                      <button onClick={() => setCurrentPage("hr")}
+                      <button onClick={() => setCurrentPage("equipe")}
                         className="px-2 py-0.5 cursor-pointer hover:brightness-90 transition-all"
                         style={{ background: "#EDE8E1", border: "1px solid #B0A898", fontSize: 9, fontFamily: "'Segoe UI', Tahoma", color: "#000" }}
                         title="Gerenciar atalhos no RH">
@@ -489,7 +485,7 @@ export default function Dashboard({ session }: DashboardProps) {
                       style={{ background: "var(--win-surface)", borderColor: "var(--win-border-dark)", fontFamily: "'Segoe UI', Tahoma" }}>
                       <span className="font-bold text-sm" style={{ color: "#000" }}>🤖 Squads — {selectedContext}</span>
                       <button
-                        onClick={() => setCurrentPage("squads")}
+                        onClick={() => setCurrentPage("producao")}
                         className="cursor-pointer hover:brightness-90 transition-all px-2 py-0.5 font-bold"
                         style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)", fontSize: 9 }}>
                         + Gerenciar
@@ -502,7 +498,7 @@ export default function Dashboard({ session }: DashboardProps) {
                           style={{ color: "#888", fontFamily: "'Segoe UI', Tahoma" }}>
                           <span className="text-3xl opacity-30">🤖</span>
                           <p style={{ fontSize: 11 }}>Nenhum squad em {selectedContext}</p>
-                          <button onClick={() => setCurrentPage("squads")}
+                          <button onClick={() => setCurrentPage("producao")}
                             className="cursor-pointer hover:brightness-90 px-2 py-1 font-bold"
                             style={{ background: "var(--af-teal)", color: "#fff", border: "1px solid var(--af-gold)", fontSize: 9 }}>
                             + Criar Squad
