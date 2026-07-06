@@ -34,6 +34,7 @@ import HRPage from "./HRPage";
 import ProductsPanel from "./ProductsPanel";
 import ProducaoPage from "./ProducaoPage";
 import ConfigPage from "./ConfigPage";
+import InicioPanel from "./InicioPanel";
 import JobsMonitor from "./JobsMonitor";
 import StartSquadModal from "./StartSquadModal";
 import type { Session } from "@supabase/supabase-js";
@@ -302,6 +303,15 @@ export default function Dashboard({ session }: DashboardProps) {
         ) : currentPage === "config" ? (
           <ConfigPage onNavigate={(p) => setCurrentPage(p as "inicio" | "equipe" | "producao" | "config")} />
         ) : (
+          <InicioPanel
+            collaborators={collaborators}
+            assignments={assignments}
+            categories={categories}
+            quickLinks={quickLinks}
+            onOpenEquipe={() => setCurrentPage("equipe")}
+          />
+        )}
+        {false && (
         <>
         {/* Header */}
         <header className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] flex flex-wrap items-center px-3 md:px-5 gap-2 md:gap-4 shrink-0 py-2 md:py-0 md:h-14">
