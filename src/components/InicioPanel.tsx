@@ -71,11 +71,11 @@ export default function InicioPanel({
         <StatusSemaforo />
       </header>
 
-      {/* Corpo dividido meio a meio */}
+      {/* Corpo: 1/3 assistentes + 2/3 escritório (mais espaço pros bonequinhos) */}
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
 
-        {/* ============ COLUNA ESQUERDA — widgets ============ */}
-        <div className="w-full md:w-1/2 border-r border-[var(--border)] overflow-auto p-4 md:p-6 space-y-5">
+        {/* ============ COLUNA ESQUERDA — widgets (1/3) ============ */}
+        <div className="w-full md:w-1/3 border-r border-[var(--border)] overflow-auto p-4 md:p-5 space-y-5">
 
           {/* Atalhos rápidos (JARBAS etc) */}
           {quickLinks.length > 0 && (
@@ -135,14 +135,19 @@ export default function InicioPanel({
                         {asgs.length} assistente{asgs.length !== 1 ? "s" : ""}
                       </span>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 pl-7">
-                      {asgs.map(asg => (
-                        <a key={asg.id} href={asg.link} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md bg-[var(--bg-tertiary)] hover:bg-[var(--accent-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] no-underline transition-all"
-                          title={asg.description || asg.tool_name}>
-                          🔗 {asg.tool_name}
-                        </a>
-                      ))}
+                    <div className="flex flex-col gap-1 pl-7">
+                      {asgs.map(asg => {
+                        const nomeDoAssistente = (asg.description?.trim() || asg.tool_name || "Assistente");
+                        return (
+                          <a key={asg.id} href={asg.link} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] rounded-md bg-[var(--bg-tertiary)] hover:bg-[var(--accent-soft)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] no-underline transition-all"
+                            title={`${nomeDoAssistente} (${asg.tool_name})`}>
+                            <span>🔗</span>
+                            <span className="font-medium truncate">{nomeDoAssistente}</span>
+                            <span className="ml-auto text-[9px] uppercase tracking-wide opacity-60 shrink-0">{asg.tool_name}</span>
+                          </a>
+                        );
+                      })}
                     </div>
                   </div>
                 ))
@@ -161,8 +166,8 @@ export default function InicioPanel({
           </section>
         </div>
 
-        {/* ============ COLUNA DIREITA — escritório (iframe) ============ */}
-        <div className="w-full md:w-1/2 flex flex-col overflow-hidden">
+        {/* ============ COLUNA DIREITA — escritório (iframe) 2/3 ============ */}
+        <div className="w-full md:w-2/3 flex flex-col overflow-hidden">
           <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
             <span className="text-sm font-semibold text-[var(--text-primary)]">🏢 Escritório</span>
             <button onClick={() => setOpenOfficeFullscreen(true)}
