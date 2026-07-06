@@ -14,6 +14,8 @@ interface JobError {
   occurredAt?: string;
 }
 
+type UserStatus = "done" | "paused" | "archived";
+
 interface Job {
   jobId: string;
   squad: string;
@@ -25,7 +27,15 @@ interface Job {
   outputUrl?: string;
   error?: JobError;
   lastSuccessfulStepId?: number | string;
+  userStatus?: UserStatus;
+  userStatusAt?: string;
 }
+
+const USER_STATUS_UI: Record<UserStatus, { icon: string; label: string; badge: string }> = {
+  done:     { icon: "✅", label: "Concluído", badge: "bg-green-500/15 text-green-400 border-green-500/30" },
+  paused:   { icon: "⏸️", label: "Pausado",   badge: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" },
+  archived: { icon: "🗄️", label: "Arquivado", badge: "bg-slate-500/15 text-slate-400 border-slate-500/30" },
+};
 
 interface PipelineStep {
   id: number | string;
@@ -53,6 +63,8 @@ interface JobFile {
 export default function JobsMonitor() {
   const [runningJobs, setRunningJobs] = useState<Job[]>([]);
   const [troubledJobs, setTroubledJobs] = useState<Job[]>([]); // failed, paused, interrupted
+  const [archivedJobs, setArchivedJobs] = useState<Job[]>([]); // marcados manualmente (done/paused/archived)
+  const [showArchived, setShowArchived] = useState(false);
   const [pendings, setPendings] = useState<Record<string, PendingCheckpoint[]>>({});
   const [pipelineSteps, setPipelineSteps] = useState<Record<string, PipelineStep[]>>({});
   const [expanded, setExpanded] = useState(false);
@@ -78,13 +90,18 @@ export default function JobsMonitor() {
       const jobsRes = await fetch(`${SQUAD_API_BASE}/api/jobs`);
       if (!jobsRes.ok) return;
       const jobs: Job[] = await jobsRes.json();
-      const running = jobs.filter((j) => j.status === "running");
+      // Job com userStatus (marcação manual da Andréia) sai das listas ativas e vai pra arquivados
+      const running = jobs.filter((j) => j.status === "running" && !j.userStatus);
       const troubled = jobs.filter(
         (j) => (j.status === "failed" || j.status === "paused" || j.status === "interrupted")
           && !dismissed.has(j.jobId)
+          && !j.userStatus
       );
+      const archived = jobs.filter((j) => !!j.userStatus)
+        .sort((a, b) => (b.userStatusAt || "").localeCompare(a.userStatusAt || ""));
       setRunningJobs(running);
       setTroubledJobs(troubled);
+      setArchivedJobs(archived);
 
       const pendingMap: Record<string, PendingCheckpoint[]> = {};
       await Promise.all(running.map(async (j) => {
@@ -109,7 +126,7 @@ export default function JobsMonitor() {
   }, [fetchData]);
 
   const pendingCount = Object.values(pendings).reduce((acc, arr) => acc + arr.length, 0);
-  const hasAnything = runningJobs.length > 0 || pendingCount > 0 || troubledJobs.length > 0;
+  const hasAnything = runningJobs.length > 0 || pendingCount > 0 || troubledJobs.length > 0 || archivedJobs.length > 0;
 
   if (!hasAnything) return null;
 
@@ -159,6 +176,25 @@ export default function JobsMonitor() {
       } catch {}
       return next;
     });
+  }
+
+  async function markJob(jobId: string, userStatus: UserStatus | null) {
+    setActionLoading(`user-status:${jobId}`);
+    try {
+      const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/user-status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userStatus }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(`Falha ao marcar: ${err.error || r.statusText}`);
+      } else {
+        await fetchData();
+      }
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   async function approveCheckpoint(jobId: string, stepId: string, approved: boolean, comment?: string) {
@@ -258,12 +294,38 @@ export default function JobsMonitor() {
                       >
                         📂 Ver arquivos
                       </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => markJob(job.jobId, "done")}
+                          disabled={actionLoading === `user-status:${job.jobId}`}
+                          className="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded border border-green-300 disabled:opacity-50"
+                          title="Já resolvi — marcar como concluído (vai pra Arquivados)"
+                        >
+                          ✅
+                        </button>
+                        <button
+                          onClick={() => markJob(job.jobId, "paused")}
+                          disabled={actionLoading === `user-status:${job.jobId}`}
+                          className="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-2 py-1 rounded border border-yellow-300 disabled:opacity-50"
+                          title="Vou lidar depois — marcar como pausado"
+                        >
+                          ⏸️
+                        </button>
+                        <button
+                          onClick={() => markJob(job.jobId, "archived")}
+                          disabled={actionLoading === `user-status:${job.jobId}`}
+                          className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded border border-slate-300 disabled:opacity-50"
+                          title="Não vou tratar — arquivar"
+                        >
+                          🗄️
+                        </button>
+                      </div>
                       <button
                         onClick={() => dismissJob(job.jobId)}
-                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded border border-gray-300"
-                        title="Esconder do painel (não apaga o job)"
+                        className="text-[10px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-0.5 rounded border border-gray-300"
+                        title="Esconder do painel só nesta sessão (sem registrar)"
                       >
-                        🗑️ Dispensar
+                        Só esconder
                       </button>
                     </div>
                   </div>
@@ -377,6 +439,62 @@ export default function JobsMonitor() {
                 </div>
               );
             })}
+
+            {/* Arquivados — jobs que a Andréia marcou manualmente. Ficam pro histórico */}
+            {archivedJobs.length > 0 && (
+              <div className="pt-2 border-t border-gray-300/50">
+                <button
+                  onClick={() => setShowArchived(!showArchived)}
+                  className="text-xs text-gray-600 hover:text-gray-800 font-semibold flex items-center gap-1.5"
+                >
+                  <span>{showArchived ? "▼" : "▶"}</span>
+                  🗂️ Registro ({archivedJobs.length} marcado{archivedJobs.length !== 1 ? "s" : ""})
+                </button>
+                {showArchived && (
+                  <div className="mt-2 space-y-1.5">
+                    {archivedJobs.map((job) => {
+                      const ui = job.userStatus ? USER_STATUS_UI[job.userStatus] : null;
+                      return (
+                        <div key={job.jobId} className="bg-white/60 border border-gray-200 rounded p-2 text-xs flex items-start gap-2">
+                          {ui && (
+                            <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${ui.badge}`}>
+                              {ui.icon} {ui.label}
+                            </span>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-gray-800">
+                              {job.squad} <span className="text-gray-500">#{job.jobId.slice(0, 8)}</span>
+                            </div>
+                            <div className="text-gray-600 italic line-clamp-1">{job.topic}</div>
+                            {job.userStatusAt && (
+                              <div className="text-[10px] text-gray-400 mt-0.5">
+                                marcado {new Date(job.userStatusAt).toLocaleString("pt-BR")}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <button
+                              onClick={() => listFiles(job.jobId)}
+                              className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200"
+                            >
+                              📂 Arquivos
+                            </button>
+                            <button
+                              onClick={() => markJob(job.jobId, null)}
+                              disabled={actionLoading === `user-status:${job.jobId}`}
+                              className="text-[10px] bg-gray-50 hover:bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 disabled:opacity-50"
+                              title="Voltar pra lista ativa"
+                            >
+                              ↩ Desmarcar
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
