@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Collaborator, Assignment, CONTEXTS, ContextType, Category as CategoryType, QuickLink } from "@/lib/types";
 import { SQUAD_API_BASE } from "@/lib/config";
 import StatusSemaforo from "./StatusSemaforo";
+import FeedTrabalhando from "./FeedTrabalhando";
 
 interface Props {
   collaborators: Collaborator[];
@@ -76,6 +77,9 @@ export default function InicioPanel({
 
         {/* ============ COLUNA ESQUERDA — widgets (1/3) ============ */}
         <div className="w-full md:w-1/3 border-r border-[var(--border)] overflow-auto p-4 md:p-5 space-y-5">
+
+          {/* Feed "quem está trabalhando" — vindo do status.json da VPS */}
+          <FeedTrabalhando />
 
           {/* Atalhos rápidos (JARBAS etc) */}
           {quickLinks.length > 0 && (
