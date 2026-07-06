@@ -57,7 +57,7 @@ export default function InicioPanel({
 
   return (
     <>
-      {/* Header simples com semáforo e busca (mais leve que antes) */}
+      {/* Header simples com contadores, atalhos e semáforo */}
       <header className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] flex items-center px-3 md:px-5 gap-3 shrink-0 h-14">
         <h1 className="text-base md:text-lg font-semibold">Início</h1>
         <div className="hidden md:flex gap-4 ml-2 text-sm">
@@ -68,6 +68,18 @@ export default function InicioPanel({
             <span className="text-[var(--text-primary)] font-medium">{assignments.length}</span> assistentes
           </span>
         </div>
+        {quickLinks.length > 0 && (
+          <div className="hidden md:flex flex-wrap gap-1.5 ml-2">
+            {quickLinks.map(ql => (
+              <a key={ql.id} href={ql.url} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg text-white no-underline transition-all hover:brightness-110"
+                style={{ background: "var(--af-teal)" }}
+                title={ql.label}>
+                <span>{ql.icon}</span>{ql.label}
+              </a>
+            ))}
+          </div>
+        )}
         <div className="flex-1" />
         <StatusSemaforo />
       </header>
@@ -80,25 +92,6 @@ export default function InicioPanel({
 
           {/* Feed "quem está trabalhando" — vindo do status.json da VPS */}
           <FeedTrabalhando />
-
-          {/* Atalhos rápidos (JARBAS etc) */}
-          {quickLinks.length > 0 && (
-            <section>
-              <h2 className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-medium mb-2">
-                Atalhos rápidos
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {quickLinks.map(ql => (
-                  <a key={ql.id} href={ql.url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg text-white no-underline transition-all hover:brightness-110"
-                    style={{ background: "var(--af-teal)" }}
-                    title={ql.label}>
-                    <span>{ql.icon}</span>{ql.label}
-                  </a>
-                ))}
-              </div>
-            </section>
-          )}
 
           {/* Seção principal: Assistentes por área */}
           <section>
