@@ -63,7 +63,15 @@ export default function JobsMonitor() {
   const [resumeModal, setResumeModal] = useState<{ jobId: string; squad: string; suggestedStepId: number | string | null } | null>(null);
   const [resumeStepId, setResumeStepId] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [dismissed, setDismissed] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = window.localStorage.getItem("jobsMonitor.dismissed");
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
 
   const fetchData = useCallback(async () => {
     try {
@@ -144,7 +152,13 @@ export default function JobsMonitor() {
   }
 
   function dismissJob(jobId: string) {
-    setDismissed((prev) => new Set(prev).add(jobId));
+    setDismissed((prev) => {
+      const next = new Set(prev).add(jobId);
+      try {
+        window.localStorage.setItem("jobsMonitor.dismissed", JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
   }
 
   async function approveCheckpoint(jobId: string, stepId: string, approved: boolean, comment?: string) {
