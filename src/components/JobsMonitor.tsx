@@ -29,6 +29,8 @@ interface Job {
   lastSuccessfulStepId?: number | string;
   userStatus?: UserStatus;
   userStatusAt?: string;
+  driveFolder?: string; // "JarbasDrive2:Squads/{squad}/{data}_{slug}" (sync automático ao completar)
+  driveSyncedAt?: string;
 }
 
 const USER_STATUS_UI: Record<UserStatus, { icon: string; label: string; badge: string }> = {
@@ -69,7 +71,8 @@ export default function JobsMonitor() {
   const [pipelineSteps, setPipelineSteps] = useState<Record<string, PipelineStep[]>>({});
   const [expanded, setExpanded] = useState(false);
   const [viewingFile, setViewingFile] = useState<{ jobId: string; name: string; content: string } | null>(null);
-  const [filesList, setFilesList] = useState<{ jobId: string; files: JobFile[] } | null>(null);
+  const [inlineFiles, setInlineFiles] = useState<Record<string, JobFile[]>>({});
+  const [openFilesFor, setOpenFilesFor] = useState<Set<string>>(new Set());
   const [rejectModal, setRejectModal] = useState<{ jobId: string; stepId: string; stepName: string } | null>(null);
   const [rejectComment, setRejectComment] = useState("");
   const [resumeModal, setResumeModal] = useState<{ jobId: string; squad: string; suggestedStepId: number | string | null } | null>(null);
@@ -229,11 +232,113 @@ export default function JobsMonitor() {
     setViewingFile({ jobId, name, content });
   }
 
-  async function listFiles(jobId: string) {
-    const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/files`);
-    if (!r.ok) return;
-    const data = await r.json();
-    setFilesList({ jobId, files: data.files || [] });
+  async function toggleInlineFiles(jobId: string) {
+    setOpenFilesFor((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+        return next;
+      }
+      next.add(jobId);
+      return next;
+    });
+    if (!inlineFiles[jobId]) {
+      try {
+        const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/files`);
+        if (!r.ok) return;
+        const data = await r.json();
+        setInlineFiles((prev) => ({ ...prev, [jobId]: data.files || [] }));
+      } catch {}
+    }
+  }
+
+  function fileIcon(name: string): string {
+    if (name.endsWith(".md")) return "📝";
+    if (name.endsWith(".yaml") || name.endsWith(".yml")) return "⚙️";
+    if (name.endsWith(".json")) return "{}";
+    if (/\.(png|jpg|jpeg|gif)$/i.test(name)) return "🖼️";
+    if (/\.html?$/i.test(name)) return "🌐";
+    return "📄";
+  }
+
+  function driveBadge(job: Job) {
+    if (!job.driveFolder) return null;
+    // driveFolder é tipo "JarbasDrive2:Squads/instagram-carrossel/2026-07-06_topic-slug"
+    // Não há URL direto pra pasta — mostrar como texto informativo.
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
+        <span>☁️</span>
+        <span className="font-mono truncate">{job.driveFolder}</span>
+        <span className="text-emerald-500 ml-auto">sincronizado</span>
+      </div>
+    );
+  }
+
+  function renderInlineFiles(job: Job) {
+    const jobId = job.jobId;
+    if (!openFilesFor.has(jobId)) return driveBadge(job); // já mostra o badge do Drive mesmo colapsado
+    const files = inlineFiles[jobId];
+    if (files === undefined) {
+      return (
+        <>
+          {driveBadge(job)}
+          <div className="mt-2 text-xs text-gray-500 italic">Carregando arquivos…</div>
+        </>
+      );
+    }
+    if (files.length === 0) {
+      return (
+        <>
+          {driveBadge(job)}
+          <div className="mt-2 text-xs text-gray-500 italic">Nenhum arquivo gerado ainda.</div>
+        </>
+      );
+    }
+    return (
+      <div className="mt-2 space-y-1 border-t border-gray-200 pt-2">
+        {driveBadge(job)}
+        {files.map((f) => {
+          const isBinaryOrHtml = /\.(png|jpg|jpeg|gif|pdf|html?)$/i.test(f.name);
+          const kb = (f.size / 1024).toFixed(1);
+          return (
+            <div key={f.name} className="flex items-center gap-2 text-[11px] bg-gray-50 border border-gray-200 rounded px-2 py-1">
+              <span>{fileIcon(f.name)}</span>
+              <span className="flex-1 font-mono truncate text-gray-700">{f.name}</span>
+              <span className="text-[9px] text-gray-400 shrink-0">{kb} KB</span>
+              {isBinaryOrHtml ? (
+                <a
+                  href={`${SQUAD_API_BASE}/api/jobs/${jobId}/files/${encodeURIComponent(f.name)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-[10px] px-2 py-0.5 rounded bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300 no-underline"
+                >
+                  Abrir ↗
+                </a>
+              ) : (
+                <button
+                  onClick={() => openFile(jobId, f.name)}
+                  className="text-[10px] px-2 py-0.5 rounded bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300"
+                >
+                  Ver
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function inlineFilesButton(jobId: string) {
+    const isOpen = openFilesFor.has(jobId);
+    const count = inlineFiles[jobId]?.length;
+    return (
+      <button
+        onClick={() => toggleInlineFiles(jobId)}
+        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded border border-blue-300"
+      >
+        📂 {isOpen ? "Esconder" : "Arquivos"}{count !== undefined ? ` (${count})` : ""}
+      </button>
+    );
   }
 
   const hasTroubled = troubledJobs.length > 0;
@@ -288,12 +393,7 @@ export default function JobsMonitor() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 shrink-0">
-                      <button
-                        onClick={() => listFiles(job.jobId)}
-                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded border border-blue-300"
-                      >
-                        📂 Ver arquivos
-                      </button>
+                      {inlineFilesButton(job.jobId)}
                       <div className="flex gap-1">
                         <button
                           onClick={() => markJob(job.jobId, "done")}
@@ -348,6 +448,7 @@ export default function JobsMonitor() {
                   >
                     {actionLoading === job.jobId ? "..." : "▶️ Retomar de onde parou"}
                   </button>
+                  {renderInlineFiles(job)}
                 </div>
               );
             })}
@@ -369,12 +470,33 @@ export default function JobsMonitor() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-1 shrink-0">
-                      <button
-                        onClick={() => listFiles(job.jobId)}
-                        className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-2 py-1 rounded border border-blue-300"
-                      >
-                        📂 Ver arquivos
-                      </button>
+                      {inlineFilesButton(job.jobId)}
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => markJob(job.jobId, "done")}
+                          disabled={actionLoading === `user-status:${job.jobId}`}
+                          className="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded border border-green-300 disabled:opacity-50"
+                          title="Marcar como concluído (vai pra Registro)"
+                        >
+                          ✅
+                        </button>
+                        <button
+                          onClick={() => markJob(job.jobId, "paused")}
+                          disabled={actionLoading === `user-status:${job.jobId}`}
+                          className="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-2 py-1 rounded border border-yellow-300 disabled:opacity-50"
+                          title="Pausar / lidar depois"
+                        >
+                          ⏸️
+                        </button>
+                        <button
+                          onClick={() => markJob(job.jobId, "archived")}
+                          disabled={actionLoading === `user-status:${job.jobId}`}
+                          className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded border border-slate-300 disabled:opacity-50"
+                          title="Arquivar"
+                        >
+                          🗄️
+                        </button>
+                      </div>
                       <button
                         onClick={() => stopJob(job.jobId)}
                         disabled={actionLoading === job.jobId}
@@ -436,6 +558,7 @@ export default function JobsMonitor() {
                       Squad rodando. Quando precisar da sua aprovação, aparece aqui.
                     </div>
                   )}
+                  {renderInlineFiles(job)}
                 </div>
               );
             })}
@@ -455,39 +578,42 @@ export default function JobsMonitor() {
                     {archivedJobs.map((job) => {
                       const ui = job.userStatus ? USER_STATUS_UI[job.userStatus] : null;
                       return (
-                        <div key={job.jobId} className="bg-white/60 border border-gray-200 rounded p-2 text-xs flex items-start gap-2">
-                          {ui && (
-                            <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${ui.badge}`}>
-                              {ui.icon} {ui.label}
-                            </span>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-gray-800">
-                              {job.squad} <span className="text-gray-500">#{job.jobId.slice(0, 8)}</span>
-                            </div>
-                            <div className="text-gray-600 italic line-clamp-1">{job.topic}</div>
-                            {job.userStatusAt && (
-                              <div className="text-[10px] text-gray-400 mt-0.5">
-                                marcado {new Date(job.userStatusAt).toLocaleString("pt-BR")}
-                              </div>
+                        <div key={job.jobId} className="bg-white/60 border border-gray-200 rounded p-2 text-xs">
+                          <div className="flex items-start gap-2">
+                            {ui && (
+                              <span className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-medium ${ui.badge}`}>
+                                {ui.icon} {ui.label}
+                              </span>
                             )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-gray-800">
+                                {job.squad} <span className="text-gray-500">#{job.jobId.slice(0, 8)}</span>
+                              </div>
+                              <div className="text-gray-600 italic line-clamp-1">{job.topic}</div>
+                              {job.userStatusAt && (
+                                <div className="text-[10px] text-gray-400 mt-0.5">
+                                  marcado {new Date(job.userStatusAt).toLocaleString("pt-BR")}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex flex-col gap-1 shrink-0">
+                              <button
+                                onClick={() => toggleInlineFiles(job.jobId)}
+                                className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200"
+                              >
+                                📂 {openFilesFor.has(job.jobId) ? "Esconder" : "Arquivos"}
+                              </button>
+                              <button
+                                onClick={() => markJob(job.jobId, null)}
+                                disabled={actionLoading === `user-status:${job.jobId}`}
+                                className="text-[10px] bg-gray-50 hover:bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 disabled:opacity-50"
+                                title="Voltar pra lista ativa"
+                              >
+                                ↩ Desmarcar
+                              </button>
+                            </div>
                           </div>
-                          <div className="flex flex-col gap-1 shrink-0">
-                            <button
-                              onClick={() => listFiles(job.jobId)}
-                              className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200"
-                            >
-                              📂 Arquivos
-                            </button>
-                            <button
-                              onClick={() => markJob(job.jobId, null)}
-                              disabled={actionLoading === `user-status:${job.jobId}`}
-                              className="text-[10px] bg-gray-50 hover:bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 disabled:opacity-50"
-                              title="Voltar pra lista ativa"
-                            >
-                              ↩ Desmarcar
-                            </button>
-                          </div>
+                          {renderInlineFiles(job)}
                         </div>
                       );
                     })}
@@ -521,49 +647,6 @@ export default function JobsMonitor() {
             <pre className="flex-1 overflow-auto p-4 text-xs whitespace-pre-wrap font-mono bg-gray-50">
               {viewingFile.content}
             </pre>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: lista de arquivos do job */}
-      {filesList && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onClick={() => setFilesList(null)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[85vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-4 py-3 border-b flex items-center justify-between bg-gray-50">
-              <div className="font-bold text-sm">📂 Arquivos produzidos — #{filesList.jobId.slice(0, 8)}</div>
-              <button
-                onClick={() => setFilesList(null)}
-                className="text-gray-500 hover:text-gray-700 text-xl"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-3 space-y-1">
-              {filesList.files.length === 0 && (
-                <div className="text-sm text-gray-500 italic p-4 text-center">
-                  Nenhum arquivo ainda. Aguarde o squad produzir os primeiros outputs.
-                </div>
-              )}
-              {filesList.files.map((f) => (
-                <button
-                  key={f.name}
-                  onClick={() => {
-                    openFile(filesList.jobId, f.name);
-                    setFilesList(null);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 rounded border border-gray-200 flex justify-between"
-                >
-                  <span className="font-mono">{f.name}</span>
-                  <span className="text-xs text-gray-500">{(f.size / 1024).toFixed(1)} KB</span>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       )}
