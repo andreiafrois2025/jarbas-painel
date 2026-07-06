@@ -181,6 +181,23 @@ export default function JobsMonitor() {
     });
   }
 
+  async function syncToDrive(jobId: string) {
+    setActionLoading(`drive-sync:${jobId}`);
+    try {
+      const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/sync-drive`, { method: "POST" });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(`Falha ao iniciar sync: ${err.error || r.statusText}`);
+      } else {
+        // Recarrega jobs em 3 e 15 segundos pra pegar o driveFolder após sync completar
+        setTimeout(() => fetchData(), 3000);
+        setTimeout(() => fetchData(), 15000);
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function markJob(jobId: string, userStatus: UserStatus | null) {
     setActionLoading(`user-status:${jobId}`);
     try {
@@ -262,14 +279,35 @@ export default function JobsMonitor() {
   }
 
   function driveBadge(job: Job) {
-    if (!job.driveFolder) return null;
-    // driveFolder é tipo "JarbasDrive2:Squads/instagram-carrossel/2026-07-06_topic-slug"
-    // Não há URL direto pra pasta — mostrar como texto informativo.
+    const syncing = actionLoading === `drive-sync:${job.jobId}`;
+    if (job.driveFolder) {
+      return (
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
+          <span>☁️</span>
+          <span className="font-mono truncate">{job.driveFolder}</span>
+          <button
+            onClick={() => syncToDrive(job.jobId)}
+            disabled={syncing}
+            className="text-emerald-600 hover:text-emerald-800 underline disabled:opacity-50 shrink-0"
+            title="Re-sincronizar (útil se você atualizou arquivos)"
+          >
+            {syncing ? "…" : "atualizar"}
+          </button>
+        </div>
+      );
+    }
+    // Ainda não subiu — botão manual pra disparar sync
     return (
-      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
+      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-600 bg-slate-50 border border-slate-200 rounded px-2 py-1">
         <span>☁️</span>
-        <span className="font-mono truncate">{job.driveFolder}</span>
-        <span className="text-emerald-500 ml-auto">sincronizado</span>
+        <span className="italic text-slate-500">Não está no Drive</span>
+        <button
+          onClick={() => syncToDrive(job.jobId)}
+          disabled={syncing}
+          className="ml-auto text-[10px] bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300 rounded px-2 py-0.5 disabled:opacity-50 shrink-0"
+        >
+          {syncing ? "Enviando…" : "Enviar pro Drive"}
+        </button>
       </div>
     );
   }
