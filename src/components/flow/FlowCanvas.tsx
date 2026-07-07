@@ -139,7 +139,7 @@ function FlowCanvasInner({ flow, readOnly, onChange }: Props) {
   );
 
   return (
-    <div className="w-full h-full relative" style={{ minHeight: 500 }}>
+    <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
