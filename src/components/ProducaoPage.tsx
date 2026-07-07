@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import SquadsPage from "./SquadsPage";
-import FlowsPage from "./FlowsPage";
+import FlowsPageV2 from "./flow/FlowsPageV2";
 
 interface Props {
   onNavigate: (page: string) => void;
@@ -42,7 +42,7 @@ export default function ProducaoPage({ onNavigate }: Props) {
         <div className="flex-1" />
         {subPage === "fluxos" && (
           <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
-            editor visual em breve
+            editor visual — desenho de automações e squads
           </span>
         )}
       </div>
@@ -50,7 +50,7 @@ export default function ProducaoPage({ onNavigate }: Props) {
         {subPage === "squads" ? (
           <SquadsPage onNavigate={onNavigate} />
         ) : (
-          <FlowsPage onNavigate={onNavigate} />
+          <FlowsPageV2 />
         )}
       </div>
     </div>
