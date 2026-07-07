@@ -92,9 +92,10 @@ function FlowCanvasInner({ flow, readOnly, onChange }: Props) {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   useEffect(() => {
-    setNodes(toRFNodes(flow.nodes));
-    setEdges(toRFEdges(flow.edges));
-  }, [flow.id]); // troca de fluxo
+    console.log(`[FlowCanvas] carregando "${flow.title}" — ${flow.nodes?.length || 0} nodes, ${flow.edges?.length || 0} edges`);
+    setNodes(toRFNodes(flow.nodes || []));
+    setEdges(toRFEdges(flow.edges || []));
+  }, [flow.id, flow.title, flow.nodes, flow.edges]); // troca de fluxo
 
   const nodeTypes = useMemo(() => ({ rough: RoughNode }), []);
 
