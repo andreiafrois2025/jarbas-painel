@@ -147,7 +147,7 @@ export default function FlowsPageV2() {
             {selected.description}
           </div>
         )}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden" style={{ minHeight: 500, height: "calc(100vh - 200px)" }}>
           <FlowCanvas flow={selected} readOnly={!!selected.is_seed} onChange={handleCanvasChange} />
         </div>
       </div>
