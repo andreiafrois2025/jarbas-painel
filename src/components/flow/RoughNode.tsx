@@ -6,6 +6,8 @@ import type { FlowDocNode } from "@/lib/types";
 
 // =============================================
 // Nodes desenhados à mão (estilo excalidraw) usando rough.js.
+// 4 handles em cada lado — com connectionMode="loose" no ReactFlow,
+// qualquer handle serve como source ou target.
 // Se rough.js falhar em runtime, faz fallback pra retângulo/círculo CSS puro.
 // =============================================
 
@@ -33,6 +35,14 @@ const STROKE_BY_TYPE: Record<FlowDocNode["type"], string> = {
   condition: "#C4A460",
   note: "#C4A460",
   end: "#A0583C",
+};
+
+const TYPE_LABEL: Record<FlowDocNode["type"], string> = {
+  start: "início",
+  action: "ação",
+  condition: "decisão",
+  note: "nota",
+  end: "fim",
 };
 
 interface RoughData extends Record<string, unknown> {
@@ -66,8 +76,8 @@ export default function RoughNode({ id, data, selected }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [roughFailed, setRoughFailed] = useState(false);
 
-  const width = shape === "circle" || shape === "endCircle" ? 130 : shape === "diamond" ? 200 : 230;
-  const height = shape === "circle" || shape === "endCircle" ? 130 : shape === "diamond" ? 120 : 100;
+  const width = shape === "circle" || shape === "endCircle" ? 140 : shape === "diamond" ? 210 : 240;
+  const height = shape === "circle" || shape === "endCircle" ? 140 : shape === "diamond" ? 130 : 110;
 
   const seed = useMemo(() => stringSeed(id), [id]);
 
@@ -78,8 +88,14 @@ export default function RoughNode({ id, data, selected }: Props) {
     (async () => {
       try {
         const roughMod: { default?: unknown; svg?: unknown } = await import("roughjs");
-        // roughjs pode exportar como default ou como namespace
-        const rough = (roughMod.default ?? roughMod) as { svg: (el: SVGSVGElement) => { ellipse: Function; rectangle: Function; polygon: Function; path: Function } };
+        const rough = (roughMod.default ?? roughMod) as {
+          svg: (el: SVGSVGElement) => {
+            ellipse: (x: number, y: number, w: number, h: number, opts: object) => SVGElement;
+            rectangle: (x: number, y: number, w: number, h: number, opts: object) => SVGElement;
+            polygon: (pts: [number, number][], opts: object) => SVGElement;
+            path: (d: string, opts: object) => SVGElement;
+          };
+        };
         if (!rough?.svg) throw new Error("rough.svg missing");
 
         svg.innerHTML = "";
@@ -132,20 +148,24 @@ export default function RoughNode({ id, data, selected }: Props) {
     })();
   }, [shape, fill, stroke, seed, selected, width, height]);
 
-  const showLeftHandle = type !== "start";
-  const showRightHandle = type !== "end";
-  const showBottomHandle = type === "condition";
-
-  // Fallback CSS puro caso rough.js não carregue
   const fallbackStyle: React.CSSProperties = roughFailed
     ? {
         background: fill,
         border: `${selected ? 2.5 : 1.8}px solid ${stroke}`,
         borderRadius: shape === "circle" || shape === "endCircle" ? "50%" : shape === "diamond" ? 0 : 8,
-        transform: shape === "diamond" ? "rotate(0deg)" : undefined,
         boxShadow: shape === "endCircle" ? `inset 0 0 0 3px ${fill}, inset 0 0 0 5px ${stroke}` : undefined,
       }
     : {};
+
+  const handleStyle: React.CSSProperties = {
+    width: 14,
+    height: 14,
+    background: "#FFFFFF",
+    border: `2px solid ${stroke}`,
+    borderRadius: "50%",
+    zIndex: 3,
+    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+  };
 
   return (
     <div
@@ -162,6 +182,24 @@ export default function RoughNode({ id, data, selected }: Props) {
         />
       )}
       <div
+        style={{
+          position: "absolute",
+          top: 4,
+          left: 8,
+          fontSize: 9,
+          color: stroke,
+          fontFamily: "'Inter', sans-serif",
+          letterSpacing: "0.5px",
+          textTransform: "uppercase",
+          opacity: 0.55,
+          fontWeight: 600,
+          pointerEvents: "none",
+          zIndex: 2,
+        }}
+      >
+        {TYPE_LABEL[type]}
+      </div>
+      <div
         className="relative z-10 flex flex-col items-center justify-center h-full px-3 text-center"
         style={{ fontFamily: '"Kalam", "Comic Sans MS", cursive', color: "#2D3B3B" }}
       >
@@ -172,20 +210,11 @@ export default function RoughNode({ id, data, selected }: Props) {
         )}
       </div>
 
-      {showLeftHandle && (
-        <Handle type="target" position={Position.Left} style={{ background: stroke, width: 8, height: 8 }} />
-      )}
-      {showRightHandle && (
-        <Handle type="source" position={Position.Right} style={{ background: stroke, width: 8, height: 8 }} />
-      )}
-      {showBottomHandle && (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          id="bottom"
-          style={{ background: stroke, width: 8, height: 8 }}
-        />
-      )}
+      {/* Handles em todas as 4 direções — connectionMode="loose" torna cada um source+target */}
+      <Handle id="left" type="source" position={Position.Left} style={handleStyle} />
+      <Handle id="right" type="source" position={Position.Right} style={handleStyle} />
+      <Handle id="top" type="source" position={Position.Top} style={handleStyle} />
+      <Handle id="bottom" type="source" position={Position.Bottom} style={handleStyle} />
     </div>
   );
 }

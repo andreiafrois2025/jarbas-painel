@@ -76,7 +76,7 @@ export default function FlowsPageV2() {
   };
 
   const handleCanvasChange = async (updates: { nodes: FlowDoc["nodes"]; edges: FlowDoc["edges"] }) => {
-    if (!selected || selected.is_seed) return;
+    if (!selected) return;
     setSaveState("saving");
     await updateFlowDoc(selected.id, updates);
     setFlows((fs) => fs.map((f) => (f.id === selected.id ? { ...f, ...updates } : f)));
@@ -97,8 +97,11 @@ export default function FlowsPageV2() {
           </button>
           <h2 className="text-base font-semibold truncate flex-1">{selected.title}</h2>
           {selected.is_seed && (
-            <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--af-teal)] text-white">
-              seed (só leitura)
+            <span
+              className="text-[10px] px-2 py-0.5 rounded bg-[var(--af-teal)] text-white"
+              title="Fluxo veio dos seeds do sistema. Pode editar à vontade."
+            >
+              seed
             </span>
           )}
           {saveState === "saving" && <span className="text-[11px] text-[var(--text-muted)]">salvando…</span>}
@@ -148,7 +151,7 @@ export default function FlowsPageV2() {
           </div>
         )}
         <div style={{ height: "75vh", minHeight: 500, position: "relative" }}>
-          <FlowCanvas flow={selected} readOnly={!!selected.is_seed} onChange={handleCanvasChange} />
+          <FlowCanvas flow={selected} onChange={handleCanvasChange} />
         </div>
       </div>
     );

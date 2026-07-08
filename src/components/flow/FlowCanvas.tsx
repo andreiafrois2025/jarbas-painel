@@ -8,9 +8,9 @@ import {
   Controls,
   MiniMap,
   MarkerType,
+  ConnectionMode,
   applyNodeChanges,
   applyEdgeChanges,
-  addEdge,
   type Node,
   type Edge,
   type NodeChange,
@@ -19,17 +19,61 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import RoughNode from "./RoughNode";
+import FlowToolbar from "./FlowToolbar";
+import FlowLegend from "./FlowLegend";
+import NodeEditor from "./NodeEditor";
+import EdgeEditor from "./EdgeEditor";
 import type { FlowDoc, FlowDocNode, FlowDocEdge } from "@/lib/types";
 
 // =============================================
-// Editor visual — recebe um FlowDoc, mostra o canvas.
-// Se readOnly (fluxo seed), só mostra. Senão, permite editar.
+// Editor visual do fluxo. Recebe FlowDoc, mostra canvas com:
+//  - toolbar pra adicionar nodes
+//  - painel lateral pra editar node ou seta selecionada
+//  - legenda flutuante
+// Persiste mudanças via onChange sempre que mexe em algo.
 // =============================================
 
 interface Props {
   flow: FlowDoc;
-  readOnly?: boolean;
   onChange?: (updates: { nodes: FlowDocNode[]; edges: FlowDocEdge[] }) => void;
+}
+
+const NEW_NODE_LABELS: Record<FlowDocNode["type"], string> = {
+  start: "Início",
+  action: "Nova ação",
+  condition: "Decisão?",
+  note: "Anotação",
+  end: "Fim",
+};
+
+function styleEdge(
+  base: {
+    id: string;
+    source: string;
+    target: string;
+    sourceHandle?: string;
+    targetHandle?: string;
+  },
+  isReturn: boolean,
+  label?: string,
+): Edge {
+  return {
+    ...base,
+    type: "smoothstep",
+    label,
+    animated: isReturn,
+    style: isReturn
+      ? { stroke: "#A0583C", strokeDasharray: "6 4", strokeWidth: 1.6 }
+      : { stroke: "#5A6B6B", strokeWidth: 1.6 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: isReturn ? "#A0583C" : "#5A6B6B" },
+    labelStyle: {
+      fontFamily: '"Kalam", "Comic Sans MS", cursive',
+      fontSize: 11,
+      fill: "#2D3B3B",
+    },
+    labelBgStyle: { fill: "#FFF9C4", fillOpacity: 0.85 },
+    labelBgPadding: [4, 2] as [number, number],
+  };
 }
 
 function toRFNodes(nodes: FlowDocNode[]): Node[] {
@@ -42,25 +86,20 @@ function toRFNodes(nodes: FlowDocNode[]): Node[] {
 }
 
 function toRFEdges(edges: FlowDocEdge[]): Edge[] {
-  return edges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    label: e.label,
-    type: "smoothstep",
-    animated: !!e.isReturn,
-    style: e.isReturn
-      ? { stroke: "#A0583C", strokeDasharray: "6 4", strokeWidth: 1.6 }
-      : { stroke: "#5A6B6B", strokeWidth: 1.6 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: e.isReturn ? "#A0583C" : "#5A6B6B" },
-    labelStyle: {
-      fontFamily: '"Kalam", "Comic Sans MS", cursive',
-      fontSize: 11,
-      fill: "#2D3B3B",
-    },
-    labelBgStyle: { fill: "#FFF9C4", fillOpacity: 0.85 },
-    labelBgPadding: [4, 2] as [number, number],
-  }));
+  return edges.map((e) =>
+    styleEdge(
+      {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        // Defaults pros seeds antigos (esquerda→direita)
+        sourceHandle: e.sourceHandle ?? "right",
+        targetHandle: e.targetHandle ?? "left",
+      },
+      !!e.isReturn,
+      e.label,
+    ),
+  );
 }
 
 function fromRFNodes(nodes: Node[]): FlowDocNode[] {
@@ -81,65 +120,175 @@ function fromRFEdges(edges: Edge[]): FlowDocEdge[] {
     id: e.id,
     source: e.source,
     target: e.target,
+    sourceHandle: (e.sourceHandle as string | undefined) ?? undefined,
+    targetHandle: (e.targetHandle as string | undefined) ?? undefined,
     label: typeof e.label === "string" ? e.label : undefined,
     isReturn: !!e.animated,
   }));
 }
 
-function FlowCanvasInner({ flow, readOnly, onChange }: Props) {
+function FlowCanvasInner({ flow, onChange }: Props) {
   const [nodes, setNodes] = useState<Node[]>(toRFNodes(flow.nodes));
   const [edges, setEdges] = useState<Edge[]>(toRFEdges(flow.edges));
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
+  const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => {
-    console.log(`[FlowCanvas] carregando "${flow.title}" — ${flow.nodes?.length || 0} nodes, ${flow.edges?.length || 0} edges`);
     setNodes(toRFNodes(flow.nodes || []));
     setEdges(toRFEdges(flow.edges || []));
-  }, [flow.id, flow.title, flow.nodes, flow.edges]); // troca de fluxo
+    setSelectedNode(null);
+    setSelectedEdge(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow.id]);
 
   const nodeTypes = useMemo(() => ({ rough: RoughNode }), []);
 
+  const persist = useCallback(
+    (ns: Node[], es: Edge[]) => {
+      onChange?.({ nodes: fromRFNodes(ns), edges: fromRFEdges(es) });
+    },
+    [onChange],
+  );
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      if (readOnly) return;
       setNodes((ns) => {
         const next = applyNodeChanges(changes, ns);
-        onChange?.({ nodes: fromRFNodes(next), edges: fromRFEdges(edges) });
+        persist(next, edges);
         return next;
       });
     },
-    [edges, onChange, readOnly],
+    [edges, persist],
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      if (readOnly) return;
       setEdges((es) => {
         const next = applyEdgeChanges(changes, es);
-        onChange?.({ nodes: fromRFNodes(nodes), edges: fromRFEdges(next) });
+        persist(nodes, next);
         return next;
       });
     },
-    [nodes, onChange, readOnly],
+    [nodes, persist],
   );
 
   const onConnect = useCallback(
     (params: Connection) => {
-      if (readOnly) return;
       setEdges((es) => {
-        const next = addEdge(
-          { ...params, type: "smoothstep", markerEnd: { type: MarkerType.ArrowClosed } },
-          es,
+        const id = `e-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const newEdge = styleEdge(
+          {
+            id,
+            source: params.source || "",
+            target: params.target || "",
+            sourceHandle: params.sourceHandle ?? undefined,
+            targetHandle: params.targetHandle ?? undefined,
+          },
+          false,
+          undefined,
         );
-        onChange?.({ nodes: fromRFNodes(nodes), edges: fromRFEdges(next) });
+        const next = [...es, newEdge];
+        persist(nodes, next);
         return next;
       });
     },
-    [nodes, onChange, readOnly],
+    [nodes, persist],
+  );
+
+  const addNode = useCallback(
+    (type: FlowDocNode["type"]) => {
+      const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const newNode: Node = {
+        id,
+        type: "rough",
+        position: { x: 260 + Math.random() * 120, y: 240 + Math.random() * 120 },
+        data: { _flowType: type, label: NEW_NODE_LABELS[type] },
+      };
+      setNodes((ns) => {
+        const next = [...ns, newNode];
+        persist(next, edges);
+        return next;
+      });
+    },
+    [edges, persist],
+  );
+
+  const updateNodeData = useCallback(
+    (nodeId: string, updates: Record<string, unknown>) => {
+      setNodes((ns) => {
+        const next = ns.map((n) =>
+          n.id === nodeId ? { ...n, data: { ...n.data, ...updates } } : n,
+        );
+        // atualiza referência do selectedNode pra refletir mudanças no painel
+        setSelectedNode((s) => (s && s.id === nodeId ? next.find((n) => n.id === nodeId) || s : s));
+        persist(next, edges);
+        return next;
+      });
+    },
+    [edges, persist],
+  );
+
+  const deleteNode = useCallback(
+    (nodeId: string) => {
+      setNodes((ns) => {
+        const nextN = ns.filter((n) => n.id !== nodeId);
+        setEdges((es) => {
+          const nextE = es.filter((e) => e.source !== nodeId && e.target !== nodeId);
+          persist(nextN, nextE);
+          return nextE;
+        });
+        return nextN;
+      });
+      setSelectedNode(null);
+    },
+    [persist],
+  );
+
+  const updateEdgeData = useCallback(
+    (edgeId: string, updates: { label?: string; isReturn?: boolean }) => {
+      setEdges((es) => {
+        const next = es.map((e) => {
+          if (e.id !== edgeId) return e;
+          const isReturn = updates.isReturn !== undefined ? updates.isReturn : !!e.animated;
+          const label =
+            "label" in updates ? updates.label : typeof e.label === "string" ? e.label : undefined;
+          return styleEdge(
+            {
+              id: e.id,
+              source: e.source,
+              target: e.target,
+              sourceHandle: (e.sourceHandle as string | undefined) ?? undefined,
+              targetHandle: (e.targetHandle as string | undefined) ?? undefined,
+            },
+            isReturn,
+            label,
+          );
+        });
+        setSelectedEdge((s) => (s && s.id === edgeId ? next.find((e) => e.id === edgeId) || s : s));
+        persist(nodes, next);
+        return next;
+      });
+    },
+    [nodes, persist],
+  );
+
+  const deleteEdge = useCallback(
+    (edgeId: string) => {
+      setEdges((es) => {
+        const next = es.filter((e) => e.id !== edgeId);
+        persist(nodes, next);
+        return next;
+      });
+      setSelectedEdge(null);
+    },
+    [nodes, persist],
   );
 
   return (
     <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+      <FlowToolbar onAdd={addNode} onToggleLegend={() => setShowLegend((v) => !v)} />
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -147,13 +296,21 @@ function FlowCanvasInner({ flow, readOnly, onChange }: Props) {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
-        onNodeClick={(_, node) => setSelectedNode(node)}
-        onPaneClick={() => setSelectedNode(null)}
-        nodesDraggable={!readOnly}
-        nodesConnectable={!readOnly}
-        elementsSelectable={!readOnly}
+        connectionMode={ConnectionMode.Loose}
+        onNodeClick={(_, node) => {
+          setSelectedNode(node);
+          setSelectedEdge(null);
+        }}
+        onEdgeClick={(_, edge) => {
+          setSelectedEdge(edge);
+          setSelectedNode(null);
+        }}
+        onPaneClick={() => {
+          setSelectedNode(null);
+          setSelectedEdge(null);
+        }}
         fitView
-        fitViewOptions={{ padding: 0.15 }}
+        fitViewOptions={{ padding: 0.2 }}
         style={{ background: "#F5F0EA" }}
       >
         <Background gap={20} color="#D8D0C8" />
@@ -172,47 +329,24 @@ function FlowCanvasInner({ flow, readOnly, onChange }: Props) {
       </ReactFlow>
 
       {selectedNode && (
-        <div className="absolute top-3 right-3 w-72 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg shadow-lg p-3 text-sm z-20">
-          <div className="flex items-start gap-2 mb-1">
-            {(selectedNode.data as { icon?: string }).icon && (
-              <span className="text-lg leading-none">{(selectedNode.data as { icon: string }).icon}</span>
-            )}
-            <div className="flex-1">
-              <div className="font-semibold text-[var(--text-primary)]">
-                {(selectedNode.data as { label: string }).label}
-              </div>
-              {(selectedNode.data as { executor?: string }).executor && (
-                <div className="text-[11px] text-[var(--text-muted)] italic">
-                  {(selectedNode.data as { executor: string }).executor}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setSelectedNode(null)}
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-            >
-              ×
-            </button>
-          </div>
-          {(selectedNode.data as { details?: string }).details && (
-            <p className="text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap mt-2">
-              {(selectedNode.data as { details: string }).details}
-            </p>
-          )}
-          {(selectedNode.data as { tags?: string[] }).tags && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {(selectedNode.data as { tags: string[] }).tags!.map((t) => (
-                <span
-                  key={t}
-                  className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        <NodeEditor
+          node={selectedNode as { id: string; data: Record<string, unknown> }}
+          onChange={(updates) => updateNodeData(selectedNode.id, updates as Record<string, unknown>)}
+          onDelete={() => deleteNode(selectedNode.id)}
+          onClose={() => setSelectedNode(null)}
+        />
       )}
+
+      {selectedEdge && (
+        <EdgeEditor
+          edge={selectedEdge}
+          onChange={(updates) => updateEdgeData(selectedEdge.id, updates)}
+          onDelete={() => deleteEdge(selectedEdge.id)}
+          onClose={() => setSelectedEdge(null)}
+        />
+      )}
+
+      {showLegend && <FlowLegend onClose={() => setShowLegend(false)} />}
     </div>
   );
 }

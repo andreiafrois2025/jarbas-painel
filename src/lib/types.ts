@@ -103,6 +103,10 @@ export interface FlowDocEdge {
   id: string;
   source: string;
   target: string;
+  /** Qual handle no node de origem — "top" | "right" | "bottom" | "left" */
+  sourceHandle?: string;
+  /** Qual handle no node de destino */
+  targetHandle?: string;
   /** Rótulo que aparece na seta (ex: "aprovado", "rejeitado", "condição X") */
   label?: string;
   /** Se true, é seta de retorno (loopback) — desenha animada */
