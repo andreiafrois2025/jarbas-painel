@@ -11,6 +11,7 @@ import {
   ConnectionMode,
   applyNodeChanges,
   applyEdgeChanges,
+  reconnectEdge,
   type Node,
   type Edge,
   type NodeChange,
@@ -196,6 +197,21 @@ function FlowCanvasInner({ flow, onChange }: Props) {
     [nodes, persist],
   );
 
+  // Reconectar seta existente: arrasta a ponta pra outro handle sem precisar excluir.
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      setEdges((es) => {
+        const next = reconnectEdge(oldEdge, newConnection, es);
+        setSelectedEdge((s) =>
+          s && s.id === oldEdge.id ? next.find((e) => e.id === oldEdge.id) || s : s,
+        );
+        persist(nodes, next);
+        return next;
+      });
+    },
+    [nodes, persist],
+  );
+
   const addNode = useCallback(
     (type: FlowDocNode["type"]) => {
       const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -295,6 +311,8 @@ function FlowCanvasInner({ flow, onChange }: Props) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
+        edgesReconnectable
         nodeTypes={nodeTypes}
         connectionMode={ConnectionMode.Loose}
         onNodeClick={(_, node) => {

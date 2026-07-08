@@ -8,8 +8,25 @@ import type { FlowDoc } from "./types";
 
 type SeedFlow = Omit<FlowDoc, "id" | "user_id" | "created_at" | "updated_at">;
 
-// Layout helper — coluna vertical com espaçamento fixo
+// Layout helper — coluna vertical com espaçamento fixo.
+// A rotação pra horizontal acontece no final via toHorizontal + rotateFlow.
 const col = (i: number, x = 250) => ({ x, y: 60 + i * 120 });
+
+// Rotaciona 90° anti-horário. Sequência vertical (y aumenta) vira horizontal (x aumenta).
+// Ramos laterais (x=100 esquerda, x=400/500 direita) viram ramos superior/inferior.
+function toHorizontal({ x, y }: { x: number; y: number }) {
+  return {
+    x: Math.round(60 + (y - 60) * 2.33),
+    y: Math.round(260 + (x - 250) * 1.07),
+  };
+}
+
+function rotateFlow(f: SeedFlow): SeedFlow {
+  return {
+    ...f,
+    nodes: f.nodes.map((n) => ({ ...n, position: toHorizontal(n.position) })),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────
 // AUTOMAÇÕES
@@ -332,4 +349,4 @@ export const SEED_FLOWS: SeedFlow[] = [
   squadInstagramCarrossel,
   squadLicitacao,
   squadCriarAgente,
-];
+].map(rotateFlow);
