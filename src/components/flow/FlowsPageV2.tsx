@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { FlowDoc, FlowCategory } from "@/lib/types";
 import { getFlowDocs, addFlowDoc, deleteFlowDoc, duplicateFlowDoc, updateFlowDoc } from "@/lib/storage";
 import FlowCanvas from "./FlowCanvas";
+import FlowKanban from "./FlowKanban";
 import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 
 // =============================================
@@ -24,6 +25,7 @@ export default function FlowsPageV2() {
   const [category, setCategory] = useState<FlowCategory>("automation");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creatingCat, setCreatingCat] = useState<FlowCategory | null>(null);
+  const [creatingInColumn, setCreatingInColumn] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
@@ -56,8 +58,12 @@ export default function FlowsPageV2() {
       ],
       edges: [],
     });
+    if (creatingInColumn) {
+      await updateFlowDoc(f.id, { kanban_column: creatingInColumn });
+    }
     setNewTitle("");
     setCreatingCat(null);
+    setCreatingInColumn(null);
     await load();
     setSelectedId(f.id);
   };
@@ -175,59 +181,26 @@ export default function FlowsPageV2() {
           </button>
         ))}
         <div className="flex-1" />
-        <button
-          onClick={() => setCreatingCat(category)}
-          className="text-xs px-3 py-1.5 rounded bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
-        >
-          + Novo fluxo
-        </button>
+        <span className="text-[10px] text-[var(--text-muted)]">
+          Arraste cards entre colunas · use + em cada coluna
+        </span>
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-hidden p-4">
         {loading ? (
           <div className="text-center text-[var(--text-muted)] py-12">Carregando…</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center text-[var(--text-muted)] py-12">
-            Nenhum fluxo aqui ainda. Clique em "+ Novo fluxo" pra começar.
-          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {filtered.map((f) => (
-              <div
-                key={f.id}
-                onClick={() => setSelectedId(f.id)}
-                className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg p-4 hover:border-[var(--accent)] cursor-pointer transition-colors group"
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3 className="font-semibold text-[var(--text-primary)] leading-tight">{f.title}</h3>
-                  {f.is_seed && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--af-teal)] text-white shrink-0">
-                      seed
-                    </span>
-                  )}
-                </div>
-                {f.description && (
-                  <p className="text-xs text-[var(--text-secondary)] line-clamp-3 mb-3">{f.description}</p>
-                )}
-                <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)]">
-                  <span>
-                    {f.nodes.length} etapas · {f.edges.length} conexões
-                  </span>
-                  {!f.is_seed && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(f.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-[var(--danger)] hover:underline"
-                    >
-                      excluir
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <FlowKanban
+            flows={filtered}
+            category={category}
+            onSelectFlow={setSelectedId}
+            onDeleteFlow={handleDelete}
+            onCreateInColumn={(colName) => {
+              setCreatingCat(category);
+              setCreatingInColumn(colName);
+            }}
+            onFlowsChanged={load}
+          />
         )}
       </div>
 
@@ -237,6 +210,11 @@ export default function FlowsPageV2() {
             <h3 className="text-lg font-semibold mb-3">Novo fluxo</h3>
             <p className="text-xs text-[var(--text-muted)] mb-3">
               Categoria: <span className="font-medium">{CATEGORIES.find((c) => c.key === creatingCat)?.label}</span>
+              {creatingInColumn && (
+                <>
+                  {" · "}Coluna: <span className="font-medium">{creatingInColumn}</span>
+                </>
+              )}
             </p>
             <input
               type="text"
@@ -250,6 +228,7 @@ export default function FlowsPageV2() {
               <button
                 onClick={() => {
                   setCreatingCat(null);
+                  setCreatingInColumn(null);
                   setNewTitle("");
                 }}
                 className="px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"

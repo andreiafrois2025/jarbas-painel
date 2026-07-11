@@ -122,9 +122,23 @@ export interface FlowDoc {
   edges: FlowDocEdge[];
   is_seed?: boolean;
   is_public?: boolean;
+  /** Coluna do kanban interno (texto livre por usuário) */
+  kanban_column?: string | null;
+  /** Ordem dentro da coluna */
+  kanban_order?: number;
   user_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Coluna do kanban interno de fluxos — gerenciada pelo usuário */
+export interface FlowColumn {
+  id: string;
+  user_id?: string;
+  category: FlowCategory;
+  name: string;
+  order: number;
+  created_at?: string;
 }
 
 /** Registro de execução */
