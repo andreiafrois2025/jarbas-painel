@@ -73,6 +73,60 @@ export interface FlowStep {
   order: number;
 }
 
+// =============================================
+// Fluxos-desenho (n8n-like, só documentação, não executa)
+// Ficam em tabela separada `flows_doc` pra não misturar com o Flow antigo.
+// =============================================
+
+export type FlowCategory = "squad" | "automation" | "manual";
+
+/** Node do desenho — compatível com React Flow */
+export interface FlowDocNode {
+  id: string;
+  type: "start" | "action" | "condition" | "note" | "end";
+  position: { x: number; y: number };
+  data: {
+    label: string;
+    /** Descrição longa que aparece ao clicar no node */
+    details?: string;
+    /** Ícone emoji */
+    icon?: string;
+    /** Quem executa (agente, sistema, humano) */
+    executor?: string;
+    /** Tags livres (Notion, WhatsApp, cron, etc.) */
+    tags?: string[];
+  };
+}
+
+/** Edge do desenho — compatível com React Flow */
+export interface FlowDocEdge {
+  id: string;
+  source: string;
+  target: string;
+  /** Qual handle no node de origem — "top" | "right" | "bottom" | "left" */
+  sourceHandle?: string;
+  /** Qual handle no node de destino */
+  targetHandle?: string;
+  /** Rótulo que aparece na seta (ex: "aprovado", "rejeitado", "condição X") */
+  label?: string;
+  /** Se true, é seta de retorno (loopback) — desenha animada */
+  isReturn?: boolean;
+}
+
+export interface FlowDoc {
+  id: string;
+  title: string;
+  category: FlowCategory;
+  description?: string;
+  nodes: FlowDocNode[];
+  edges: FlowDocEdge[];
+  is_seed?: boolean;
+  is_public?: boolean;
+  user_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 /** Registro de execução */
 export interface Execution {
   id: string;

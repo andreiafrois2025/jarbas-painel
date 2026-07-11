@@ -4,7 +4,7 @@
 // =============================================
 
 import { supabase } from "./supabase";
-import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Product, Squad } from "./types";
+import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Product, Squad, FlowDoc, FlowCategory } from "./types";
 
 // ---- AUTH ----
 
@@ -586,4 +586,78 @@ export async function migrateFromAgents(userId: string): Promise<void> {
       user_id: userId,
     }).select().single();
   }
+}
+
+// ---- FLOWS DOC (editor visual n8n-like) ----
+
+/** Listar fluxos-desenho — próprios + seed (globais) */
+export async function getFlowDocs(): Promise<FlowDoc[]> {
+  const { data, error } = await supabase
+    .from("flows_doc")
+    .select("*")
+    .order("is_seed", { ascending: false })
+    .order("title", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+/** Um fluxo por id */
+export async function getFlowDoc(id: string): Promise<FlowDoc | null> {
+  const { data, error } = await supabase.from("flows_doc").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** Criar fluxo novo */
+export async function addFlowDoc(input: {
+  title: string;
+  category: FlowCategory;
+  description?: string;
+  nodes?: FlowDoc["nodes"];
+  edges?: FlowDoc["edges"];
+}): Promise<FlowDoc> {
+  const user = await getUser();
+  if (!user) throw new Error("Não autenticado");
+  const { data, error } = await supabase
+    .from("flows_doc")
+    .insert({
+      title: input.title,
+      category: input.category,
+      description: input.description || null,
+      nodes: input.nodes || [],
+      edges: input.edges || [],
+      user_id: user.id,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Salvar edits (nodes/edges/título/descrição) */
+export async function updateFlowDoc(
+  id: string,
+  updates: Partial<Pick<FlowDoc, "title" | "description" | "nodes" | "edges" | "is_public">>,
+): Promise<void> {
+  const { error } = await supabase.from("flows_doc").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+/** Duplicar um fluxo (útil pra clonar um seed pra editar) */
+export async function duplicateFlowDoc(id: string): Promise<FlowDoc> {
+  const src = await getFlowDoc(id);
+  if (!src) throw new Error("Fluxo não encontrado");
+  return addFlowDoc({
+    title: `${src.title} (cópia)`,
+    category: src.category,
+    description: src.description,
+    nodes: src.nodes,
+    edges: src.edges,
+  });
+}
+
+/** Deletar (só próprios, RLS bloqueia deletar seed) */
+export async function deleteFlowDoc(id: string): Promise<void> {
+  const { error } = await supabase.from("flows_doc").delete().eq("id", id);
+  if (error) throw error;
 }
