@@ -113,10 +113,6 @@ export default function FlowKanban({
     if (!flowId) return;
     const f = flows.find((x) => x.id === flowId);
     if (!f || f.kanban_column === targetCol) return;
-    if (f.is_seed) {
-      alert('Fluxo "seed" não pode ser movido diretamente. Duplique ele primeiro.');
-      return;
-    }
     try {
       await updateFlowDoc(flowId, { kanban_column: targetCol });
       await onFlowsChanged();
