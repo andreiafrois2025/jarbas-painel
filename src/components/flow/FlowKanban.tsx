@@ -53,10 +53,15 @@ export default function FlowKanban({
 
   const handleAddColumn = async () => {
     if (!newColName.trim()) return;
-    await addFlowColumn({ category, name: newColName.trim(), order: columns.length });
-    setNewColName("");
-    setAddingCol(false);
-    await loadColumns();
+    try {
+      await addFlowColumn({ category, name: newColName.trim(), order: columns.length });
+      setNewColName("");
+      setAddingCol(false);
+      await loadColumns();
+    } catch (e) {
+      console.error("Erro ao criar coluna:", e);
+      alert(`Erro ao criar coluna: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
 
   const handleRename = async (id: string) => {
