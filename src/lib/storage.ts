@@ -4,7 +4,7 @@
 // =============================================
 
 import { supabase } from "./supabase";
-import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Product, Squad, FlowDoc, FlowCategory } from "./types";
+import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Product, Squad, FlowDoc, FlowCategory, FlowColumn } from "./types";
 
 // ---- AUTH ----
 
@@ -637,9 +637,48 @@ export async function addFlowDoc(input: {
 /** Salvar edits (nodes/edges/título/descrição) */
 export async function updateFlowDoc(
   id: string,
-  updates: Partial<Pick<FlowDoc, "title" | "description" | "nodes" | "edges" | "is_public">>,
+  updates: Partial<Pick<FlowDoc, "title" | "description" | "nodes" | "edges" | "is_public" | "kanban_column" | "kanban_order">>,
 ): Promise<void> {
   const { error } = await supabase.from("flows_doc").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+// ─── Colunas do kanban ───
+
+export async function getFlowColumns(category: FlowCategory): Promise<FlowColumn[]> {
+  const { data, error } = await supabase
+    .from("flow_columns")
+    .select("*")
+    .eq("category", category)
+    .order("order", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function addFlowColumn(input: { category: FlowCategory; name: string; order?: number }): Promise<FlowColumn> {
+  const user = await getUser();
+  if (!user) throw new Error("Não autenticado");
+  const { data, error } = await supabase
+    .from("flow_columns")
+    .insert({
+      user_id: user.id,
+      category: input.category,
+      name: input.name,
+      order: input.order ?? 999,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateFlowColumn(id: string, updates: Partial<Pick<FlowColumn, "name" | "order">>): Promise<void> {
+  const { error } = await supabase.from("flow_columns").update(updates).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteFlowColumn(id: string): Promise<void> {
+  const { error } = await supabase.from("flow_columns").delete().eq("id", id);
   if (error) throw error;
 }
 
