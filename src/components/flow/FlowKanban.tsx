@@ -94,11 +94,16 @@ export default function FlowKanban({
     const target = idx + direction;
     if (target < 0 || target >= columns.length) return;
     const a = columns[idx], b = columns[target];
-    await Promise.all([
-      updateFlowColumn(a.id, { order: b.order }),
-      updateFlowColumn(b.id, { order: a.order }),
-    ]);
-    await loadColumns();
+    try {
+      await Promise.all([
+        updateFlowColumn(a.id, { order: b.order }),
+        updateFlowColumn(b.id, { order: a.order }),
+      ]);
+      await loadColumns();
+    } catch (e) {
+      console.error("Erro ao reordenar coluna:", e);
+      alert(`Erro ao reordenar: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
 
   const handleDrop = async (targetCol: string | null, e: React.DragEvent) => {
@@ -108,8 +113,17 @@ export default function FlowKanban({
     if (!flowId) return;
     const f = flows.find((x) => x.id === flowId);
     if (!f || f.kanban_column === targetCol) return;
-    await updateFlowDoc(flowId, { kanban_column: targetCol });
-    await onFlowsChanged();
+    if (f.is_seed) {
+      alert('Fluxo "seed" não pode ser movido diretamente. Duplique ele primeiro.');
+      return;
+    }
+    try {
+      await updateFlowDoc(flowId, { kanban_column: targetCol });
+      await onFlowsChanged();
+    } catch (e) {
+      console.error("Erro ao mover card:", e);
+      alert(`Erro ao mover card: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
 
   const columnsToRender: { key: string; name: string; id: string | null }[] = [
