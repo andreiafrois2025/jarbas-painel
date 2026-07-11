@@ -42,8 +42,22 @@ export default function FlowsPageV2() {
   };
 
   useEffect(() => {
+    // Deep-link: /producao/fluxos?fluxo=<id>&cat=<categoria> sobrevive ao F5
+    const params = new URLSearchParams(window.location.search);
+    const cat = params.get("cat");
+    if (cat === "automation" || cat === "squad" || cat === "manual") setCategory(cat);
+    const fluxo = params.get("fluxo");
+    if (fluxo) setSelectedId(fluxo);
     load();
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    const params = new URLSearchParams();
+    if (selectedId) params.set("fluxo", selectedId);
+    else params.set("cat", category);
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+  }, [selectedId, category, loading]);
 
   const selected = flows.find((f) => f.id === selectedId) || null;
   const filtered = flows.filter((f) => f.category === category);
