@@ -334,6 +334,147 @@ const squadCriarAgente: SeedFlow = {
   ],
 };
 
+const pipelineReels: SeedFlow = {
+  title: "Pipeline de reels (pauta → roteiro)",
+  category: "automation",
+  description:
+    "Quarta 18h nascem as pautas (2 Descomplicando + 1 dica + notícia UAU se houver). Você aprova no kanban; o roteiro chega quinta à noite no WhatsApp + lista de tarefas. Custo: 1 chamada Gemini por rodada + 1 por roteiro.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Quarta 18h BRT", icon: "⏰", details: "Trilhos: backlog Descomplicando…, dica-bank menos usada, notícia UAU da semana.", executor: "cron → reels_pipeline.py ideias", tags: ["Gemini"] } },
+    { id: "2", type: "action", position: col(1), data: { label: "Cards no Radar", icon: "🗂️", details: "Status: Pra avaliar - Reels · Tipo: reel.\nAviso no Telegram + WhatsApp + tarefa no Notion.", executor: "reels_pipeline.py", tags: ["Notion", "WhatsApp"] } },
+    { id: "3", type: "condition", position: col(2), data: { label: "Você aprova? (quinta)", icon: "👩🏽", details: "Kanban de sempre. Aprovado segue; descartado morre.", executor: "Andréia" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Roteiro no estilo dela", icon: "🎬", details: "Gancho ≤3s, 3 blocos, CTA, texto de capa, sugestão visual.\nRoda 19h e 22h30 — chega quinta à noite.", executor: "reels_pipeline.py roteiros", tags: ["Gemini"] } },
+    { id: "5", type: "end", position: col(4), data: { label: "Ler quinta, gravar sexta", icon: "📱", details: "Roteiro no card + Esteira (Gravar Reels) + tarefa no Notion + WhatsApp.\nSábado é o plano B oficial.", executor: "Andréia" } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+    { id: "e4-5", source: "4", target: "5" },
+  ],
+};
+
+const reelsStudio: SeedFlow = {
+  title: "Reels-studio: edição automática (\"meu CapCut\")",
+  category: "automation",
+  description:
+    "Você grava e sobe o bruto; a VPS devolve o reel editado no seu estilo: cortes de silêncio e de \"corta isso\", legendas IBM Plex com destaque Terracota, punch-in no gancho, trilha com ducking e capa da série. Zero token (ffmpeg + Whisper local).",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Vídeo bruto", icon: "🎥", details: "Você envia pelo Telegram ou sobe no Drive (Instagram/Reels).", executor: "Andréia" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Transcrever", icon: "🎧", details: "faster-whisper local (modelo small, mesmo cache do transcribe.py).", executor: "/opt/reels-studio/studio.py" } },
+    { id: "3", type: "action", position: col(2), data: { label: "Cortar silêncios e erros", icon: "✂️", details: "Silêncio ≥0,8s sai; trecho com \"corta isso\"/\"de novo\" é descartado.", executor: "studio.py" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Legendas + zoom + trilha", icon: "🎨", details: "Legendas queimadas (IBM Plex, destaque Terracota), punch-in 3s no gancho, música com ducking na voz.", executor: "ffmpeg" } },
+    { id: "5", type: "end", position: col(4), data: { label: "Reel 1080×1920 + capa", icon: "✅", details: "MP4 + capa PNG (Special Elite) prontos pra agendar.\nPreset: estilo-andreia.yaml (ajusta 1x, repete sempre).", executor: "studio.py" } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+    { id: "e4-5", source: "4", target: "5" },
+  ],
+};
+
+const radarParaInstagram: SeedFlow = {
+  title: "Ponte Radar → Instagram",
+  category: "automation",
+  description:
+    "Card do Radar marcado com o checkbox \"→ Instagram\" vira ideia no Banco de Ideias (banco Conteúdos) com a pesquisa já pronta — a squad de carrossel pula a etapa do Mike. Todo dia 18h, zero token.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Todo dia 18h BRT", icon: "⏰", executor: "cron → radar_to_carousel.py" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Buscar cards marcados", icon: "☑️", details: "Checkbox \"→ Instagram\" no Radar.", executor: "radar_to_carousel.py", tags: ["Notion"] } },
+    { id: "3", type: "action", position: col(2), data: { label: "Criar ideia no banco Conteúdos", icon: "💡", details: "Formato=Carrossel · Canal=Instagram · corpo com o texto do card.", executor: "radar_to_carousel.py", tags: ["Notion"] } },
+    { id: "4", type: "end", position: col(3), data: { label: "Aviso no Telegram", icon: "💬", executor: "Bot Telegram" } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+  ],
+};
+
+const aprendizEstilo: SeedFlow = {
+  title: "Aprendiz de estilo (Mike melhorando)",
+  category: "automation",
+  description:
+    "Domingo à noite o sistema estuda o que você aprovou, editou e descartou no Radar e recalcula os pesos do Mike (fontes e temas). 1 chamada Gemini por semana pros padrões de edição.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Domingo 21h30 BRT", icon: "⏰", executor: "cron → style_learner.py" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Ler decisões do Radar", icon: "🗂️", details: "Aprovados vs descartados por fonte, tema, tipo; edições que você fez nos textos.", executor: "style_learner.py", tags: ["Notion"] } },
+    { id: "3", type: "action", position: col(2), data: { label: "Atualizar style-profile.json", icon: "🧠", details: "Pesos por fonte/tema + padrões de edição (Gemini 1x/semana).", executor: "style_learner.py", tags: ["Gemini"] } },
+    { id: "4", type: "end", position: col(3), data: { label: "Mike e Izzy usam na próxima rodada", icon: "📈", details: "Fonte ruim perde ponto; taxa de aprovação vira o gráfico do painel /metricas.", executor: "ia_content_generator.py" } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+  ],
+};
+
+const snapshotMetricas: SeedFlow = {
+  title: "Snapshot diário de métricas",
+  category: "automation",
+  description:
+    "Toda noite a VPS consolida saúde + produção (fila, Radar, dicas, jobs) e publica o histórico que alimenta as páginas /metricas e /metricas/palestra. Zero token.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "23h BRT — todo dia", icon: "⏰", executor: "cron → metrics-snapshot.py" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Coletar fontes", icon: "🧮", details: "status.json, ia_queue, Radar (Notion), dica-bank, jobs das squads, logs.", executor: "metrics-snapshot.py", tags: ["Notion"] } },
+    { id: "3", type: "end", position: col(2), data: { label: "Publicar metrics-history.json", icon: "📊", details: "Bucket público do Supabase Storage (mesmo padrão do status.json).", executor: "Supabase Storage", tags: ["Supabase"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+  ],
+};
+
+const alertaFalhasDonna: SeedFlow = {
+  title: "Donna alerta falhas no WhatsApp",
+  category: "automation",
+  description:
+    "A cada 5 min o semáforo verifica ENTREGAS (o briefing saiu hoje? tem envio pendente?), não só processos. Problema novo = Donna te avisa no WhatsApp pessoal; resolveu = avisa que voltou ao verde. Sem spam (cooldown 6h, silêncio 22h30–6h30 exceto vermelho).",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "A cada 5 min", icon: "⏰", executor: "cron → status-saude.py" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Checar entregas de verdade", icon: "🔎", details: "Briefings WhatsApp/Telegram saíram HOJE? Pendente travado? Crons frescos? Fila alta? Disco?", executor: "status-saude.py" } },
+    { id: "3", type: "condition", position: col(2), data: { label: "Problema novo?", icon: "❓", details: "Compara com o último estado alertado (dedup).", executor: "status-saude.py" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Donna te chama no WhatsApp", icon: "🚨", details: "Número pessoal, nunca o grupo. Recuperação também avisa (1x).", executor: "openclaw", tags: ["WhatsApp"] } },
+    { id: "5", type: "end", position: col(4), data: { label: "Painel atualizado", icon: "🟡", details: "status.json → semáforo + /metricas.", executor: "Supabase Storage" } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+    { id: "e4-5", source: "4", target: "5" },
+  ],
+};
+
+const rotinaSemanal: SeedFlow = {
+  title: "Minha semana de conteúdo (rotina)",
+  category: "manual",
+  description:
+    "A rotina realista: semana é celular (aprovações rápidas), produção pesada é sexta/sábado/domingo. O sistema te lembra de tudo por WhatsApp + lista de tarefas.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Seg-qua: kanban no celular", icon: "📱", details: "~10 min/dia: aprovar/descartar notícias e dicas; responder comentários.", executor: "Andréia" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Qua 18h: pautas de reels chegam", icon: "🎬", details: "Automático (aviso WhatsApp + tarefa).", executor: "reels_pipeline" } },
+    { id: "3", type: "action", position: col(2), data: { label: "Qui: aprovar + ler roteiros à noite", icon: "🌙", details: "Roteiro chega pronto à noite; ler e deixar a ideia decantar.", executor: "Andréia" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Sex: gravar (plano B: sábado)", icon: "🎥", details: "Falou \"corta isso\"? O reels-studio limpa. Subir brutos no Telegram/Drive.", executor: "Andréia" } },
+    { id: "5", type: "action", position: col(4), data: { label: "Sáb: revisar artes + agendar", icon: "🗓️", details: "Checkpoints da squad, Canva, Meta Business Suite (semana seguinte).", executor: "Andréia" } },
+    { id: "6", type: "end", position: col(5), data: { label: "Dom: Revisão Semanal (30 min)", icon: "📊", details: "Colar métricas no Notion; olhar o Calendário Editorial. Produção longa (e-book, aulas) é fds.", executor: "Andréia" } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+    { id: "e4-5", source: "4", target: "5" },
+    { id: "e5-6", source: "5", target: "6" },
+  ],
+};
+
 export const SEED_FLOWS: SeedFlow[] = [
   // Automações
   briefingTelegram,
@@ -345,8 +486,16 @@ export const SEED_FLOWS: SeedFlow[] = [
   saudeEcossistema,
   rondaDiaria,
   resumoPendentesIA,
+  pipelineReels,
+  reelsStudio,
+  radarParaInstagram,
+  aprendizEstilo,
+  snapshotMetricas,
+  alertaFalhasDonna,
   // Squads
   squadInstagramCarrossel,
   squadLicitacao,
   squadCriarAgente,
+  // Rotina manual
+  rotinaSemanal,
 ].map(rotateFlow);
