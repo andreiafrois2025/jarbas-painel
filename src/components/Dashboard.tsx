@@ -27,7 +27,8 @@ const NAV_ITEMS: { path: string; icon: string; title: string; match: string }[] 
   { path: "/inicio", icon: "🏠", title: "Início", match: "/inicio" },
   { path: "/equipe", icon: "👥", title: "Equipe", match: "/equipe" },
   { path: "/producao/squads", icon: "🚀", title: "Produção (Squads + Fluxos)", match: "/producao" },
-  { path: "/config", icon: "⚙️", title: "Config (Integrações + Métricas)", match: "/config" },
+  { path: "/metricas", icon: "📊", title: "Métricas", match: "/metricas" },
+  { path: "/config", icon: "⚙️", title: "Config (Integrações)", match: "/config" },
 ];
 
 // Shell do painel: sidebar + JobsMonitor + dados compartilhados.
