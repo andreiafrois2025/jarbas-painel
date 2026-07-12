@@ -65,11 +65,13 @@ export function useMetricsHistory(refreshMs = 0) {
   return { data, erro, hoje: data?.days?.[data.days.length - 1] ?? null };
 }
 
-// Ordena chaves "2026-W27" cronologicamente e devolve rótulo curto "S27"
-export function semanasOrdenadas<T>(mapa: Record<string, T>): { key: string; label: string; valor: T }[] {
-  return Object.keys(mapa)
+// Ordena chaves "2026-W27" cronologicamente e devolve rótulo curto "S27".
+// Tolera mapa ausente: o JSON publicado pode ser de uma versão mais antiga
+// do coletor (foi exatamente isso que derrubou a página em 12/07).
+export function semanasOrdenadas<T>(mapa: Record<string, T> | undefined | null): { key: string; label: string; valor: T }[] {
+  return Object.keys(mapa ?? {})
     .sort()
-    .map((k) => ({ key: k, label: `S${k.split("-W")[1]}`, valor: mapa[k] }));
+    .map((k) => ({ key: k, label: `S${k.split("-W")[1]}`, valor: (mapa as Record<string, T>)[k] }));
 }
 
 export function tempoRelativo(iso: string | null): string {

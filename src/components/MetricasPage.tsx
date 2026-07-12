@@ -71,7 +71,7 @@ export default function MetricasPage() {
     valor: s.valor as number,
   }));
 
-  const sinais = Object.entries(hoje.saude.sinais);
+  const sinais = Object.entries(hoje.saude?.sinais ?? {});
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
@@ -111,7 +111,7 @@ export default function MetricasPage() {
           <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[#E5DED4]">
             <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">Última execução das automações</h3>
             <ul className="space-y-1 text-sm text-[var(--text-primary)]">
-              {Object.entries(hoje.automacoes).map(([k, iso]) => (
+              {Object.entries(hoje.automacoes ?? {}).map(([k, iso]) => (
                 <li key={k} className="flex justify-between gap-2">
                   <span>{NOME_AUTOMACAO[k] ?? k}</span>
                   <span className="text-[var(--text-secondary)] whitespace-nowrap">{tempoRelativo(iso)}</span>
@@ -129,7 +129,7 @@ export default function MetricasPage() {
           <Tile icone="📤" titulo="Posts no grupo IA" valor={hoje.enviados_total}
             sub={`${hoje.fila.enviados_7d} nos últimos 7 dias`} />
           <Tile icone="⏱️" titulo="Horas economizadas" valor={`${hoje.horas_economizadas}h`}
-            sub={`fórmula: ${data.formula_horas.post_grupo_min} min/post + ${data.formula_horas.carrossel_min} min/carrossel`} />
+            sub={`fórmula: ${data.formula_horas?.post_grupo_min ?? 25} min/post + ${data.formula_horas?.carrossel_min ?? 120} min/carrossel`} />
           <Tile icone="💡" titulo="Dicas do banco" valor={`${hoje.dicas.usadas}/${hoje.dicas.total}`}
             sub="já usadas em posts" />
           <Tile icone="🤖" titulo="Squads (jobs)" valor={hoje.jobs.concluidos}
