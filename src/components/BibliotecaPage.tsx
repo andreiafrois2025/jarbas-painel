@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { CRIACOES, SKILLS } from "@/lib/biblioteca";
+import GrafoView from "./GrafoView";
 
 // Biblioteca: acesso rápido a tudo que existe (links diretos) e o catálogo
 // de skills/capacidades do ecossistema, com como acionar cada uma.
 
-type Aba = "criacoes" | "skills";
+type Aba = "criacoes" | "skills" | "grafo";
 
 export default function BibliotecaPage() {
   const [aba, setAba] = useState<Aba>("criacoes");
@@ -30,9 +31,11 @@ export default function BibliotecaPage() {
         <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">📚 Biblioteca</h1>
         {botao("criacoes", "🔗 Criações")}
         {botao("skills", "🧰 Skills")}
+        {botao("grafo", "🕸️ Grafo")}
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {aba === "grafo" ? <GrafoView /> : (
         <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
           {aba === "criacoes" ? (
             CRIACOES.map((g) => (
@@ -89,6 +92,7 @@ export default function BibliotecaPage() {
             Pra adicionar itens aqui, é só me pedir no chat — eu mantenho este catálogo.
           </p>
         </div>
+        )}
       </div>
     </div>
   );
