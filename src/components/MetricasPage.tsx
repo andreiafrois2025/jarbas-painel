@@ -74,7 +74,8 @@ export default function MetricasPage() {
   const sinais = Object.entries(hoje.saude?.sinais ?? {});
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
+    <div className="flex-1 overflow-y-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-8">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">📊 Métricas</h1>
         <span className="text-xs text-[var(--text-secondary)]">
@@ -156,6 +157,7 @@ export default function MetricasPage() {
           <a href="/metricas/palestra" className="underline" target="_blank">/metricas/palestra</a>
         </p>
       </section>
+    </div>
     </div>
   );
 }

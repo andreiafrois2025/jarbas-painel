@@ -44,6 +44,19 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContext, setSelectedContext] = useState<string>(CONTEXTS[1]);
+  // Painel Setores recolhível: no celular começa recolhido; a escolha fica salva
+  const [setoresRecolhido, setSetoresRecolhido] = useState(false);
+  useEffect(() => {
+    const salvo = localStorage.getItem("squads_setores_recolhido");
+    if (salvo !== null) setSetoresRecolhido(salvo === "1");
+    else if (window.matchMedia("(max-width: 767px)").matches) setSetoresRecolhido(true);
+  }, []);
+  const toggleSetores = () => {
+    setSetoresRecolhido((v) => {
+      localStorage.setItem("squads_setores_recolhido", v ? "0" : "1");
+      return !v;
+    });
+  };
   const [showForm, setShowForm] = useState(false);
   const [editingSquad, setEditingSquad] = useState<Squad | null>(null);
   const [saving, setSaving] = useState(false);
@@ -240,7 +253,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] flex items-center px-5 gap-4 shrink-0 h-14">
+      <header className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] flex items-center px-3 md:px-5 gap-2 md:gap-4 shrink-0 h-14">
         <button onClick={() => onNavigate("office")} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors text-sm">
           ← Escritório
         </button>
@@ -258,22 +271,42 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       <div className="flex-1 p-4 overflow-hidden">
         <div className="win-border-outset flex h-full" style={{ background: "var(--win-surface)" }}>
 
-          {/* Left — Context list */}
-          <div className="shrink-0 border-r border-[var(--border)] flex flex-col" style={{ width: 180, background: "var(--bg-secondary)" }}>
-            <div className="win-titlebar" style={{ fontSize: 10 }}>Setores</div>
+          {/* Left — Context list (recolhível: vira trilho de ícones) */}
+          <div className="shrink-0 border-r border-[var(--border)] flex flex-col transition-all" style={{ width: setoresRecolhido ? 52 : 180, background: "var(--bg-secondary)" }}>
+            <div className="win-titlebar flex items-center justify-between gap-1" style={{ fontSize: 10 }}>
+              {!setoresRecolhido && <span>Setores</span>}
+              <button
+                onClick={() => toggleSetores()}
+                className="px-1 cursor-pointer opacity-80 hover:opacity-100"
+                title={setoresRecolhido ? "Expandir setores" : "Recolher setores"}
+              >
+                {setoresRecolhido ? "»" : "«"}
+              </button>
+            </div>
             <div className="flex-1 overflow-auto py-1">
               {CONTEXTS.map(ctx => {
                 const count = squads.filter(s => s.status !== "inactive" && (s.contexts || []).includes(ctx)).length;
                 return (
                   <button key={ctx} onClick={() => setSelectedContext(ctx)}
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-left transition-all text-sm cursor-pointer ${
+                    title={ctx}
+                    className={`w-full flex items-center gap-2 py-2.5 text-left transition-all text-sm cursor-pointer ${
+                      setoresRecolhido ? "justify-center px-0" : "px-3"
+                    } ${
                       selectedContext === ctx
                         ? "bg-[var(--accent-soft)] text-[var(--text-primary)] font-semibold"
                         : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                     }`}>
-                    <span>{CONTEXT_ICONS[ctx] || "📁"}</span>
-                    <span className="flex-1 truncate">{ctx}</span>
-                    {count > 0 && (
+                    <span className="relative">
+                      {CONTEXT_ICONS[ctx] || "📁"}
+                      {setoresRecolhido && count > 0 && (
+                        <span className="absolute -top-1.5 -right-2 text-[9px] font-bold px-1 rounded-full"
+                          style={{ background: "var(--accent)", color: "#fff" }}>
+                          {count}
+                        </span>
+                      )}
+                    </span>
+                    {!setoresRecolhido && <span className="flex-1 truncate">{ctx}</span>}
+                    {!setoresRecolhido && count > 0 && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                         style={{ background: selectedContext === ctx ? "var(--accent)" : "var(--bg-tertiary)", color: selectedContext === ctx ? "#fff" : "var(--text-muted)" }}>
                         {count}
