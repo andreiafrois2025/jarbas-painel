@@ -33,6 +33,7 @@ export interface SnapshotDia {
   radar_por_status: Record<string, number>;
   enviados_total: number;
   horas_economizadas: number;
+  atividades_por_agente?: Record<string, number>;
 }
 
 export interface MetricsHistory {

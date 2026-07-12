@@ -172,48 +172,64 @@ function IntegracoesTab() {
   const rodouRecente = (iso: string | null | undefined, horas: number) =>
     !!iso && Date.now() - new Date(iso).getTime() < horas * 3600 * 1000;
 
-  const itens: { nome: string; icone: string; ok: boolean | null; detalhe: string; onde: string }[] = [
+  const itens: { nome: string; icone: string; ok: boolean | null; detalhe: string; onde: string;
+                 links?: { rotulo: string; url: string }[] }[] = [
     {
       nome: "WhatsApp (Donna)", icone: "📱",
       ok: st ? !!st.sinais_vitais?.whatsapp : null,
       detalhe: "Briefing matinal, grupo IA, alertas de falha e avisos de tarefas.",
       onde: "Gateway OpenClaw na VPS (re-parear: openclaw channels)",
+      links: [{ rotulo: "WhatsApp Web", url: "https://web.whatsapp.com" }],
     },
     {
       nome: "Telegram (bot)", icone: "💬",
       ok: st ? !!st.sinais_vitais?.telegram : null,
       detalhe: "Canal de fallback: checkpoints das squads, entrega de carrosséis.",
       onde: "claude-telegram.service + OpenClaw",
+      links: [{ rotulo: "Abrir bot", url: "https://t.me/jarbas_af_bot" }],
     },
     {
       nome: "Notion", icone: "🗂️",
       ok: hoje ? rodouRecente(autom.status_saude, 2) : null,
       detalhe: "Radar de Posts IA, banco Conteúdos, lista de tarefas, Segundo Cérebro.",
       onde: "Token no container OpenClaw (workspace/notion_radar.py)",
+      links: [
+        { rotulo: "Radar", url: "https://app.notion.com/p/391b90b9061d81d993b7dc2de46eab87" },
+        { rotulo: "Tarefas", url: "https://app.notion.com/p/a73b90b9061d8299899f81c8938e9de6" },
+        { rotulo: "Produção de Conteúdo", url: "https://app.notion.com/p/2fbb90b9061d812f9afce74e767879eb" },
+      ],
     },
     {
       nome: "Google Gemini", icone: "🤖",
       ok: null,
       detalhe: "Gerador de posts, roteiros de reels e aprendiz de estilo (conta do Jarbas).",
       onde: "GEMINI_API_KEY no container — uso visível nos logs da VPS",
+      links: [{ rotulo: "Console (uso/quota)", url: "https://aistudio.google.com" }],
     },
     {
       nome: "Google Calendar", icone: "📅",
       ok: st ? !!st.sinais_vitais?.container : null,
       detalhe: "Agenda do briefing matinal (conta assistentejarbas.ia@gmail.com).",
       onde: "google_calendar_token.json no container",
+      links: [{ rotulo: "Abrir agenda", url: "https://calendar.google.com" }],
     },
     {
       nome: "Google Drive (backups e reels)", icone: "☁️",
       ok: st ? st.crons?.backup_diario?.ok ?? null : null,
       detalhe: "Backup diário da VPS + acervo Instagram/Reels + Marca.",
       onde: "rclone remote JarbasDrive2",
+      links: [{ rotulo: "Abrir Drive", url: "https://drive.google.com/drive/my-drive" }],
     },
     {
       nome: "Supabase (painel)", icone: "⚡",
       ok: st !== null,
       detalhe: "Login, fluxos, equipe, status e métricas do painel.",
       onde: ".env.local do painel + bucket público status",
+      links: [
+        { rotulo: "Projeto", url: "https://supabase.com/dashboard/project/pmmyqljiuslstwbmiron" },
+        { rotulo: "Deploys (Vercel)", url: "https://vercel.com/andreiafrois2025s-projects/jarbas-painel" },
+        { rotulo: "Repositório", url: "https://github.com/andreiafrois2025/jarbas-painel" },
+      ],
     },
   ];
 
@@ -234,6 +250,17 @@ function IntegracoesTab() {
             </div>
             <p className="text-sm text-[var(--text-secondary)] mt-0.5">{i.detalhe}</p>
             <p className="text-xs text-[var(--text-muted)] mt-1">Onde vive: {i.onde}</p>
+            {i.links && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {i.links.map((l) => (
+                  <a key={l.url} href={l.url} target="_blank" rel="noreferrer"
+                    className="text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80"
+                    style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
+                    {l.rotulo} ↗
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ))}
