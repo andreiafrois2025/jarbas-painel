@@ -121,7 +121,7 @@ function AbaGeral({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSeman
             [EQUIPE.length, "agentes na equipe"],
             [hoje.fila?.cards_gerados_total ?? "—", "notícias e dicas curadas"],
             [hoje.enviados_total ?? "—", "posts publicados"],
-            [`${Math.round(hoje.horas_economizadas ?? 0)}h`, "de trabalho economizado"],
+            [`${Math.round(hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0)}h`, "economizadas em conteúdo"],
           ].map(([v, r]) => (
             <div key={String(r)}>
               <div className="text-4xl md:text-5xl font-bold" style={{ color: "#2D6B6B" }}>{v}</div>
@@ -175,8 +175,10 @@ function AbaProducao({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSe
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Tile icone="📤" titulo="Posts no grupo IA" valor={hoje.enviados_total ?? "—"}
           sub={`${hoje.fila?.enviados_7d ?? 0} nos últimos 7 dias`} />
-        <Tile icone="⏱️" titulo="Horas economizadas" valor={`${hoje.horas_economizadas ?? 0}h`}
-          sub={`fórmula: ${data.formula_horas?.post_grupo_min ?? 25} min/post + ${data.formula_horas?.carrossel_min ?? 120} min/carrossel`} />
+        <Tile icone="⏱️" titulo="Horas economizadas (conteúdo)" valor={`${hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0}h`}
+          sub={hoje.horas_trabalho != null
+            ? `+ ${hoje.horas_trabalho}h no serviço público`
+            : "serviço público: medição chega com o hub IGAM"} />
         <Tile icone="💡" titulo="Dicas do banco" valor={`${hoje.dicas?.usadas ?? 0}/${hoje.dicas?.total ?? 0}`}
           sub="já usadas em posts" />
         <Tile icone="🤖" titulo="Squads (jobs)" valor={hoje.jobs?.concluidos ?? 0}
@@ -208,7 +210,7 @@ function AbaProducao({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSe
       </div>
 
       <div className="grid lg:grid-cols-2 gap-3">
-        <CartaoGrafico titulo="O Mike melhorando 📈"
+        <CartaoGrafico titulo="Aprendizado geral 📈"
           sub="Taxa de aprovação dos cards do Radar por semana de criação">
           <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
         </CartaoGrafico>
@@ -216,6 +218,29 @@ function AbaProducao({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSe
           sub="Curadoria aprovada por você que chegou na comunidade">
           <GraficoBarras pontos={enviosSemana} />
         </CartaoGrafico>
+      </div>
+
+      {/* Evolução individual por agente (pedido dela 12/07) */}
+      <div className="grid lg:grid-cols-3 gap-3">
+        {([
+          ["mike", "🔍 Mike — notícias", "aprovação das notícias propostas"],
+          ["izzy", "✍️ Izzy — dicas", "aprovação das dicas propostas"],
+          ["reels", "🎬 Reels — pautas", "aprovação das pautas de reel"],
+        ] as const).map(([chave, titulo, sub]) => {
+          const serie = semanasOrdenadas<{ aprovados: number; descartados: number; taxa: number | null }>(
+            data.radar_semanas_por_agente?.[chave])
+            .filter((s) => s.valor?.taxa !== null && s.valor?.taxa !== undefined)
+            .map((s) => ({
+              label: s.label,
+              valor: Math.round((s.valor.taxa as number) * 100),
+              detalhe: `${s.valor.aprovados} aprov. / ${s.valor.descartados} desc.`,
+            }));
+          return (
+            <CartaoGrafico key={chave} titulo={titulo} sub={sub}>
+              <GraficoLinha pontos={serie} unidade="%" maxY={100} altura={170} />
+            </CartaoGrafico>
+          );
+        })}
       </div>
     </div>
   );

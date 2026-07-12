@@ -1,28 +1,52 @@
 "use client";
 
-// 🎤 Modo palestra — tela limpa pra projetar em apresentações.
-// Rota pública de propósito: sem login no palco, e a fonte de dados
-// (metrics-history.json) já é um objeto público sem nada sensível.
-// ?tema=trabalho → versão pro serviço público (sem a parte de criadora
-// de conteúdo: some posts/Instagram, o foco vira automação e equipe).
+// 🎤 Modo palco v2 — interativo: clicar num agente abre o cartão com papel e
+// habilidades; contadores explicam a origem do número ao clicar.
+// ?tema=trabalho → versão serviço público (sem nada de criação de conteúdo,
+// e horas de trabalho só aparecem quando forem medidas de verdade).
 
 import { useEffect, useState } from "react";
 import { GraficoLinha } from "@/components/charts";
 import { useMetricsHistory, semanasOrdenadas } from "@/lib/metrics";
+import { EQUIPE, type Agente } from "@/lib/equipe";
 
-const EQUIPE = [
-  ["🤵", "Jarbas"], ["🗂️", "Donna"], ["🔍", "Mike"], ["✍️", "Izzy"],
-  ["🎨", "Felipe"], ["🗺️", "Eric"], ["⚖️", "Dr. Harvey"], ["📜", "Katrina"],
-  ["💻", "Junior"], ["📊", "Tonny"], ["🎬", "Theo"], ["🧭", "Rafaela"],
-  ["💰", "Louis"], ["🥗", "Lara"], ["🧠", "Dra. Nara"], ["📚", "Sofia"],
-];
-
-function Contador({ valor, rotulo }: { valor: string | number; rotulo: string }) {
+function Contador({ valor, rotulo, detalhe }: { valor: string | number; rotulo: string; detalhe: string }) {
+  const [aberto, setAberto] = useState(false);
   return (
-    <div className="text-center">
-      <div className="text-5xl md:text-7xl font-bold" style={{ color: "#2D6B6B" }}>{valor}</div>
+    <button className="text-center cursor-pointer group" onClick={() => setAberto(!aberto)}>
+      <div className="text-5xl md:text-7xl font-bold group-hover:opacity-80 transition-opacity" style={{ color: "#2D6B6B" }}>{valor}</div>
       <div className="mt-2 text-sm md:text-base uppercase tracking-widest" style={{ color: "#6B7A7A" }}>
         {rotulo}
+      </div>
+      {aberto && (
+        <div className="mt-2 text-xs md:text-sm rounded-xl px-3 py-2 max-w-[240px] mx-auto text-left" style={{ background: "#FFFFFF", color: "#2D3B3B" }}>
+          {detalhe}
+        </div>
+      )}
+    </button>
+  );
+}
+
+function CartaoAgente({ agente, onFechar }: { agente: Agente; onFechar: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "rgba(45,59,59,.45)" }} onClick={onFechar}>
+      <div className="rounded-2xl p-6 md:p-8 max-w-md w-full" style={{ background: "#F5F0EA", color: "#2D3B3B" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-4">
+          <span className="text-5xl">{agente.icone}</span>
+          <div>
+            <h3 className="text-2xl font-bold">{agente.nome}</h3>
+            <p className="text-sm uppercase tracking-widest" style={{ color: "#A0583C" }}>{agente.papel}</p>
+          </div>
+        </div>
+        <p className="mt-4 text-sm md:text-base leading-relaxed">{agente.descricao}</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {agente.habilidades.map((h) => (
+            <span key={h} className="text-xs px-3 py-1.5 rounded-full" style={{ background: "#FFFFFF", color: "#2D6B6B", border: "1px solid #2D6B6B" }}>
+              {h}
+            </span>
+          ))}
+        </div>
+        <button onClick={onFechar} className="mt-5 text-sm underline opacity-60 hover:opacity-100">fechar</button>
       </div>
     </div>
   );
@@ -31,6 +55,7 @@ function Contador({ valor, rotulo }: { valor: string | number; rotulo: string })
 export default function PalestraPage() {
   const { data, hoje } = useMetricsHistory(5 * 60 * 1000);
   const [trabalho, setTrabalho] = useState(false);
+  const [agenteAberto, setAgenteAberto] = useState<Agente | null>(null);
 
   useEffect(() => {
     setTrabalho(new URLSearchParams(window.location.search).get("tema") === "trabalho");
@@ -49,26 +74,28 @@ export default function PalestraPage() {
     .map((s) => ({ label: s.label, valor: Math.round((s.valor.taxa as number) * 100) }));
 
   const atividadesHoje = Object.values(hoje.atividades_por_agente ?? {}).reduce((a, b) => a + b, 0);
+  const horasConteudo = hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0;
+  const horasTrabalho = hoje.horas_trabalho; // null até o hub IGAM medir de verdade
 
-  const contadores: [string | number, string][] = trabalho
+  const contadores: { valor: string | number; rotulo: string; detalhe: string }[] = trabalho
     ? [
-        [EQUIPE.length, "agentes na equipe"],
-        [`${hoje.saude?.crons_ok ?? "—"}+`, "rotinas automáticas diárias"],
-        [atividadesHoje || hoje.fila?.cards_gerados_total || "—", "ações executadas hoje"],
-        [`${Math.round(hoje.horas_economizadas ?? 0)}h`, "de trabalho economizado"],
+        { valor: EQUIPE.length, rotulo: "agentes na equipe", detalhe: "Especialistas de IA, cada um com papel definido — toca num deles ali embaixo pra conhecer." },
+        { valor: `${hoje.saude?.crons_ok ?? "—"}+`, rotulo: "rotinas automáticas diárias", detalhe: "Verificações, briefings, backups e monitoramentos que rodam sozinhos na VPS, 24h." },
+        { valor: atividadesHoje || "—", rotulo: "ações executadas hoje", detalhe: "Contagem real do dia: envios, curadorias, rondas e avisos registrados pelo sistema." },
+        ...(horasTrabalho != null
+          ? [{ valor: `${Math.round(horasTrabalho)}h`, rotulo: "economizadas no trabalho", detalhe: "Medidas a partir de atas, documentos e automações do serviço público." }]
+          : []),
       ]
     : [
-        [EQUIPE.length, "agentes na equipe"],
-        [hoje.fila?.cards_gerados_total ?? "—", "notícias e dicas curadas"],
-        [hoje.enviados_total ?? "—", "posts publicados"],
-        [`${Math.round(hoje.horas_economizadas ?? 0)}h`, "de trabalho economizado"],
+        { valor: EQUIPE.length, rotulo: "agentes na equipe", detalhe: "Especialistas de IA, cada um com papel definido — toca num deles ali embaixo pra conhecer." },
+        { valor: hoje.fila?.cards_gerados_total ?? "—", rotulo: "notícias e dicas curadas", detalhe: "Todo card que a equipe propôs desde o início — a decisão final é sempre humana." },
+        { valor: hoje.enviados_total ?? "—", rotulo: "posts publicados", detalhe: "Posts aprovados por mim que chegaram à comunidade, com agendamento automático." },
+        { valor: `${Math.round(horasConteudo)}h`, rotulo: "economizadas em conteúdo", detalhe: `Fórmula transparente: ${data.formula_horas?.post_grupo_min ?? 25} min por post curado + ${data.formula_horas?.carrossel_min ?? 120} min por carrossel produzido.` },
       ];
 
   return (
     <main className="min-h-screen px-6 py-10 md:px-16 md:py-14 relative" style={{ background: "#F5F0EA", color: "#2D3B3B" }}>
-      {/* voltar discreto — some na projeção, aparece pra quem procura */}
-      <a href="/metricas" className="absolute top-3 left-4 text-sm opacity-30 hover:opacity-90 transition-opacity"
-        style={{ color: "#2D3B3B" }}>
+      <a href="/metricas" className="absolute top-3 left-4 text-sm opacity-30 hover:opacity-90 transition-opacity" style={{ color: "#2D3B3B" }}>
         ← painel
       </a>
 
@@ -87,7 +114,7 @@ export default function PalestraPage() {
       </header>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto mb-12">
-        {contadores.map(([v, r]) => <Contador key={r} valor={v} rotulo={r} />)}
+        {contadores.map((c) => <Contador key={c.rotulo} {...c} />)}
       </section>
 
       {!trabalho && (
@@ -114,18 +141,23 @@ export default function PalestraPage() {
       )}
 
       <section className="max-w-4xl mx-auto text-center">
-        <h2 className="text-lg font-semibold mb-4" style={{ color: "#6B7A7A" }}>
+        <h2 className="text-lg font-semibold mb-1" style={{ color: "#6B7A7A" }}>
           A equipe (cada um com sua especialidade)
         </h2>
+        <p className="text-xs mb-4" style={{ color: "#A0583C" }}>toque num agente pra conhecer 👇</p>
         <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
-          {EQUIPE.map(([icone, nome]) => (
-            <div key={nome} className="rounded-xl py-3 px-1" style={{ background: "#FFFFFF" }}>
-              <div className="text-2xl">{icone}</div>
-              <div className="text-xs mt-1 font-medium">{nome}</div>
-            </div>
+          {EQUIPE.map((a) => (
+            <button key={a.nome} onClick={() => setAgenteAberto(a)}
+              className="rounded-xl py-3 px-1 cursor-pointer hover:scale-105 transition-transform"
+              style={{ background: "#FFFFFF" }}>
+              <div className="text-2xl">{a.icone}</div>
+              <div className="text-xs mt-1 font-medium">{a.nome}</div>
+            </button>
           ))}
         </div>
       </section>
+
+      {agenteAberto && <CartaoAgente agente={agenteAberto} onFechar={() => setAgenteAberto(null)} />}
 
       <footer className="text-center mt-12 text-sm" style={{ color: "#6B7A7A" }}>
         {trabalho ? "Andréia Frois · IA aplicada ao serviço público" : "andreiafrois.tech · Imersão IA na Prática"}

@@ -33,13 +33,18 @@ export interface SnapshotDia {
   radar_por_status: Record<string, number>;
   enviados_total: number;
   horas_economizadas: number;
+  horas_conteudo?: number;
+  horas_trabalho?: number | null;
   atividades_por_agente?: Record<string, number>;
 }
+
+export type SerieSemanal = Record<string, { aprovados: number; descartados: number; taxa: number | null }>;
 
 export interface MetricsHistory {
   updated_at: string;
   days: SnapshotDia[];
   radar_semanas: Record<string, { aprovados: number; descartados: number; taxa: number | null }>;
+  radar_semanas_por_agente?: Record<string, Record<string, { aprovados: number; descartados: number; taxa: number | null }>>;
   envios_semanas: Record<string, number>;
   formula_horas: Record<string, number>;
 }
