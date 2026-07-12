@@ -9,9 +9,42 @@ export interface Agente {
   habilidades: string[];
 }
 
+// Versão pública COMPLETA (dados reais do RH, sincronizados pela VPS —
+// /root/equipe-sync.py — sem links privados). O palco usa esta com
+// fallback pro catálogo estático abaixo.
+export interface AgentePublico {
+  nome: string;
+  icone: string;
+  papel: string;
+  bio: string;
+  skills: string[];
+  personalidade: string;
+  funcoes: { nome: string; descricao: string }[];
+}
+
+const EQUIPE_PUBLICA_URL =
+  "https://pmmyqljiuslstwbmiron.supabase.co/storage/v1/object/public/status/equipe-publica.json";
+
+export async function fetchEquipePublica(): Promise<AgentePublico[] | null> {
+  try {
+    const r = await fetch(`${EQUIPE_PUBLICA_URL}?t=${Date.now()}`);
+    const d = await r.json();
+    return Array.isArray(d?.equipe) && d.equipe.length ? d.equipe : null;
+  } catch {
+    return null;
+  }
+}
+
+export function fallbackPublico(): AgentePublico[] {
+  return EQUIPE.map((a) => ({
+    nome: a.nome, icone: a.icone, papel: a.papel, bio: a.descricao,
+    skills: a.habilidades, personalidade: "", funcoes: [],
+  }));
+}
+
 export const EQUIPE: Agente[] = [
   { icone: "🤵", nome: "Jarbas", papel: "Orquestrador",
-    descricao: "O chefe de gabinete digital: entende o pedido, decide quem da equipe deve agir e acompanha até entregar.",
+    descricao: "O orquestrador digital: entende o pedido, decide quem da equipe deve agir e acompanha até entregar.",
     habilidades: ["Roteamento de demandas", "Ronda diária do ecossistema", "Coordenação de squads"] },
   { icone: "🗂️", nome: "Donna", papel: "Assistente executiva",
     descricao: "O braço direito no WhatsApp: briefing matinal, avisos de tarefas, alertas de falha e envios pro grupo.",

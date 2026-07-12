@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { GraficoLinha } from "@/components/charts";
 import { useMetricsHistory, semanasOrdenadas } from "@/lib/metrics";
-import { EQUIPE, type Agente } from "@/lib/equipe";
+import { EQUIPE, fetchEquipePublica, fallbackPublico, type AgentePublico } from "@/lib/equipe";
 import { AUTOMACOES, SEM_IA } from "@/lib/automacoes";
 
 function Contador({ valor, rotulo, detalhe }: { valor: string | number; rotulo: string; detalhe: string }) {
@@ -28,25 +28,57 @@ function Contador({ valor, rotulo, detalhe }: { valor: string | number; rotulo: 
   );
 }
 
-function CartaoAgente({ agente, onFechar }: { agente: Agente; onFechar: () => void }) {
+function CartaoAgente({ agente, onFechar }: { agente: AgentePublico; onFechar: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: "rgba(45,59,59,.45)" }} onClick={onFechar}>
-      <div className="rounded-2xl p-6 md:p-8 max-w-md w-full" style={{ background: "#F5F0EA", color: "#2D3B3B" }} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6" style={{ background: "rgba(45,59,59,.45)" }} onClick={onFechar}>
+      <div className="rounded-2xl p-6 md:p-8 max-w-lg w-full max-h-[85vh] overflow-y-auto" style={{ background: "#F5F0EA", color: "#2D3B3B" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-4">
           <span className="text-5xl">{agente.icone}</span>
           <div>
             <h3 className="text-2xl font-bold">{agente.nome}</h3>
-            <p className="text-sm uppercase tracking-widest" style={{ color: "#A0583C" }}>{agente.papel}</p>
+            {agente.papel && <p className="text-sm uppercase tracking-widest" style={{ color: "#A0583C" }}>{agente.papel}</p>}
           </div>
         </div>
-        <p className="mt-4 text-sm md:text-base leading-relaxed">{agente.descricao}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {agente.habilidades.map((h) => (
-            <span key={h} className="text-xs px-3 py-1.5 rounded-full" style={{ background: "#FFFFFF", color: "#2D6B6B", border: "1px solid #2D6B6B" }}>
-              {h}
-            </span>
-          ))}
-        </div>
+
+        {agente.bio && (
+          <p className="mt-4 text-sm md:text-base leading-relaxed whitespace-pre-line">{agente.bio}</p>
+        )}
+
+        {agente.skills.length > 0 && (
+          <>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-widest" style={{ color: "#6B7A7A" }}>Habilidades</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {agente.skills.map((h) => (
+                <span key={h} className="text-xs px-3 py-1.5 rounded-full" style={{ background: "#FFFFFF", color: "#2D6B6B", border: "1px solid #2D6B6B" }}>
+                  {h}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+
+        {agente.funcoes.length > 0 && (
+          <>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-widest" style={{ color: "#6B7A7A" }}>Funções que executa</p>
+            <ul className="mt-2 space-y-1.5">
+              {agente.funcoes.map((f, i) => (
+                <li key={i} className="text-sm rounded-lg px-3 py-2" style={{ background: "#FFFFFF" }}>
+                  <span className="font-medium">{f.descricao || f.nome}</span>
+                  {f.descricao && f.nome && (
+                    <span className="block text-xs" style={{ color: "#6B7A7A" }}>via {f.nome}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {agente.personalidade && (
+          <p className="mt-4 text-xs italic leading-relaxed" style={{ color: "#6B7A7A" }}>
+            “{agente.personalidade}”
+          </p>
+        )}
+
         <button onClick={onFechar} className="mt-5 text-sm underline opacity-60 hover:opacity-100">fechar</button>
       </div>
     </div>
@@ -56,10 +88,12 @@ function CartaoAgente({ agente, onFechar }: { agente: Agente; onFechar: () => vo
 export default function PalestraPage() {
   const { data, hoje } = useMetricsHistory(5 * 60 * 1000);
   const [trabalho, setTrabalho] = useState(false);
-  const [agenteAberto, setAgenteAberto] = useState<Agente | null>(null);
+  const [agenteAberto, setAgenteAberto] = useState<AgentePublico | null>(null);
+  const [equipe, setEquipe] = useState<AgentePublico[]>(fallbackPublico());
 
   useEffect(() => {
     setTrabalho(new URLSearchParams(window.location.search).get("tema") === "trabalho");
+    fetchEquipePublica().then((e) => e && setEquipe(e));
   }, []);
 
   if (!data || !hoje) {
@@ -158,7 +192,7 @@ export default function PalestraPage() {
         </h2>
         <p className="text-xs mb-4" style={{ color: "#A0583C" }}>toque num agente pra conhecer 👇</p>
         <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
-          {EQUIPE.map((a) => (
+          {equipe.map((a) => (
             <button key={a.nome} onClick={() => setAgenteAberto(a)}
               className="rounded-xl py-3 px-1 cursor-pointer hover:scale-105 transition-transform"
               style={{ background: "#FFFFFF" }}>
