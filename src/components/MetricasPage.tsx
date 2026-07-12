@@ -9,6 +9,7 @@ import { GraficoLinha, GraficoBarras } from "./charts";
 import {
   useMetricsHistory, semanasOrdenadas, tempoRelativo,
 } from "@/lib/metrics";
+import { AUTOMACOES, SEM_IA } from "@/lib/automacoes";
 
 const NOME_AUTOMACAO: Record<string, string> = {
   style_learner: "Aprendiz de estilo (Mike)",
@@ -110,6 +111,40 @@ export default function MetricasPage() {
   );
 }
 
+function SecaoIAConstroi() {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[#E5DED4] text-center">
+      <p className="text-lg md:text-xl font-semibold text-[var(--text-primary)]">
+        🧮 Das <span style={{ color: "#2D6B6B" }}>{AUTOMACOES.length} automações</span> no ar,{" "}
+        <span style={{ color: "#A0583C" }}>{SEM_IA} rodam sem gastar 1 token de IA</span>
+      </p>
+      <p className="text-sm text-[var(--text-secondary)] mt-1">
+        Todas foram <strong>construídas</strong> com IA — mas a maioria <strong>roda</strong> só com Python, de graça, pra sempre.
+      </p>
+      <button onClick={() => setAberto(!aberto)} className="text-xs underline decoration-dotted mt-2 text-[var(--text-secondary)]">
+        {aberto ? "esconder a lista" : "ver quem é quem"}
+      </button>
+      {aberto && (
+        <div className="grid md:grid-cols-2 gap-1.5 mt-3 text-left">
+          {AUTOMACOES.map((a) => (
+            <div key={a.nome} className="flex items-start gap-2 text-sm rounded-lg px-3 py-2"
+              style={{ background: "var(--bg-primary)" }}>
+              <span>{a.icone}</span>
+              <span className="text-[var(--text-primary)]">
+                {a.nome}
+                <span className="block text-xs text-[var(--text-secondary)]">
+                  {a.usaIA ? `🤖 usa IA: ${a.custo}` : `🐍 sem IA na execução (${a.custo})`}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function AbaGeral({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSemanal: { label: string; valor: number }[] }) {
   return (
@@ -130,6 +165,9 @@ function AbaGeral({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSeman
           ))}
         </div>
       </section>
+
+      {/* A tese dela: IA constrói, Python roda (12/07) */}
+      <SecaoIAConstroi />
 
       <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
         sub="% das pautas propostas pela IA que eu aprovo, semana a semana">

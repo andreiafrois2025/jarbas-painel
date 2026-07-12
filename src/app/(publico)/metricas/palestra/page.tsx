@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { GraficoLinha } from "@/components/charts";
 import { useMetricsHistory, semanasOrdenadas } from "@/lib/metrics";
 import { EQUIPE, type Agente } from "@/lib/equipe";
+import { AUTOMACOES, SEM_IA } from "@/lib/automacoes";
 
 function Contador({ valor, rotulo, detalhe }: { valor: string | number; rotulo: string; detalhe: string }) {
   const [aberto, setAberto] = useState(false);
@@ -139,6 +140,17 @@ export default function PalestraPage() {
           </div>
         </section>
       )}
+
+      {/* A tese: IA constrói, Python roda — contra o mito do "gastar rios com IA" */}
+      <section className="max-w-3xl mx-auto mb-12 rounded-2xl p-6 md:p-8 text-center" style={{ background: "#2D6B6B", color: "#F5F0EA" }}>
+        <p className="text-2xl md:text-4xl font-bold">
+          {SEM_IA} das {AUTOMACOES.length} automações rodam <u>sem gastar IA</u>
+        </p>
+        <p className="mt-3 text-sm md:text-base" style={{ color: "#C9D8D5" }}>
+          Eu uso IA pra <strong>construir</strong> — depois, é Python rodando de graça, pra sempre.
+          A IA só entra onde precisa pensar: escrever, analisar, decidir.
+        </p>
+      </section>
 
       <section className="max-w-4xl mx-auto text-center">
         <h2 className="text-lg font-semibold mb-1" style={{ color: "#6B7A7A" }}>
