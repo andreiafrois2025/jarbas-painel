@@ -50,7 +50,7 @@ function CartaoGrafico({ titulo, sub, children }: {
   );
 }
 
-type Aba = "geral" | "producao" | "saude";
+type Aba = "geral" | "producao" | "saude" | "diario";
 
 export default function MetricasPage() {
   const { data, erro, hoje } = useMetricsHistory();
@@ -94,6 +94,7 @@ export default function MetricasPage() {
         {botaoAba("geral", "🎤 Painel Geral")}
         {botaoAba("producao", "🤖 Produtividade IA")}
         {botaoAba("saude", "❤️ Saúde do sistema")}
+        {botaoAba("diario", "📖 Diário de bordo")}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -105,6 +106,7 @@ export default function MetricasPage() {
           {aba === "geral" && <AbaGeral data={data} hoje={hoje} taxaSemanal={taxaSemanal} />}
           {aba === "producao" && <AbaProducao data={data} hoje={hoje} taxaSemanal={taxaSemanal} />}
           {aba === "saude" && <AbaSaude hoje={hoje} />}
+          {aba === "diario" && <AbaDiario data={data} />}
         </div>
       </div>
     </div>
@@ -277,6 +279,48 @@ function AbaProducao({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSe
             <CartaoGrafico key={chave} titulo={titulo} sub={sub}>
               <GraficoLinha pontos={serie} unidade="%" maxY={100} altura={170} />
             </CartaoGrafico>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AbaDiario({ data }: { data: any }) {
+  const dias = [...(data.days ?? [])].reverse(); // mais recente primeiro
+  if (dias.length === 0) {
+    return <p className="text-sm text-[var(--text-secondary)]">O diário começa a se preencher com os snapshots diários.</p>;
+  }
+  const fmtData = (iso: string) =>
+    new Date(iso + "T12:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-[var(--text-secondary)]">
+        A linha do tempo do que o ecossistema fez por você. Cresce um marco a cada dia — vira material de palestra e memória do que rodou enquanto você tocava a vida.
+      </p>
+      <div className="relative border-l-2 border-[#E5DED4] ml-3 space-y-5">
+        {dias.map((d: any, i: number) => {
+          const ant = dias[i + 1];
+          const postsHoje = ant ? Math.max(0, (d.enviados_total ?? 0) - (ant.enviados_total ?? 0)) : d.fila?.enviados_7d;
+          const cardsHoje = ant ? Math.max(0, (d.fila?.cards_gerados_total ?? 0) - (ant.fila?.cards_gerados_total ?? 0)) : null;
+          const marcos: string[] = [];
+          if (postsHoje) marcos.push(`📤 ${postsHoje} post${postsHoje > 1 ? "s" : ""} no grupo`);
+          if (cardsHoje) marcos.push(`📡 ${cardsHoje} notícia/dica curada${cardsHoje > 1 ? "s" : ""}`);
+          const ativ = Object.values(d.atividades_por_agente ?? {}).reduce((a: number, b: any) => a + b, 0);
+          if (ativ) marcos.push(`⚡ ${ativ} ações de agentes`);
+          if (d.saude?.problemas?.length) marcos.push(`⚠️ ${d.saude.problemas.length} alerta(s)`);
+          if (d.horas_conteudo) marcos.push(`⏱️ ${d.horas_conteudo}h acumuladas`);
+          return (
+            <div key={d.date} className="ml-5 relative">
+              <span className="absolute -left-[26px] top-1.5 w-3 h-3 rounded-full" style={{ background: i === 0 ? "#A0583C" : "#2D6B6B", border: "2px solid var(--bg-primary)" }} />
+              <p className="text-sm font-semibold text-[var(--text-primary)] capitalize">{fmtData(d.date)}</p>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {marcos.length ? marcos.map((m) => (
+                  <span key={m} className="text-xs px-2.5 py-1 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]">{m}</span>
+                )) : <span className="text-xs text-[var(--text-muted)]">dia tranquilo</span>}
+              </div>
+            </div>
           );
         })}
       </div>
