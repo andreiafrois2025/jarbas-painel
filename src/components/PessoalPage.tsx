@@ -4,8 +4,11 @@
 // pessoais e espaço pra crescer (saúde, casa, família).
 
 import { useState } from "react";
+import { useHoje } from "@/lib/hoje";
 
 type Aba = "luiz" | "financas";
+
+const EMOJI_TIPO: Record<string, string> = { prova: "🔴", avaliativa: "🟡", paracasa: "🟢", envio: "➡️" };
 
 const LINKS_FINANCAS = [
   { rotulo: "Finanças Pessoais (Notion)", url: "https://app.notion.com/p/2fbb90b9061d811b91aedee510b09f24" },
@@ -14,6 +17,8 @@ const LINKS_FINANCAS = [
 
 export default function PessoalPage() {
   const [aba, setAba] = useState<Aba>("luiz");
+  const { dados } = useHoje();
+  const escola = dados?.escola ?? [];
 
   const botao = (id: Aba, rotulo: string) => (
     <button
@@ -40,8 +45,24 @@ export default function PessoalPage() {
         <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
           {aba === "luiz" ? (
             <>
+              {escola.length > 0 && (
+                <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
+                  <h2 className="font-semibold text-[var(--text-primary)] mb-3">📚 Próximas entregas do Luiz</h2>
+                  <ul className="space-y-2">
+                    {escola.map((e, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
+                        <span className="text-[var(--text-muted)] whitespace-nowrap">
+                          {new Date(e.data + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                        </span>
+                        <span>{EMOJI_TIPO[e.tipo] || "📌"}</span>
+                        <span><strong>{e.disciplina}</strong>{e.nome ? ` — ${e.nome}` : ""}{e.pontos ? ` (${e.pontos})` : ""}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
-                <h2 className="font-semibold text-[var(--text-primary)] mb-2">📚 Agenda escolar / controle de prazos</h2>
+                <h2 className="font-semibold text-[var(--text-primary)] mb-2">📚 Como funciona a agenda escolar</h2>
                 <p className="text-sm text-[var(--text-secondary)]">
                   A Central de Captura da Donna está em implantação: você vai mandar foto do
                   caderno, print do Teams ou bilhete da escola <strong>direto no WhatsApp</strong>,
