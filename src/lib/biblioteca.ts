@@ -127,6 +127,9 @@ export const SKILLS: { grupo: string; itens: SkillItem[] }[] = [
       { icone: "🎧", nome: "Transcrição Whisper", descricao: "Áudio/vídeo → texto, local e grátis.", como: "manda áudio no Telegram" },
       { icone: "🖼️", nome: "Template tweet da marca", descricao: "Slide estilo tweet com sua foto oficial, IBM Plex, fundo branco.", como: "usado pela squad de carrossel" },
       { icone: "📊", nome: "Dataviz", descricao: "Gráficos e dashboards com método de design validado (este painel usa).", como: "pede um gráfico no chat" },
+      { icone: "🎨", nome: "Gerador de apresentações", descricao: "Tema → slides na sua marca (IBM Plex + paleta AF) + notas de fala. Substitui o Gamma.", como: "me pede um deck no chat (presets palestra ou Igam)" },
+      { icone: "📥", nome: "Central de Captura da Donna", descricao: "Manda áudio/foto/print/link no WhatsApp; ela classifica e roteia (tarefa, ideia, escola do Luiz, demanda).", como: "manda qualquer coisa no WhatsApp da Donna" },
+      { icone: "🎒", nome: "Agenda escolar do Luiz", descricao: "Foto do caderno vira agenda com prazos + avisos D-3/D-1 e relatório de domingo no WhatsApp.", como: "manda a foto da tarefa pra Donna" },
     ],
   },
   {
