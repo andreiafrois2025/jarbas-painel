@@ -1,0 +1,75 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "./supabase";
+import { SQUAD_API_BASE } from "./config";
+
+export interface CardCaixa {
+  id: string;
+  titulo: string;
+  coluna: string;
+  url: string;
+}
+
+export interface ItemEscola {
+  data: string;
+  tipo: string;
+  disciplina?: string;
+  nome?: string;
+  pontos?: string | null;
+}
+
+export interface Atividade {
+  quando: string;
+  quem: string;
+  icone: string;
+  texto: string;
+}
+
+export interface DadosHoje {
+  gerado_em: string;
+  agenda: string;
+  tarefas: string;
+  caixa: CardCaixa[];
+  escola: ItemEscola[];
+  atividades: Atividade[];
+  nivel?: string;
+  erro?: string;
+}
+
+async function comToken(path: string, init?: RequestInit) {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("sem sessão");
+  return fetch(`${SQUAD_API_BASE}${path}`, {
+    ...init,
+    headers: { ...(init?.headers || {}), Authorization: `Bearer ${token}` },
+  });
+}
+
+export function useHoje() {
+  const [dados, setDados] = useState<DadosHoje | null>(null);
+  const [erro, setErro] = useState(false);
+
+  const carregar = useCallback(async () => {
+    try {
+      const r = await comToken("/api/hoje");
+      if (!r.ok) throw new Error(String(r.status));
+      setDados(await r.json());
+    } catch {
+      setErro(true);
+    }
+  }, []);
+
+  useEffect(() => { carregar(); }, [carregar]);
+  return { dados, erro, recarregar: carregar };
+}
+
+export async function decidirCard(pageId: string, acao: "aprovar" | "prioridade" | "descartar") {
+  const r = await comToken(`/api/radar/${pageId}/decidir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ acao }),
+  });
+  return r.ok;
+}
