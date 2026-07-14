@@ -5,6 +5,7 @@
 // no Supabase. Clique num nó abre a página no Notion.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SQUAD_API_BASE } from "@/lib/config";
 
 const GRAFO_URL =
   "https://pmmyqljiuslstwbmiron.supabase.co/storage/v1/object/public/status/grafo_conteudo.json";
@@ -45,9 +46,8 @@ export default function GrafoConteudoView() {
   async function atualizarAgora() {
     setAtualizando(true);
     try {
-      await fetch("/api/grafo/atualizar", { method: "POST" }).catch(() => {});
-      // dá um tempo pro coletor publicar e recarrega
-      await new Promise((r) => setTimeout(r, 2500));
+      // o endpoint roda o coletor no servidor e só responde quando publica
+      await fetch(`${SQUAD_API_BASE}/api/grafo/atualizar`, { method: "POST" }).catch(() => {});
       await carrega();
     } finally {
       setAtualizando(false);
