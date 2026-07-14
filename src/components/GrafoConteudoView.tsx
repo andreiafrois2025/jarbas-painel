@@ -172,8 +172,9 @@ export default function GrafoConteudoView() {
                     {(n.tipo === "nota" ? (ICONE_SUB[n.subtipo || "nota"] || "📄") + " " : "") + n.rotulo}
                   </text>
                 )}
-                {n.tipo === "tag" && (sel?.id === n.id || (sel && conexoes.some((c) => c.id === n.id))) && (
-                  <text textAnchor="middle" dy={r + 10} fontSize="8.5" fill="var(--text-secondary)">#{n.rotulo}</text>
+                {n.tipo === "tag" && (
+                  <text textAnchor="middle" dy={r + 8} fontSize="7.5"
+                    fill={sel?.id === n.id ? "var(--text-primary)" : "var(--text-muted)"}>#{n.rotulo}</text>
                 )}
               </g>
             );
