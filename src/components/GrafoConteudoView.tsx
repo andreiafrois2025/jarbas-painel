@@ -173,8 +173,9 @@ export default function GrafoConteudoView() {
                   </text>
                 )}
                 {n.tipo === "tag" && (
-                  <text textAnchor="middle" dy={r + 8} fontSize="7.5"
-                    fill={sel?.id === n.id ? "var(--text-primary)" : "var(--text-muted)"}>#{n.rotulo}</text>
+                  <text textAnchor="middle" dy={r + 9} fontSize="8.5"
+                    paintOrder="stroke" stroke="var(--bg-secondary)" strokeWidth="2.5"
+                    fill={sel?.id === n.id ? "var(--text-primary)" : "var(--text-secondary)"}>#{n.rotulo}</text>
                 )}
               </g>
             );
