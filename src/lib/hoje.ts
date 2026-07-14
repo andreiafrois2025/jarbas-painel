@@ -65,6 +65,24 @@ export function useHoje() {
   return { dados, erro, recarregar: carregar };
 }
 
+export interface ResumoFin { receitas: number; despesas: number; saldo: number; n: number }
+export interface ResumoFinancas { mes: string; pessoal: ResumoFin; empresa: ResumoFin }
+
+export function useFinancas() {
+  const [financas, setFinancas] = useState<ResumoFinancas | null>(null);
+  const [erroFin, setErroFin] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await comToken("/api/financas");
+        if (!r.ok) throw new Error(String(r.status));
+        setFinancas(await r.json());
+      } catch { setErroFin(true); }
+    })();
+  }, []);
+  return { financas, erroFin };
+}
+
 export async function decidirCard(pageId: string, acao: "aprovar" | "prioridade" | "descartar") {
   const r = await comToken(`/api/radar/${pageId}/decidir`, {
     method: "POST",

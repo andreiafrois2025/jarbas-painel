@@ -4,7 +4,16 @@
 // pessoais e espaço pra crescer (saúde, casa, família).
 
 import { useState } from "react";
-import { useHoje } from "@/lib/hoje";
+import { useHoje, useFinancas, type ResumoFin } from "@/lib/hoje";
+
+const brl = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const nomeMes = (mes: string) => {
+  const [a, m] = mes.split("-");
+  const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  return `${meses[Number(m) - 1]}/${a}`;
+};
 
 type Aba = "luiz" | "financas";
 
@@ -18,7 +27,25 @@ const LINKS_FINANCAS = [
 export default function PessoalPage() {
   const [aba, setAba] = useState<Aba>("luiz");
   const { dados } = useHoje();
+  const { financas, erroFin } = useFinancas();
   const escola = dados?.escola ?? [];
+
+  const cardResumo = (titulo: string, r: ResumoFin) => (
+    <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
+      <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+        {titulo} <span className="normal-case font-normal text-[var(--text-muted)]">· {r.n} lançamento{r.n !== 1 ? "s" : ""}</span>
+      </p>
+      {r.n === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">Sem lançamentos registrados este mês.</p>
+      ) : (
+        <div className="flex flex-wrap gap-4">
+          <div><p className="text-[11px] text-[var(--text-muted)]">Receitas</p><p className="text-base font-semibold" style={{ color: "#2D6B6B" }}>{brl(r.receitas)}</p></div>
+          <div><p className="text-[11px] text-[var(--text-muted)]">Despesas</p><p className="text-base font-semibold" style={{ color: "#A0583C" }}>{brl(r.despesas)}</p></div>
+          <div><p className="text-[11px] text-[var(--text-muted)]">Saldo</p><p className="text-base font-semibold" style={{ color: r.saldo >= 0 ? "#2D6B6B" : "#C0392B" }}>{brl(r.saldo)}</p></div>
+        </div>
+      )}
+    </div>
+  );
 
   const botao = (id: Aba, rotulo: string) => (
     <button
@@ -95,6 +122,24 @@ export default function PessoalPage() {
             </>
           ) : (
             <>
+              <h2 className="font-semibold text-[var(--text-primary)]">
+                💰 Resumo de {financas ? nomeMes(financas.mes) : "…"}
+              </h2>
+              {erroFin && (
+                <p className="text-xs text-[var(--text-muted)]">Faça login pra ver o resumo. Seus links continuam abaixo.</p>
+              )}
+              {!financas && !erroFin && (
+                <p className="text-sm text-[var(--text-muted)]">Carregando resumo do mês…</p>
+              )}
+              {financas && (
+                <>
+                  {cardResumo("Pessoal", financas.pessoal)}
+                  {cardResumo("Empresa (Meraki)", financas.empresa)}
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Soma das transações lançadas no mês (despesas já contam como saída). Lido ao vivo do seu Notion, sem expor nada em página pública.
+                  </p>
+                </>
+              )}
               <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
                 <h2 className="font-semibold text-[var(--text-primary)] mb-2">💰 Suas finanças no Notion</h2>
                 <p className="text-sm text-[var(--text-secondary)] mb-3">
@@ -110,8 +155,7 @@ export default function PessoalPage() {
                   ))}
                 </div>
                 <p className="text-xs text-[var(--text-muted)] mt-3">
-                  Próximo passo (roadmap): resumo do mês aqui nesta tela, lendo os DBs do
-                  Notion sem expor nada em página pública.
+                  O Louis registra por áudio no WhatsApp; o resumo acima lê esses lançamentos.
                 </p>
               </div>
             </>
