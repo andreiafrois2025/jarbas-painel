@@ -403,10 +403,16 @@ export default function JobsMonitor() {
   }
 
   const hasTroubled = troubledJobs.length > 0;
-  const bannerColor = hasTroubled ? "red" : "yellow";
-  const bannerBg = hasTroubled ? "bg-red-50 border-red-500" : "bg-yellow-50 border-yellow-400";
-  const bannerText = hasTroubled ? "text-red-900 hover:text-red-700" : "text-yellow-900 hover:text-yellow-700";
-  const bannerSubText = hasTroubled ? "text-red-800" : "text-yellow-800";
+  // Cores (pedido 18/07): vermelho = esperando ELA (problema ou aprovação);
+  // azul = squad rodando; verde = tudo em dia. Amarelo saiu (parecia pendência).
+  const aguardandoEla = hasTroubled || pendingCount > 0;
+  const rodando = runningJobs.length > 0;
+  const bannerBg = aguardandoEla ? "bg-red-50 border-red-500"
+    : rodando ? "bg-blue-50 border-blue-400" : "bg-green-50 border-green-400";
+  const bannerText = aguardandoEla ? "text-red-900 hover:text-red-700"
+    : rodando ? "text-blue-900 hover:text-blue-700" : "text-green-900 hover:text-green-700";
+  const bannerSubText = aguardandoEla ? "text-red-800"
+    : rodando ? "text-blue-800" : "text-green-800";
 
   return (
     <>
@@ -417,12 +423,14 @@ export default function JobsMonitor() {
             onClick={() => setExpanded(!expanded)}
             className={`flex items-center gap-2 text-sm font-bold ${bannerText} cursor-pointer`}
           >
-            {hasTroubled ? "🚨" : pendingCount > 0 ? "🔔" : "⚡"}
+            {hasTroubled ? "🚨" : pendingCount > 0 ? "🔔" : rodando ? "⚡" : "✅"}
             {hasTroubled
               ? `${troubledJobs.length} squad(s) precisam da sua atenção`
               : pendingCount > 0
               ? `${pendingCount} aprovação(ões) pendente(s)`
-              : `${runningJobs.length} squad(s) em execução`}
+              : rodando
+              ? `${runningJobs.length} squad(s) em execução`
+              : "Squads em dia, nenhuma em execução"}
             <span className="text-xs">{expanded ? "▲" : "▼"}</span>
           </button>
           <div className={`text-xs ${bannerSubText}`}>
