@@ -217,6 +217,29 @@ export default function JobsMonitor() {
     }
   }
 
+  async function deleteJob(jobId: string, confirmar = true) {
+    if (confirmar && !window.confirm("Excluir este registro? Os arquivos de saída dele na VPS também serão apagados.")) return;
+    setActionLoading(`delete:${jobId}`);
+    try {
+      const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}`, { method: "DELETE" });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(`Falha ao excluir: ${err.error || r.statusText}`);
+      } else {
+        setArchivedJobs((js) => js.filter((j) => j.jobId !== jobId));
+      }
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function deleteAllArchived() {
+    if (!window.confirm(`Excluir os ${archivedJobs.length} registros? Os arquivos de saída deles na VPS também serão apagados.`)) return;
+    for (const j of [...archivedJobs]) {
+      await deleteJob(j.jobId, false);
+    }
+  }
+
   async function approveCheckpoint(jobId: string, stepId: string, approved: boolean, comment?: string) {
     const key = `${jobId}:${stepId}`;
     setActionLoading(key);
@@ -604,13 +627,23 @@ export default function JobsMonitor() {
             {/* Arquivados — jobs que a Andréia marcou manualmente. Ficam pro histórico */}
             {archivedJobs.length > 0 && (
               <div className="pt-2 border-t border-gray-300/50">
-                <button
-                  onClick={() => setShowArchived(!showArchived)}
-                  className="text-xs text-gray-600 hover:text-gray-800 font-semibold flex items-center gap-1.5"
-                >
-                  <span>{showArchived ? "▼" : "▶"}</span>
-                  🗂️ Registro ({archivedJobs.length} marcado{archivedJobs.length !== 1 ? "s" : ""})
-                </button>
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => setShowArchived(!showArchived)}
+                    className="text-xs text-gray-600 hover:text-gray-800 font-semibold flex items-center gap-1.5"
+                  >
+                    <span>{showArchived ? "▼" : "▶"}</span>
+                    🗂️ Registro ({archivedJobs.length} marcado{archivedJobs.length !== 1 ? "s" : ""})
+                  </button>
+                  {showArchived && (
+                    <button
+                      onClick={deleteAllArchived}
+                      className="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200"
+                    >
+                      🗑 Excluir todos
+                    </button>
+                  )}
+                </div>
                 {showArchived && (
                   <div className="mt-2 space-y-1.5">
                     {archivedJobs.map((job) => {
@@ -648,6 +681,14 @@ export default function JobsMonitor() {
                                 title="Voltar pra lista ativa"
                               >
                                 ↩ Desmarcar
+                              </button>
+                              <button
+                                onClick={() => deleteJob(job.jobId)}
+                                disabled={actionLoading === `delete:${job.jobId}`}
+                                className="text-[10px] bg-red-50 hover:bg-red-100 text-red-700 px-1.5 py-0.5 rounded border border-red-200 disabled:opacity-50"
+                                title="Excluir o registro de vez (apaga também os arquivos na VPS)"
+                              >
+                                🗑 Excluir
                               </button>
                             </div>
                           </div>
