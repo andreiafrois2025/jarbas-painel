@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 // Semáforo de saúde do ecossistema. Lê o status.json que a VPS publica no
 // Supabase Storage a cada 5 min (gerado por /root/status-saude.py).
@@ -64,14 +65,13 @@ export default function StatusSemaforo() {
         <span>{ui.dot}</span>
         <span className="hidden md:inline text-[var(--text-secondary)]">{ui.label}</span>
       </button>
-      {open && (
-        // clique fora fecha o popup
-        <div className="fixed inset-0 z-[99]" onClick={() => setOpen(false)} />
-      )}
-      {open && (
-        // fixed (não absolute): a barra do topo tem overflow-x-auto, que cortava
-        // o popup — parecia que a caixa "ficava atrás da janela" (bug 18/07)
-        <div className="fixed right-3 top-16 w-80 max-w-[calc(100vw-1.5rem)] max-h-[70vh] overflow-y-auto bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl p-4 z-[100] text-sm">
+      {open && createPortal(
+        // PORTAL no <body> (18/07): o header tem backdrop-blur, que no CSS faz
+        // até um "fixed" ficar preso (e cortado) dentro dele. Renderizando fora
+        // da barra, o popup flutua por cima de tudo de verdade.
+        <>
+          <div className="fixed inset-0 z-[99]" onClick={() => setOpen(false)} />
+          <div className="fixed right-3 top-16 w-80 max-w-[calc(100vw-1.5rem)] max-h-[70vh] overflow-y-auto bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl p-4 z-[100] text-sm">
           <div className="font-semibold mb-2 flex items-center gap-2">
             {ui.dot} Saúde do ecossistema
           </div>
@@ -91,7 +91,9 @@ export default function StatusSemaforo() {
               Atualizado {new Date(status.gerado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · disco {status.disco_pct}%
             </p>
           )}
-        </div>
+          </div>
+        </>,
+        document.body
       )}
     </div>
   );

@@ -109,7 +109,8 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
         <div className="flex items-baseline justify-between flex-wrap gap-2">
           <h1 className="text-2xl font-bold text-[var(--text-primary)] capitalize">🏠 {hoje}</h1>
           <span className="text-xs text-[var(--text-secondary)]">
-            atualizado {tempoRelativo(dados.gerado_em)}
+            atualizado às {new Date(dados.gerado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+            {" "}({tempoRelativo(dados.gerado_em)})
             {" · "}
             <button onClick={recarregar} className="underline hover:text-[var(--text-primary)] cursor-pointer">
               ↻ atualizar
@@ -118,10 +119,14 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-5 items-start">
-          {/* Lateral esquerda: assistentes por área (coluna estreita, do topo) */}
+          {/* Lateral esquerda: assistentes por área (coluna estreita, do topo).
+              A altura acompanha o miolo (termina na linha do "O que a equipe
+              fez"); se a lista for maior, rola por dentro. */}
           {lateral && (
-            <div className="w-full lg:w-[270px] lg:shrink-0 order-3 lg:order-none">
-              {lateral}
+            <div className="w-full lg:w-[270px] lg:shrink-0 order-3 lg:order-none lg:self-stretch lg:relative">
+              <div className="lg:absolute lg:inset-0 lg:overflow-y-auto lg:pr-1">
+                {lateral}
+              </div>
             </div>
           )}
 

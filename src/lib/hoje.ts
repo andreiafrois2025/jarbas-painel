@@ -61,7 +61,12 @@ export function useHoje() {
     }
   }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregar();
+    // recarrega sozinho a cada 5 min — o "atualizado às HH:MM" fica honesto
+    const id = setInterval(carregar, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [carregar]);
   return { dados, erro, recarregar: carregar };
 }
 
