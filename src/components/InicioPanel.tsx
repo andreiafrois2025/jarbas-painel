@@ -4,7 +4,8 @@
 // O que saiu: header "Início" (redundante com o Hoje), FeedTrabalhando
 // (duplicava o "O que a equipe fez" do Hoje) e os quick links (foram pra
 // barra do topo em inicio/page.tsx).
-// "Assistentes por área" agora é recolhível: os bonequinhos dominam a tela.
+// Layout: Assistentes por área à ESQUERDA (recolhível) e escritório à
+// DIREITA; recolhendo os assistentes, os bonequinhos ocupam a largura toda.
 
 import { useMemo, useState } from "react";
 import { Collaborator, Assignment, CONTEXTS, ContextType, Category as CategoryType } from "@/lib/types";
@@ -57,43 +58,32 @@ export default function InicioPanel({
   const officeUrl = `${SQUAD_API_BASE}/office/`;
 
   return (
-    <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-4">
-      {/* Escritório em destaque: os bonequinhos com o máximo de espaço */}
-      <section className="rounded-xl border border-[var(--border)] overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
-          <span className="text-sm font-semibold text-[var(--text-primary)]">🏢 Escritório</span>
-          <button onClick={() => setOpenOfficeFullscreen(true)}
-            className="text-[11px] px-2 py-1 rounded bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-125 cursor-pointer transition-all">
-            Ver em tela cheia ↗
-          </button>
-        </div>
-        <iframe
-          src={officeUrl}
-          className="w-full border-0 h-[55vh] md:h-[65vh]"
-          title="Escritório virtual"
-          loading="lazy"
-        />
-      </section>
+    <div className="p-4 md:p-6 max-w-[1500px] mx-auto">
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+        {/* ESQUERDA — Assistentes por área (recolhível: fechado, o escritório
+            ocupa a largura toda) */}
+        <section className={`bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] self-start ${
+          assistentesAbertos ? "w-full lg:w-1/3 lg:shrink-0" : "w-full lg:w-auto lg:shrink-0"
+        }`}>
+          <div className="flex items-center justify-between gap-3 px-4 py-3">
+            <button
+              onClick={() => setAssistentesAbertos(a => !a)}
+              className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] cursor-pointer whitespace-nowrap">
+              <span className="text-[var(--text-secondary)]">{assistentesAbertos ? "▾" : "▸"}</span>
+              🤖 Assistentes por área
+              <span className="text-[10px] font-normal text-[var(--text-muted)]">
+                {assignments.length}
+              </span>
+            </button>
+            {assistentesAbertos && (
+              <button onClick={onOpenEquipe}
+                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline whitespace-nowrap">
+                Gerenciar →
+              </button>
+            )}
+          </div>
 
-      {/* Assistentes por área — recolhível */}
-      <section className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)]">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setAssistentesAbertos(a => !a)}
-            className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)] cursor-pointer">
-            <span className="text-[var(--text-secondary)]">{assistentesAbertos ? "▾" : "▸"}</span>
-            🤖 Assistentes por área
-            <span className="text-[10px] font-normal text-[var(--text-muted)]">
-              {assignments.length} no total
-            </span>
-          </button>
-          <button onClick={onOpenEquipe}
-            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline">
-            Gerenciar na Equipe →
-          </button>
-        </div>
-
-        {assistentesAbertos && (
+          {assistentesAbertos && (
           <div className="px-4 pb-4">
             {/* Chips das 4 áreas */}
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -111,7 +101,7 @@ export default function InicioPanel({
             </div>
 
             {/* Lista compacta: persona + seus assistentes */}
-            <div className="space-y-2.5 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-2.5 md:space-y-0">
+            <div className="space-y-2.5">
               {assistentesByArea[assistArea]?.length ? (
                 assistentesByArea[assistArea].map(({ collab, asgs }) => (
                   <div key={collab.id} className="bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg p-2.5">
@@ -151,8 +141,26 @@ export default function InicioPanel({
               Total em {assistArea}: <strong>{totalAssistants}</strong>
             </p>
           </div>
-        )}
-      </section>
+          )}
+        </section>
+
+        {/* DIREITA — Escritório (os bonequinhos) */}
+        <section className="flex-1 rounded-xl border border-[var(--border)] overflow-hidden flex flex-col min-w-0">
+          <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
+            <span className="text-sm font-semibold text-[var(--text-primary)]">🏢 Escritório</span>
+            <button onClick={() => setOpenOfficeFullscreen(true)}
+              className="text-[11px] px-2 py-1 rounded bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-125 cursor-pointer transition-all">
+              Ver em tela cheia ↗
+            </button>
+          </div>
+          <iframe
+            src={officeUrl}
+            className="w-full border-0 h-[55vh] md:h-[65vh]"
+            title="Escritório virtual"
+            loading="lazy"
+          />
+        </section>
+      </div>
 
       {/* Modal de escritório em tela cheia */}
       {openOfficeFullscreen && (
