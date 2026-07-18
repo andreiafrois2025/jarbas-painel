@@ -110,6 +110,10 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
           <h1 className="text-2xl font-bold text-[var(--text-primary)] capitalize">🏠 {hoje}</h1>
           <span className="text-xs text-[var(--text-secondary)]">
             atualizado {tempoRelativo(dados.gerado_em)}
+            {" · "}
+            <button onClick={recarregar} className="underline hover:text-[var(--text-primary)] cursor-pointer">
+              ↻ atualizar
+            </button>
           </span>
         </div>
 
@@ -196,9 +200,6 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
           </section>
         </div>
 
-        <button onClick={recarregar} className="text-xs underline text-[var(--text-secondary)]">
-          atualizar
-        </button>
       </div>
     </div>
   );

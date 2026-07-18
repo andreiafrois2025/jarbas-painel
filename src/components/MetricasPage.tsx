@@ -4,7 +4,7 @@
 //   Painel Geral (default, resumo tipo palestra) · Produtividade IA · Saúde do sistema
 // Fonte: metrics-history.json publicado toda noite pelo metrics-snapshot.py.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GraficoLinha, GraficoBarras } from "./charts";
 import {
   useMetricsHistory, semanasOrdenadas, tempoRelativo,
@@ -328,20 +328,42 @@ function AbaDiario({ data }: { data: any }) {
   );
 }
 
+// Mesma fonte AO VIVO do semáforo da barra do topo (18/07: a aba mostrava o
+// snapshot noturno e dizia "verde" enquanto o semáforo estava vermelho)
+const STATUS_VIVO_URL =
+  "https://pmmyqljiuslstwbmiron.supabase.co/storage/v1/object/public/status/status.json";
+
 function AbaSaude({ hoje }: { hoje: any }) {
+  const [vivo, setVivo] = useState<any>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const r = await fetch(`${STATUS_VIVO_URL}?t=${Date.now()}`, { cache: "no-store" });
+        if (r.ok && alive) setVivo(await r.json());
+      } catch { /* mantém o snapshot */ }
+    };
+    load();
+    const id = setInterval(load, 60000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  const nivel = vivo?.nivel ?? hoje.saude?.nivel;
+  const problemas: string[] = vivo?.problemas ?? hoje.saude?.problemas ?? [];
   const nivelUi = { verde: "🟢 Tudo funcionando", amarelo: "🟡 Atenção", vermelho: "🔴 Algo caiu" }[
-    hoje.saude?.nivel as "verde" | "amarelo" | "vermelho"
-  ] ?? `⚪ ${hoje.saude?.nivel ?? "?"}`;
-  const sinais = Object.entries((hoje.saude?.sinais ?? {}) as Record<string, boolean>);
+    nivel as "verde" | "amarelo" | "vermelho"
+  ] ?? `⚪ ${nivel ?? "?"}`;
+  const sinais = Object.entries(
+    (vivo?.sinais_vitais ?? hoje.saude?.sinais ?? {}) as Record<string, boolean>);
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Tile titulo="Estado geral" valor={nivelUi}
-          sub={hoje.saude?.problemas?.length ? hoje.saude.problemas.join(" · ") : "nenhum problema aberto"} />
+          sub={problemas.length ? problemas.join(" · ") : "nenhum problema aberto"} />
         <Tile icone="⏰" titulo="Rotinas automáticas" valor={`${hoje.saude?.crons_ok ?? "?"}/${hoje.saude?.crons_total ?? "?"}`}
           sub="rodando no horário" />
-        <Tile icone="💾" titulo="Disco da VPS" valor={`${hoje.saude?.disco_pct ?? "?"}%`} sub="usado" />
+        <Tile icone="💾" titulo="Disco da VPS" valor={`${vivo?.disco_pct ?? hoje.saude?.disco_pct ?? "?"}%`} sub="usado" />
         <Tile icone="📬" titulo="Fila do grupo IA"
           valor={hoje.fila?.pausado ? "⏸ pausada" : `${hoje.fila?.aprovados ?? 0} na fila`}
           sub={`${hoje.fila?.pendentes ?? 0} aguardando sua avaliação`} />

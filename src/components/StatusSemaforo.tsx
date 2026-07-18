@@ -65,9 +65,13 @@ export default function StatusSemaforo() {
         <span className="hidden md:inline text-[var(--text-secondary)]">{ui.label}</span>
       </button>
       {open && (
+        // clique fora fecha o popup
+        <div className="fixed inset-0 z-[99]" onClick={() => setOpen(false)} />
+      )}
+      {open && (
         // fixed (não absolute): a barra do topo tem overflow-x-auto, que cortava
         // o popup — parecia que a caixa "ficava atrás da janela" (bug 18/07)
-        <div className="fixed right-3 top-16 w-80 max-w-[calc(100vw-1.5rem)] bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl p-4 z-[100] text-sm">
+        <div className="fixed right-3 top-16 w-80 max-w-[calc(100vw-1.5rem)] max-h-[70vh] overflow-y-auto bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl p-4 z-[100] text-sm">
           <div className="font-semibold mb-2 flex items-center gap-2">
             {ui.dot} Saúde do ecossistema
           </div>
