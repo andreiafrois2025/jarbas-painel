@@ -97,16 +97,15 @@ const noticiasNormal: SeedFlow = {
   title: "Notícias diárias — fluxo normal (Mike → Izzy → Grupo IA)",
   category: "automation",
   description:
-    "Todo dia 8h BRT o Mike busca notícias de IA. Cria cards no Notion pra você avaliar. 3x por dia (8h/13h/18h BRT) o Izzy gera post das aprovadas, você aprova, o sender publica no grupo.",
+    "O Mike busca notícias a cada 30 min em ~28 fontes (BR + internacionais). 3x por dia (8h/13h/18h BRT) a Izzy escreve os posts (2 notícias + 1 caso de uso se houver + 3 dicas), cria cards no Radar, você aprova no kanban ou na home do painel, o sender publica no grupo.",
   is_seed: true,
   nodes: [
-    { id: "1", type: "start", position: col(0), data: { label: "8h BRT", icon: "⏰", details: "HEARTBEAT bloco 4, trava diária.", executor: "cron 30min → HEARTBEAT" } },
-    { id: "2", type: "action", position: col(1), data: { label: "Mike busca RSS", icon: "🔍", details: "Fontes: OpenAI, Anthropic, Google DeepMind, Google AI, Meta AI, Mistral, NVIDIA, MS AI, HuggingFace, The Verge AI, TechCrunch AI, VentureBeat AI, MIT Tech Review, etc.\nJanela: últimas 48h.\nSalva: ia_raw_news.json.", executor: "ia_news_fetcher.py", tags: ["RSS"] } },
-    { id: "3", type: "action", position: col(2), data: { label: "Cria card Notion", icon: "📇", details: "Radar de Posts IA.\nStatus inicial: 'Pra avaliar'.\nSe is_uau=false (não é fonte oficial + verbo de lançamento).", executor: "notion_radar.create_card", tags: ["Notion"] } },
-    { id: "4", type: "action", position: col(3), data: { label: "Você avalia no kanban", icon: "👀", details: "Você arrasta o card:\n- 'Aprovado' = vira post\n- 'Descartado' = ignora\n- Fica 'Pra avaliar' = aguarda", executor: "humano", tags: ["Notion"] } },
-    { id: "5", type: "action", position: col(4), data: { label: "Izzy gera post", icon: "✏️", details: "3x/dia (8h/13h/18h BRT).\nPega até 25 cards 'Aprovado' e monta o texto do post pro grupo WA.\nCusto: usa Gemini (chave faturada).", executor: "ia_content_generator.py", tags: ["Gemini"] } },
-    { id: "6", type: "action", position: col(5), data: { label: "Sender publica", icon: "📤", details: "Janela: 8h–20h30 BRT.\nIntervalo mínimo: 2h entre posts.\nOrdem: Prioridade → Aprovado.", executor: "ia_group_sender.py", tags: ["WhatsApp"] } },
-    { id: "7", type: "end", position: col(6), data: { label: "Grupo IA no WA", icon: "💬", details: "Grupo Imersão IA na Prática (comunidade).", tags: ["WhatsApp"] } },
+    { id: "1", type: "start", position: col(0), data: { label: "A cada 30 min", icon: "⏰", details: "HEARTBEAT bloco 4 (18/07: era 1x/dia às 8h; agora toda passagem — RSS é custo zero).", executor: "cron 30min → HEARTBEAT" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Mike busca RSS", icon: "🔍", details: "~28 fontes: labs oficiais (OpenAI, Anthropic, DeepMind...), tier-1 (TechCrunch, Verge...), BR (InfoMoney IA, IA Todo Dia, IA Brasil, Catai, NotJournal, Mundo Conectado, Exame, CNN, Convergência, Olhar Digital, TecMundo, TechTudo...).\nJanela 48h, dedup semântico.\nDetecta: is_uau e is_caso_uso.", executor: "ia_news_fetcher.py", tags: ["RSS"] } },
+    { id: "3", type: "action", position: col(2), data: { label: "Izzy escreve + cria cards", icon: "✏️", details: "3x/dia (8h/13h/18h BRT): 2 notícias por score + 1 caso de uso (vaga garantida, card '🧩 Caso de uso') + 3 dicas do banco curado.\nDica descartada 1x não volta nunca mais.\nNotícias: Izzy via Claude; dicas: Gemini formata.", executor: "ia_content_generator.py", tags: ["Notion", "Gemini"] } },
+    { id: "4", type: "action", position: col(3), data: { label: "Você avalia", icon: "👀", details: "No kanban do Radar OU na caixa de aprovação da home do painel (só notícias):\n- 'Aprovado' = vira post\n- 'Descartado' = ignora e o sistema aprende", executor: "humano", tags: ["Notion"] } },
+    { id: "5", type: "action", position: col(4), data: { label: "Sender publica", icon: "📤", details: "Janela: 8h–20h30 BRT.\nIntervalo mínimo: 2h entre posts.\nCard com [Prioridade] no título fura a fila.", executor: "ia_group_sender.py", tags: ["WhatsApp"] } },
+    { id: "6", type: "end", position: col(5), data: { label: "Grupo IA no WA", icon: "💬", details: "Grupo Imersão IA na Prática (comunidade).", tags: ["WhatsApp"] } },
   ],
   edges: [
     { id: "e1-2", source: "1", target: "2" },
@@ -114,7 +113,6 @@ const noticiasNormal: SeedFlow = {
     { id: "e3-4", source: "3", target: "4" },
     { id: "e4-5", source: "4", target: "5", label: "Aprovado" },
     { id: "e5-6", source: "5", target: "6" },
-    { id: "e6-7", source: "6", target: "7" },
   ],
 };
 
@@ -122,17 +120,17 @@ const noticiasUAU: SeedFlow = {
   title: "Notícias UAU (fluxo prioritário)",
   category: "automation",
   description:
-    "Ramo especial do fluxo de notícias. Se o Mike detecta uma notícia UAU (fonte oficial + verbo de lançamento), o card vai direto pra 'Importante'. A Donna te avisa no WhatsApp pra você olhar rápido. Se você aprovar, move pra 'Prioridade' — que pula a fila.",
+    "Ramo especial do fluxo de notícias. UAU agora dispara por TEMA em qualquer fonte (modelo aberto chinês, rebrand de ferramenta popular, marco BR de proteção de dados) além das fontes oficiais. O card nasce NA HORA (sem esperar o slot), com [Prioridade] no título, e a Donna te avisa no WhatsApp. Aprovar já fura a fila.",
   is_seed: true,
   nodes: [
-    { id: "1", type: "start", position: col(0), data: { label: "Mike encontrou notícia", icon: "🔍", details: "Já no ia_news_fetcher, cada item é marcado is_uau=true se: (a) fonte oficial (OpenAI/Anthropic/etc.) ou tier-1 (The Verge/TechCrunch/etc.) E (b) título tem verbo de lançamento (launches, releases, announces, novo modelo, gpt-N, claude N, gemini N, fable N, sora, veo N).", executor: "ia_news_fetcher.py" } },
-    { id: "2", type: "condition", position: col(1), data: { label: "É UAU?", icon: "🌟", details: "Só entra nesse fluxo se is_uau=true." } },
-    { id: "3", type: "action", position: { x: 500, y: 180 }, data: { label: "Card 'Importante'", icon: "🔥", details: "notion_radar.create_card com status='Importante'.\nColuna laranja no kanban.", executor: "notion_radar.py", tags: ["Notion"] } },
-    { id: "4", type: "action", position: { x: 500, y: 300 }, data: { label: "Donna monitora", icon: "👁️", details: "A cada 30 min, verifica cards em 'Importante' que ainda não foram vistos.\nGuarda page_ids em notion_important_seen.json.", executor: "notion_important_watcher.py" } },
-    { id: "5", type: "action", position: { x: 500, y: 420 }, data: { label: "Notifica WhatsApp", icon: "📱", details: "🔥 *Notícia UAU no Radar*\n*<título>*\n_Fonte: <fonte>_\n\nAvalia no Notion:\n<url>\n\nSe quiser publicar no grupo, move o card pra *Prioridade*.", executor: "OpenClaw", tags: ["WhatsApp"] } },
-    { id: "6", type: "action", position: { x: 500, y: 540 }, data: { label: "Você avalia", icon: "🧐", details: "Você abre o Notion, lê a notícia. Decide:\n- Move pra 'Prioridade' = publica na frente da fila\n- Move pra 'Descartado' = ignora\n- Deixa em 'Importante' = fica em standby", executor: "humano" } },
-    { id: "7", type: "action", position: { x: 500, y: 660 }, data: { label: "Sender publica primeiro", icon: "🚀", details: "ia_group_sender reordena a fila: 'Prioridade' vai antes de 'Aprovado'.\nAinda respeita janela 8h–20h30 e 2h entre posts.", executor: "ia_group_sender.py", tags: ["WhatsApp"] } },
-    { id: "8", type: "end", position: { x: 100, y: 420 }, data: { label: "Fluxo normal", icon: "↩️", details: "Se não é UAU, segue o fluxo normal (card em 'Pra avaliar')." } },
+    { id: "1", type: "start", position: col(0), data: { label: "Mike encontrou notícia", icon: "🔍", details: "is_uau=true se: fonte oficial/tier-1 + verbo de lançamento, OU tema forte em QUALQUER fonte (18/07): labs chineses/modelo aberto (Kimi, DeepSeek, Qwen...), 'Kimi K3' e afins, rebrand de ferramenta que ela ensina (NotebookLM...), marcos BR de proteção de dados/LGPD.", executor: "ia_news_fetcher.py" } },
+    { id: "2", type: "condition", position: col(1), data: { label: "É UAU?", icon: "🌟", details: "Só entra nesse fluxo se is_uau=true.\nDedup: mesma bomba em várias fontes vira 1 card só (semântico + por entidade)." } },
+    { id: "3", type: "action", position: { x: 500, y: 180 }, data: { label: "Card imediato [Prioridade]", icon: "🔥", details: "Gerado NA HORA pelo heartbeat (--uau-only, a cada 30 min), sem esperar os slots.\nStatus 'Pra avaliar - Notícia' com [Prioridade] no título (a coluna própria foi extinta 18/07).", executor: "ia_content_generator.py --uau-only", tags: ["Notion"] } },
+    { id: "4", type: "action", position: { x: 500, y: 300 }, data: { label: "Donna monitora", icon: "👁️", details: "A cada 30 min, procura cards 'Pra avaliar - Notícia' com [Prioridade] no título ainda não vistos.", executor: "notion_important_watcher.py" } },
+    { id: "5", type: "action", position: { x: 500, y: 420 }, data: { label: "Notifica WhatsApp", icon: "📱", details: "🔥 *Notícia UAU no Radar* + link do card.\nNa home do painel o card aparece com selo 🔥 UAU em destaque.", executor: "OpenClaw", tags: ["WhatsApp"] } },
+    { id: "6", type: "action", position: { x: 500, y: 540 }, data: { label: "Você avalia", icon: "🧐", details: "No Notion ou na home do painel:\n- 'Aprovado' = publica furando a fila (o [Prioridade] no título garante)\n- 'Descartado' = ignora", executor: "humano" } },
+    { id: "7", type: "action", position: { x: 500, y: 660 }, data: { label: "Sender publica primeiro", icon: "🚀", details: "Aprovado + [Prioridade] no título = frente da fila.\nAinda respeita janela 8h–20h30 e 2h entre posts.", executor: "ia_group_sender.py", tags: ["WhatsApp"] } },
+    { id: "8", type: "end", position: { x: 100, y: 420 }, data: { label: "Fluxo normal", icon: "↩️", details: "Se não é UAU, segue o fluxo normal (espera o próximo slot de escrita)." } },
   ],
   edges: [
     { id: "e1-2", source: "1", target: "2" },
@@ -141,7 +139,7 @@ const noticiasUAU: SeedFlow = {
     { id: "e3-4", source: "3", target: "4" },
     { id: "e4-5", source: "4", target: "5" },
     { id: "e5-6", source: "5", target: "6" },
-    { id: "e6-7", source: "6", target: "7", label: "Prioridade" },
+    { id: "e6-7", source: "6", target: "7", label: "Aprovado" },
   ],
 };
 
@@ -335,23 +333,26 @@ const squadCriarAgente: SeedFlow = {
 };
 
 const pipelineReels: SeedFlow = {
-  title: "Pipeline de reels (pauta → roteiro)",
+  title: "Pipeline de reels (pauta → roteiro → feedback)",
   category: "automation",
   description:
-    "Quarta 18h nascem as pautas (2 Descomplicando + 1 dica + notícia UAU se houver). Você aprova no kanban; o roteiro chega quinta à noite no WhatsApp + lista de tarefas. Custo: 1 chamada Gemini por rodada + 1 por roteiro.",
+    "Quarta 18h nascem as pautas DIRETO no banco Conteúdos (coluna IDEIAS, Formato Reels). Você aprova movendo pra 'A fazer'; em até 30 min o roteiro aparece no PRÓPRIO card e ele vai pra 'Gravar Reels'. Quer ajustar? Escreve 'FEEDBACK: ...' no card e volta pra 'A fazer' — regrava e aprende pros próximos.",
   is_seed: true,
   nodes: [
-    { id: "1", type: "start", position: col(0), data: { label: "Quarta 18h BRT", icon: "⏰", details: "Trilhos: backlog Descomplicando…, dica-bank menos usada, notícia UAU da semana.", executor: "cron → reels_pipeline.py ideias", tags: ["Gemini"] } },
-    { id: "2", type: "action", position: col(1), data: { label: "Cards no Radar", icon: "🗂️", details: "Status: Pra avaliar - Reels · Tipo: reel.\nAviso no Telegram + WhatsApp + tarefa no Notion.", executor: "reels_pipeline.py", tags: ["Notion", "WhatsApp"] } },
-    { id: "3", type: "condition", position: col(2), data: { label: "Você aprova? (quinta)", icon: "👩🏽", details: "Kanban de sempre. Aprovado segue; descartado morre.", executor: "Andréia" } },
-    { id: "4", type: "action", position: col(3), data: { label: "Roteiro no estilo dela", icon: "🎬", details: "Gancho ≤3s, 3 blocos, CTA, texto de capa, sugestão visual.\nRoda 19h e 22h30 — chega quinta à noite.", executor: "reels_pipeline.py roteiros", tags: ["Gemini"] } },
-    { id: "5", type: "end", position: col(4), data: { label: "Ler quinta, gravar sexta", icon: "📱", details: "Roteiro no card + Esteira (Gravar Reels) + tarefa no Notion + WhatsApp.\nSábado é o plano B oficial.", executor: "Andréia" } },
+    { id: "1", type: "start", position: col(0), data: { label: "Quarta 18h BRT", icon: "⏰", details: "Trilhos: backlog Descomplicando…, dica-bank menos usada, notícia UAU da semana ([Prioridade] no título).", executor: "cron → reels_pipeline.py ideias", tags: ["Gemini"] } },
+    { id: "2", type: "action", position: col(1), data: { label: "Pautas no banco Conteúdos", icon: "💡", details: "Status IDEIAS · Formato Reels · Canal Instagram (18/07: o Radar não tem mais coluna de reels).\nAviso no Telegram + WhatsApp + tarefa no Notion.", executor: "reels_pipeline.py", tags: ["Notion", "WhatsApp"] } },
+    { id: "3", type: "condition", position: col(2), data: { label: "Você aprova?", icon: "👩🏽", details: "Aprovar = mover o card IDEIAS → 'A fazer'.\nNão gostou = deixa lá ou descarta.", executor: "Andréia" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Roteiro no PRÓPRIO card", icon: "🎬", details: "Em até 30 min (heartbeat).\nGancho ≤3s, 3 blocos, CTA, capa, sugestão visual — estilo dela + aprendizados de feedbacks anteriores.\nCard vai pra 'Gravar Reels'.", executor: "reels_pipeline.py roteiros", tags: ["Gemini"] } },
+    { id: "5", type: "condition", position: col(4), data: { label: "Quer ajustar?", icon: "✍️", details: "Escreve parágrafo 'FEEDBACK: ...' no card e move de volta pra 'A fazer'.\nRegrava em até 30 min seguindo o feedback; o pedido fica salvo e vale pros próximos roteiros.", executor: "Andréia" } },
+    { id: "6", type: "end", position: col(5), data: { label: "Gravar sexta", icon: "📱", details: "Roteiro no card ('Gravar Reels') + tarefa no Notion + aviso WhatsApp.\nSábado é o plano B oficial.", executor: "Andréia" } },
   ],
   edges: [
     { id: "e1-2", source: "1", target: "2" },
     { id: "e2-3", source: "2", target: "3" },
-    { id: "e3-4", source: "3", target: "4" },
+    { id: "e3-4", source: "3", target: "4", label: "A fazer" },
     { id: "e4-5", source: "4", target: "5" },
+    { id: "e5-4", source: "5", target: "4", label: "FEEDBACK + A fazer" },
+    { id: "e5-6", source: "5", target: "6", label: "tá bom" },
   ],
 };
 
@@ -362,7 +363,7 @@ const reelsStudio: SeedFlow = {
     "Você grava e sobe o bruto; a VPS devolve o reel editado no seu estilo: cortes de silêncio e de \"corta isso\", legendas IBM Plex com destaque Terracota, punch-in no gancho, trilha com ducking e capa da série. Zero token (ffmpeg + Whisper local).",
   is_seed: true,
   nodes: [
-    { id: "1", type: "start", position: col(0), data: { label: "Vídeo bruto", icon: "🎥", details: "Você envia pelo Telegram ou sobe no Drive (Instagram/Reels).", executor: "Andréia" } },
+    { id: "1", type: "start", position: col(0), data: { label: "Vídeo bruto", icon: "🎥", details: "Você envia pro BOT do Telegram (@jarbas_open_bot) — a Donna do WhatsApp NÃO edita vídeo. Pode dizer o título da capa e a série na mesma mensagem.", executor: "Andréia" } },
     { id: "2", type: "action", position: col(1), data: { label: "Transcrever", icon: "🎧", details: "faster-whisper local (modelo small, mesmo cache do transcribe.py).", executor: "/opt/reels-studio/studio.py" } },
     { id: "3", type: "action", position: col(2), data: { label: "Cortar silêncios e erros", icon: "✂️", details: "Silêncio ≥0,8s sai; trecho com \"corta isso\"/\"de novo\" é descartado.", executor: "studio.py" } },
     { id: "4", type: "action", position: col(3), data: { label: "Legendas + zoom + trilha", icon: "🎨", details: "Legendas queimadas (IBM Plex, destaque Terracota), punch-in 3s no gancho, música com ducking na voz.", executor: "ffmpeg" } },
@@ -380,12 +381,12 @@ const radarParaInstagram: SeedFlow = {
   title: "Ponte Radar → Instagram",
   category: "automation",
   description:
-    "Card do Radar marcado com o checkbox \"→ Instagram\" vira ideia no Banco de Ideias (banco Conteúdos) com a pesquisa já pronta — a squad de carrossel pula a etapa do Mike. Todo dia 18h, zero token.",
+    "Card do Radar marcado com o checkbox \"→ Instagram\" vira ideia no banco Conteúdos (coluna IDEIAS) com a pesquisa já pronta — a squad de carrossel pula a etapa do Mike. De hora em hora, zero token.",
   is_seed: true,
   nodes: [
-    { id: "1", type: "start", position: col(0), data: { label: "Todo dia 18h BRT", icon: "⏰", executor: "cron → radar_to_carousel.py" } },
+    { id: "1", type: "start", position: col(0), data: { label: "De hora em hora", icon: "⏰", details: "18/07: era 1x/dia às 18h; agora roda a cada hora.", executor: "cron → radar_to_carousel.py" } },
     { id: "2", type: "action", position: col(1), data: { label: "Buscar cards marcados", icon: "☑️", details: "Checkbox \"→ Instagram\" no Radar.", executor: "radar_to_carousel.py", tags: ["Notion"] } },
-    { id: "3", type: "action", position: col(2), data: { label: "Criar ideia no banco Conteúdos", icon: "💡", details: "Formato=Carrossel · Canal=Instagram · corpo com o texto do card.", executor: "radar_to_carousel.py", tags: ["Notion"] } },
+    { id: "3", type: "action", position: col(2), data: { label: "Criar ideia no banco Conteúdos", icon: "💡", details: "Status=IDEIAS · Formato=Carrossel · Canal=Instagram · corpo com o texto do card.", executor: "radar_to_carousel.py", tags: ["Notion"] } },
     { id: "4", type: "end", position: col(3), data: { label: "Aviso no Telegram", icon: "💬", executor: "Bot Telegram" } },
   ],
   edges: [
@@ -432,23 +433,42 @@ const snapshotMetricas: SeedFlow = {
 };
 
 const alertaFalhasDonna: SeedFlow = {
-  title: "Donna alerta falhas no WhatsApp",
+  title: "Donna alerta falhas (canal cruzado)",
   category: "automation",
   description:
-    "A cada 5 min o semáforo verifica ENTREGAS (o briefing saiu hoje? tem envio pendente?), não só processos. Problema novo = Donna te avisa no WhatsApp pessoal; resolveu = avisa que voltou ao verde. Sem spam (cooldown 6h, silêncio 22h30–6h30 exceto vermelho).",
+    "A cada 5 min o semáforo verifica ENTREGAS (o briefing saiu hoje? tem envio pendente?), não só processos. Problema novo = alerta com canal CRUZADO: problema no WhatsApp/gateway chega pelo Telegram (direto na API, sem passar pelo gateway caído); problema no Telegram chega pelo WhatsApp. Fila do kanban só alerta com 10+ NOTÍCIAS pendentes (dica/reel não contam). Sem spam (cooldown 6h, silêncio 22h30–6h30 exceto vermelho).",
   is_seed: true,
   nodes: [
     { id: "1", type: "start", position: col(0), data: { label: "A cada 5 min", icon: "⏰", executor: "cron → status-saude.py" } },
-    { id: "2", type: "action", position: col(1), data: { label: "Checar entregas de verdade", icon: "🔎", details: "Briefings WhatsApp/Telegram saíram HOJE? Pendente travado? Crons frescos? Fila alta? Disco?", executor: "status-saude.py" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Checar entregas de verdade", icon: "🔎", details: "Briefings WhatsApp/Telegram saíram HOJE? Pendente travado? Crons frescos? 10+ notícias esperando avaliação? Disco?", executor: "status-saude.py" } },
     { id: "3", type: "condition", position: col(2), data: { label: "Problema novo?", icon: "❓", details: "Compara com o último estado alertado (dedup).", executor: "status-saude.py" } },
-    { id: "4", type: "action", position: col(3), data: { label: "Donna te chama no WhatsApp", icon: "🚨", details: "Número pessoal, nunca o grupo. Recuperação também avisa (1x).", executor: "openclaw", tags: ["WhatsApp"] } },
-    { id: "5", type: "end", position: col(4), data: { label: "Painel atualizado", icon: "🟡", details: "status.json → semáforo + /metricas.", executor: "Supabase Storage" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Alerta no canal que FUNCIONA", icon: "🚨", details: "Problema no WhatsApp/gateway → Telegram (Bot API direta).\nOutros problemas → WhatsApp pessoal (nunca o grupo).\nRecuperação também avisa (1x), pelo mesmo canal.", executor: "status-saude.py", tags: ["WhatsApp", "Telegram"] } },
+    { id: "5", type: "end", position: col(4), data: { label: "Painel atualizado", icon: "🟢", details: "status.json AO VIVO → semáforo do topo + aba Saúde do /metricas (mesma fonte).", executor: "Supabase Storage" } },
   ],
   edges: [
     { id: "e1-2", source: "1", target: "2" },
     { id: "e2-3", source: "2", target: "3" },
     { id: "e3-4", source: "3", target: "4" },
     { id: "e4-5", source: "4", target: "5" },
+  ],
+};
+
+const donnaCapturaIdeias: SeedFlow = {
+  title: "Donna captura ideias de conteúdo (WhatsApp)",
+  category: "automation",
+  description:
+    "Encaminhou um link do Instagram pra Donna, ou disse 'isso é ideia de post/reels/carrossel/stories'? Ela salva no banco Conteúdos com Status IDEIAS e o campo Link preenchido — sem formato nem plataforma, porque quem decide o que a ideia vira é você, depois.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Você manda pra Donna", icon: "📱", details: "Link do Instagram encaminhado OU mensagem tipo 'ideia pra post/reels/carrossel/stories' + o conteúdo.", executor: "Andréia", tags: ["WhatsApp"] } },
+    { id: "2", type: "action", position: col(1), data: { label: "Donna classifica", icon: "🧠", details: "Reconhece que é ideia de conteúdo pras redes (não tarefa, não despejo).", executor: "Donna (Gemini)", tags: ["Gemini"] } },
+    { id: "3", type: "action", position: col(2), data: { label: "Salva no banco Conteúdos", icon: "💡", details: "captura.py ideia \"título\" \"descrição\" \"link\".\nStatus SEMPRE IDEIAS · Link preenchido · SEM formato/canal (você decide depois).", executor: "capturas/captura.py", tags: ["Notion"] } },
+    { id: "4", type: "end", position: col(3), data: { label: "Confirmação em 1 linha", icon: "✅", details: "\"💡 Salvei no banco de Conteúdos, coluna IDEIAS.\"", executor: "Donna", tags: ["WhatsApp"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
   ],
 };
 
@@ -489,6 +509,7 @@ export const SEED_FLOWS: SeedFlow[] = [
   pipelineReels,
   reelsStudio,
   radarParaInstagram,
+  donnaCapturaIdeias,
   aprendizEstilo,
   snapshotMetricas,
   alertaFalhasDonna,
