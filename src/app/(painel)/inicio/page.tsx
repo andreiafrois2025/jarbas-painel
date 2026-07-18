@@ -1,25 +1,24 @@
 "use client";
 
 // Página única (18/07): Hoje + Escritório unificados, sem abas.
-// Atalhos (quick links) ficam na barra do topo, sempre à mão.
+// Barra do topo: contadores primeiro, depois os atalhos, sempre à mão.
+// Assistentes por área é a coluna lateral esquerda do Hoje.
 
-import { useRouter } from "next/navigation";
 import InicioPanel from "@/components/InicioPanel";
 import HojePanel from "@/components/HojePanel";
+import AssistentesPorArea from "@/components/AssistentesPorArea";
 import StatusSemaforo from "@/components/StatusSemaforo";
 import { usePainel } from "@/lib/painel-context";
 
 export default function InicioPage() {
-  const router = useRouter();
-  const { collaborators, assignments, categories, quickLinks } = usePainel();
+  const { collaborators, assignments, quickLinks } = usePainel();
 
   const ativos = collaborators.filter(c => (c.status || "active") === "active").length;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Barra do topo: atalhos de acesso rápido + contadores + semáforo */}
+      {/* Barra do topo: contadores + atalhos + semáforo */}
       <header className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] flex items-center px-3 md:px-5 gap-3 shrink-0 h-14 overflow-x-auto">
-        {/* Contadores primeiro, atalhos depois (pedido dela 18/07) */}
         <div className="flex gap-3 text-sm shrink-0 whitespace-nowrap">
           <span className="text-[var(--text-secondary)]">
             <span className="text-[var(--text-primary)] font-medium">{ativos}</span> colaboradores
@@ -46,13 +45,8 @@ export default function InicioPage() {
 
       {/* Página única rolável: o dia primeiro, o escritório embaixo */}
       <div className="flex-1 overflow-y-auto">
-        <HojePanel />
-        <InicioPanel
-          collaborators={collaborators}
-          assignments={assignments}
-          categories={categories}
-          onOpenEquipe={() => router.push("/equipe")}
-        />
+        <HojePanel lateral={<AssistentesPorArea />} />
+        <InicioPanel />
       </div>
     </div>
   );

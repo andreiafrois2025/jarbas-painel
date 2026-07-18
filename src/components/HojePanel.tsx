@@ -79,7 +79,7 @@ function LinkCanto({ href, rotulo }: { href: string; rotulo: string }) {
   );
 }
 
-export default function HojePanel() {
+export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
   const { dados, erro, recarregar } = useHoje();
   const [feitos, setFeitos] = useState<Set<string>>(new Set());
 
@@ -113,9 +113,16 @@ export default function HojePanel() {
           </span>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-3 items-start">
-          {/* Coluna esquerda + centro: o dia dela */}
-          <div className="lg:col-span-2 space-y-5">
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
+          {/* Lateral esquerda: assistentes por área (coluna estreita, do topo) */}
+          {lateral && (
+            <div className="w-full lg:w-[270px] lg:shrink-0 order-3 lg:order-none">
+              {lateral}
+            </div>
+          )}
+
+          {/* Centro: o dia dela */}
+          <div className="flex-1 min-w-0 space-y-5 order-2 lg:order-none">
             <div className="grid md:grid-cols-2 gap-4">
               {/* Agenda + tarefas */}
               <section className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
@@ -173,7 +180,7 @@ export default function HojePanel() {
           </div>
 
           {/* Coluna direita: caixa de aprovação (fila única, só notícias) */}
-          <section className="order-first lg:order-none">
+          <section className="w-full lg:w-[350px] lg:shrink-0 order-1 lg:order-none">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
               📥 Caixa de aprovação {caixa.length > 0 && <span className="text-[var(--accent)]">({caixa.length})</span>}
             </h2>
