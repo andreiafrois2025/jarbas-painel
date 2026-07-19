@@ -3,9 +3,10 @@
 import { useRouter } from "next/navigation";
 import SquadsPage from "./SquadsPage";
 import FlowsPageV2 from "./flow/FlowsPageV2";
+import EstudioPage from "./EstudioPage";
 import { pageToPath } from "@/lib/painel-context";
 
-type SubPage = "squads" | "fluxos";
+type SubPage = "squads" | "fluxos" | "estudio";
 
 interface Props {
   sub: SubPage;
@@ -40,18 +41,35 @@ export default function ProducaoPage({ sub }: Props) {
         >
           🔄 Fluxos
         </button>
+        <button
+          onClick={() => router.push("/producao/estudio")}
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
+            sub === "estudio"
+              ? "border-[var(--accent)] text-[var(--text-primary)]"
+              : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          🎬 Estúdio
+        </button>
         <div className="flex-1" />
         {sub === "fluxos" && (
           <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
             editor visual — desenho de automações e squads
           </span>
         )}
+        {sub === "estudio" && (
+          <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
+            revisão da edição automática de reels
+          </span>
+        )}
       </div>
       <div className="flex-1 overflow-hidden">
         {sub === "squads" ? (
           <SquadsPage onNavigate={(p: string) => router.push(pageToPath(p))} />
-        ) : (
+        ) : sub === "fluxos" ? (
           <FlowsPageV2 />
+        ) : (
+          <EstudioPage />
         )}
       </div>
     </div>
