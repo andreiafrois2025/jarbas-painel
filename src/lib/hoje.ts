@@ -65,7 +65,18 @@ export function useHoje() {
     carregar();
     // recarrega sozinho a cada 5 min — o "atualizado às HH:MM" fica honesto
     const id = setInterval(carregar, 5 * 60 * 1000);
-    return () => clearInterval(id);
+    // recarrega também quando a aba volta a ficar visível ou ganha foco
+    const aoFicarVisivel = () => {
+      if (document.visibilityState === "visible") carregar();
+    };
+    const aoFocar = () => carregar();
+    document.addEventListener("visibilitychange", aoFicarVisivel);
+    window.addEventListener("focus", aoFocar);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", aoFicarVisivel);
+      window.removeEventListener("focus", aoFocar);
+    };
   }, [carregar]);
   return { dados, erro, recarregar: carregar };
 }

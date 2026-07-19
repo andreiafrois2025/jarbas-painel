@@ -141,7 +141,7 @@ export default function FlowKanban({
   }
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-3 h-full">
+    <div className="flex flex-col md:flex-row gap-3 md:overflow-x-auto pb-3 md:h-full min-h-0">
       {columnsToRender.map((col, colIdx) => {
         const items = flowsInColumn(col.name, col.id);
         const isDropTarget = dragOverCol === col.key;
@@ -154,9 +154,9 @@ export default function FlowKanban({
             }}
             onDragLeave={() => setDragOverCol(null)}
             onDrop={(e) => handleDrop(col.id ? col.name : null, e)}
-            className={`shrink-0 w-72 bg-[var(--bg-tertiary)] rounded-lg border ${
+            className={`shrink-0 w-full md:w-72 bg-[var(--bg-tertiary)] rounded-lg border ${
               isDropTarget ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/40" : "border-[var(--border)]"
-            } flex flex-col max-h-full`}
+            } flex flex-col md:max-h-full`}
           >
             <div className="p-3 border-b border-[var(--border)] flex items-center gap-2">
               {renamingId === col.id ? (
@@ -221,7 +221,7 @@ export default function FlowKanban({
                 </>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px]">
+            <div className="flex-1 md:overflow-y-auto p-2 space-y-2 min-h-[80px]">
               {items.length === 0 && (
                 <div className="text-center text-[10px] text-[var(--text-muted)] py-4">
                   arraste um card aqui

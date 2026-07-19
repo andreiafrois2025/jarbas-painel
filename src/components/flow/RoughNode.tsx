@@ -201,7 +201,7 @@ export default function RoughNode({ id, data, selected }: Props) {
       </div>
       <div
         className="relative z-10 flex flex-col items-center justify-center h-full px-3 text-center"
-        style={{ fontFamily: '"Kalam", "Comic Sans MS", cursive', color: "#2D3B3B" }}
+        style={{ fontFamily: 'var(--font-kalam), "Comic Sans MS", cursive', color: "#2D3B3B" }}
       >
         {d.icon && <span className="text-xl leading-none mb-1">{d.icon}</span>}
         <span className="text-[13px] leading-tight font-semibold">{d.label || "sem título"}</span>

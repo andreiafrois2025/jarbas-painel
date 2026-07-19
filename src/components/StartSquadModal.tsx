@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Squad, SquadDocument } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { SQUAD_API_BASE } from "@/lib/config";
+import { squadFetch } from "@/lib/squadFetch";
 
 interface StartSquadModalProps {
   squad: Squad | null;
@@ -110,7 +111,7 @@ export default function StartSquadModal({ squad, open, onClose }: StartSquadModa
     setStarting(true);
     setError(null);
     try {
-      const res = await fetch(`${SQUAD_API_BASE}/api/run`, {
+      const res = await squadFetch(`/api/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

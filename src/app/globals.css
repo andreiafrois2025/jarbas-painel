@@ -50,7 +50,7 @@
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), 'Segoe UI', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   margin: 0;
   padding: 0;

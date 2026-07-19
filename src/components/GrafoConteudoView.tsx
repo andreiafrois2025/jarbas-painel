@@ -5,7 +5,7 @@
 // no Supabase. Clique num nó abre a página no Notion.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SQUAD_API_BASE } from "@/lib/config";
+import { squadFetch } from "@/lib/squadFetch";
 
 const GRAFO_URL =
   "https://pmmyqljiuslstwbmiron.supabase.co/storage/v1/object/public/status/grafo_conteudo.json";
@@ -47,7 +47,7 @@ export default function GrafoConteudoView() {
     setAtualizando(true);
     try {
       // o endpoint roda o coletor no servidor e só responde quando publica
-      await fetch(`${SQUAD_API_BASE}/api/grafo/atualizar`, { method: "POST" }).catch(() => {});
+      await squadFetch(`/api/grafo/atualizar`, { method: "POST" }).catch(() => {});
       await carrega();
     } finally {
       setAtualizando(false);
@@ -142,13 +142,20 @@ export default function GrafoConteudoView() {
           className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] hover:opacity-80 disabled:opacity-50">
           {atualizando ? "🔄 Atualizando…" : "🔄 Atualizar agora"}
         </button>
+        {sel && (
+          <button onClick={() => setSel(null)}
+            className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] hover:opacity-80">
+            ✕ limpar seleção
+          </button>
+        )}
         <span className="ml-auto text-xs text-[var(--text-secondary)]">
           {grafo.stats.topicos} temas · {grafo.stats.notas} notas · {grafo.stats.tags} tags
         </span>
       </div>
 
       <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] overflow-hidden">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minHeight: 340 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minHeight: 340 }}
+          onClick={() => setSel(null)}>
           {pronto && arestas.map(([a, b], i) => {
             const A = pos[a], B = pos[b];
             if (!A || !B) return null;
@@ -165,7 +172,9 @@ export default function GrafoConteudoView() {
             return (
               <g key={n.id} transform={`translate(${P.x},${P.y})`}
                 className="cursor-pointer" opacity={apagado ? 0.2 : 1}
-                onClick={() => setSel(sel?.id === n.id ? null : n)}>
+                onClick={(e) => { e.stopPropagation(); setSel((prev) => prev?.id === n.id ? null : n); }}>
+                {/* alvo de toque invisível maior — facilita clicar/tocar no nó */}
+                <circle r={r + 10} fill="transparent" />
                 <circle r={r} fill={COR[n.tipo]} stroke="#FFFFFF" strokeWidth="1.5" />
                 {n.tipo !== "tag" && (
                   <text textAnchor="middle" dy={r + 11} fontSize="9" fill="var(--text-secondary)">

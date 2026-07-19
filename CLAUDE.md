@@ -1,153 +1,76 @@
-# Jarbas — Painel de Agentes de IA
+# Jarbas — Painel (Central Inteligente da Andréia)
 
-## Visão Geral
-Painel web para gerenciar agentes de IA com visual estilo Windows 97/98.
-Cada agente é representado por um bonequinho pixel art sentado em uma mesa.
-Clicar no bonequinho abre o link do agente.
-
-## Proprietária
-Andréia Rodrigues Frois — andreiamgbh@gmail.com
+## Visão geral
+Painel web pessoal da Andréia Frois: resumo do dia, aprovação de conteúdo,
+produção (squads/fluxos/estúdio de reels), métricas do ecossistema e biblioteca.
+Identidade visual AF (teal #2D6B6B, terracota #A0583C, creme #F5F0EA).
 
 ## Deploy
-- **URL:** https://jarbas-painel.vercel.app
-- **Plataforma:** Vercel (plano Hobby, gratuito)
+- **Produção:** https://painel.andreiafrois.tech (também jarbas-painel.vercel.app)
+- **Vercel** plano Hobby; push na `main` → deploy automático (~1 min)
 - **Repositório:** https://github.com/andreiafrois2025/jarbas-painel
-- **Branch principal:** main
-- **Deploy automático:** push no main → Vercel atualiza sozinho
+- **Cópia de trabalho nesta VPS:** `/opt/jarbas-painel` (é daqui que se edita e pusha)
 
 ## Stack
-- **Framework:** Next.js 15 + React 19 + TypeScript
-- **Estilo:** Tailwind CSS 4 + CSS customizado Win98
-- **Banco de dados:** Supabase (PostgreSQL)
-- **Auth:** Supabase Auth (email + senha)
+- Next.js 15 + React 19 + TypeScript + Tailwind CSS 4
+- Supabase (PostgreSQL + Auth email/senha, RLS por user_id)
+- Dados vivos vêm de duas fontes externas ao Supabase:
+  1. **squad-api** (VPS, `/opt/opensquad/squad-api/server.js`, pm2 `squad-api`,
+     https://squad.srv1536795.hstgr.cloud) — endpoints `/api/*` autenticados com
+     o JWT da sessão Supabase (padrão `comToken`/`squadFetch`)
+  2. **Bucket público `status`** do Supabase Storage — JSONs publicados pela VPS:
+     `status.json` (semáforo+atividades+fila, 5/5min, `/root/status-saude.py`),
+     `metrics-history.json` (snapshot noturno, `/root/metrics-snapshot.py`),
+     `equipe-publica.json` (`/root/equipe-sync.py`), `grafo_conteudo.json`
+     (coletor `grafo_conteudo.py` no container OpenClaw)
 
-## Supabase
-- **URL:** https://pmmyqljiuslstwbmiron.supabase.co
-- **Projeto:** Jarbas (FREE tier)
-- **Anon Key:** sb_publishable_XT73QR_hOggP8bNwOmDj6A_AHvMuII2
+## Regra de ouro dos dados
+**Tempo-real = status.json (5/5min) · Histórico = metrics-history.json (noturno).**
+Nunca mostrar dado operacional "de agora" lendo o snapshot noturno.
 
-### Tabelas
-| Tabela | Descrição |
-|--------|-----------|
-| `agents` | Agentes de IA cadastrados (id, agent_name, name, link, category, type, icon, description, gender, user_id) |
-| `categories` | Setores/abas (id, name, order, user_id) |
-| `executions` | Registro de uso (id, agent_id, flow_id, status, result, user_id, created_at) |
-| `flows` | Fluxos de automação (id, name, steps JSONB, user_id) |
+## Rotas e páginas (App Router)
+| Rota | Componente | O que é |
+|------|-----------|---------|
+| `/inicio` | HojePanel + AssistentesPorArea + InicioPanel | Dia dela: agenda, tarefas, escola do Luiz, feed "o que a equipe fez", Caixa de aprovação (só notícias do grupo), escritório (iframe da squad-api) |
+| `/equipe` | HRPage | RH: colaboradores (16 personas), setores, assistentes (assignments), quick-links — CRUD no Supabase |
+| `/producao/squads` | SquadsPage | Inicia/acompanha squads do OpenSquad |
+| `/producao/fluxos` | FlowsPageV2 (FlowKanban + FlowCanvas) | Desenho de fluxos estilo excalidraw + kanban por categoria |
+| `/producao/estudio` | EstudioPage | Revisão da edição automática de reels (blocos, zooms, legendas, re-render) |
+| `/pessoal` | PessoalPage | Luiz (escola) + finanças (resumo do mês via squad-api) |
+| `/metricas` | MetricasPage | Abas: Painel Geral, Produtividade IA, Saúde do sistema (ao vivo), Diário de bordo |
+| `/metricas/palestra` | (publico)/metricas/palestra | Modo palco público pra projetar em palestras |
+| `/biblioteca` | BibliotecaPage | Criações, Skills, Grafo do ecossistema (GrafoView), Grafo de conhecimento (GrafoConteudoView) |
+| `/config` | ConfigPage | Conta + integrações |
 
-### RLS (Row Level Security)
-Cada tabela filtra por `user_id` — cada usuário vê apenas seus dados.
+O shell (sidebar + JobsMonitor + dados compartilhados) vive em
+`src/app/(painel)/layout.tsx` → `Dashboard.tsx` e persiste entre rotas
+(`PainelContext`).
 
-## Estrutura de Arquivos
-```
-frontend/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx          # Página principal (auth + redirect pro Dashboard)
-│   │   ├── layout.tsx        # Layout global
-│   │   ├── globals.css       # Estilos globais + variáveis Win98
-│   │   └── api/automation/   # Rota de automação de fluxos
-│   ├── components/
-│   │   ├── Dashboard.tsx     # Dashboard principal (sidebar + escritório Win98)
-│   │   ├── DeskCard.tsx      # Bonequinho pixel art na mesa (SVG animado)
-│   │   ├── AgentModal.tsx    # Modal criar/editar agente
-│   │   ├── CategoryModal.tsx # Modal gerenciar setores
-│   │   ├── FlowsPage.tsx     # Página de fluxos de automação
-│   │   └── MetricsPage.tsx   # Página de métricas (funcionário do mês etc)
-│   └── lib/
-│       ├── supabase.ts       # Cliente Supabase
-│       ├── storage.ts        # Todas as funções CRUD (agents, categories, flows, executions)
-│       └── types.ts          # Interfaces TypeScript (Agent, Category, Flow, Execution)
-├── .env.local                # Variáveis de ambiente (NÃO sobe pro git)
-├── package.json
-├── next.config.ts
-└── tsconfig.json
-```
+## Tabelas Supabase
+`collaborators` (personas, sincronizadas de `/opt/personas` por
+`scripts/sync_personas.py`), `categories` (setores por contexto),
+`assignments` (assistente = colaborador × setor × ferramenta/link),
+`quick_links`, `flows`/`flow_docs` + `flow_columns` (kanban), `executions`.
+Tudo com RLS por `user_id`. CRUD centralizado em `src/lib/storage.ts`.
 
-## Interface
+## Catálogos hardcoded (dívida conhecida — F2 do plano)
+`src/lib/equipe.ts`, `src/lib/biblioteca.ts` e `src/lib/automacoes.ts` são
+escritos à mão e desatualizam. O plano é substituí-los por JSON publicado da
+VPS (`catalogo-sync`). Até lá: quem mexer no ecossistema DEVE atualizar esses
+arquivos.
 
-### Layout Principal (Dashboard.tsx)
-- **Sidebar esquerda (64px):** ícones de navegação — Escritório 🏢 | Fluxos 🔄 | Métricas 📊 | Sair 🚪
-- **Header:** título da página, contador de agentes/execuções, busca, botões "Setores" e "+ Novo Agente"
-- **Abas de categorias:** filtra por setor (Todos | Trabalho | Pessoal | Criação | Pesquisa | ...)
-- **Janela Win98:** área central com visual retrô — barra de título, menu, escritório, statusbar
+## Convenções
+- Commits em português `tipo: descrição`; código em inglês, comentários PT-BR
+- Indentação 2 espaços; Tailwind com CSS vars do tema (`globals.css`)
+- Fontes carregadas via `next/font/google` (Inter no corpo, Kalam nos nós do fluxo)
+- Antes de push: `npx tsc --noEmit` e `npm run build`
+- Segredos só em `.env.local` (nunca commitar, nunca imprimir)
 
-### Escritório Win98
-- Parede com plaquinha "JARBAS" e gráfico de sucesso
-- Grid de `DeskCard` (bonequinhos nas mesas)
-- Statusbar: total de funcionários | execuções hoje | horário | dia da semana
-
-### DeskCard (DeskCard.tsx)
-- SVG pixel art: mesa com monitor CRT verde, teclado, mouse, caneca de café, planta, papéis
-- Bonequinho animado digitando (braços se movem)
-- Cores do bonequinho geradas por hash do nome (único por agente)
-- Suporta gênero masculino/feminino
-- Hover: aparece botões Editar ✏️ e Excluir 🗑️
-- Clique → abre link do agente + registra execução no Supabase
-
-### Tipos de Agente (types.ts)
-```typescript
-interface Agent {
-  id: string
-  agent_name?: string    // Nome personalizado (ex: "Sofia") — aparece acima da cabeça
-  name: string           // Nome da ferramenta (ex: "Claude") — plaquinha da mesa
-  link: string           // URL para abrir
-  category: string       // Setor (aba)
-  type: "manual" | "automatic"
-  icon?: string          // Emoji
-  description?: string   // Função curta (ex: "Chat", "Imagem")
-  gender?: "male" | "female"
-}
-```
-
-### Agentes padrão (novos usuários)
-Atlas (ChatGPT) • Sofia (Claude) • Neo (Gemini) • Luna (Midjourney) • Max (Perplexity) • Dev (GitHub Copilot)
-
-### Categorias padrão
-Trabalho • Pessoal • Criação • Pesquisa
-
-## Páginas
-
-### Fluxos (FlowsPage.tsx)
-- Criar sequências de agentes para executar em ordem
-- Fluxo salvo no Supabase: `flows` com `steps` JSONB
-- Exemplo existente: "Gerar Carrossel"
-
-### Métricas (MetricsPage.tsx)
-- Dashboard de uso dos agentes
-- "Funcionário do Mês" — agente mais usado no período
-- Gráficos de execuções por agente, por setor, por dia
-
-## Variáveis de Ambiente
-```
-NEXT_PUBLIC_SUPABASE_URL=https://pmmyqljiuslstwbmiron.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_XT73QR_hOggP8bNwOmDj6A_AHvMuII2
-```
-No Vercel: Settings → Environment Variables (já configurado)
-
-## Como Fazer Deploy de Atualização
+## Rodar localmente (na VPS)
 ```bash
-cd "C:\Users\Hwaendrix\Desktop\Projetos_AI\Jarbas\frontend"
-git add .
-git commit -m "descrição da mudança"
-git push
+cd /opt/jarbas-painel && npm run dev   # porta 3000
 ```
-Vercel detecta o push e faz deploy automático em ~1 minuto.
 
-## Como Rodar Localmente
-```bash
-cd "C:\Users\Hwaendrix\Desktop\Projetos_AI\Jarbas\frontend"
-npm run dev
-```
-Acessa em http://localhost:3000
-
-## Login
-- Email: andreiamgbh@gmail.com
-- Criar conta na primeira vez pelo próprio painel
-
-## Domínio Futuro
-Quando comprar domínio: Vercel → Settings → Domains → Add Domain
-Apontar DNS: registro tipo CNAME para `cname.vercel-dns.com`
-
-## Projetos Relacionados
-- **Jarbas Bot (Telegram):** VPS 187.77.245.243 | `/home/jarbas/bot` | PM2: jarbas-bot
-- **Scripts VPS:** `/home/jarbas/scripts/` (Notion, Calendar, lembretes, Whisper)
+## Documentos relacionados
+- Plano mestre vigente: `/root/docs/plano-central-inteligente-2026-07-19.md`
+- Progresso geral: `/root/PROGRESS.md`

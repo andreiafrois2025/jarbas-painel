@@ -356,6 +356,13 @@ function AbaSaude({ hoje }: { hoje: any }) {
   const sinais = Object.entries(
     (vivo?.sinais_vitais ?? hoje.saude?.sinais ?? {}) as Record<string, boolean>);
 
+  // Fila e automações: preferir o status ao vivo (5 em 5 min) e cair pro
+  // snapshot noturno só se o fetch do vivo falhar
+  const fila = vivo?.fila_kanban ?? hoje.fila;
+  const automacoes = vivo?.automacoes ?? hoje.automacoes;
+  const filaAoVivo = !!vivo?.fila_kanban;
+  const automacoesAoVivo = !!vivo?.automacoes;
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -365,8 +372,8 @@ function AbaSaude({ hoje }: { hoje: any }) {
           sub="rodando no horário" />
         <Tile icone="💾" titulo="Disco da VPS" valor={`${vivo?.disco_pct ?? hoje.saude?.disco_pct ?? "?"}%`} sub="usado" />
         <Tile icone="📬" titulo="Fila do grupo IA"
-          valor={hoje.fila?.pausado ? "⏸ pausada" : `${hoje.fila?.aprovados ?? 0} na fila`}
-          sub={`${hoje.fila?.pendentes ?? 0} aguardando sua avaliação`} />
+          valor={fila?.pausado ? "⏸ pausada" : `${fila?.aprovados ?? 0} na fila`}
+          sub={`${fila?.pendentes ?? 0} aguardando sua avaliação${filaAoVivo ? " · ao vivo (5 em 5 min)" : ""}`} />
       </div>
 
       <div className="grid md:grid-cols-2 gap-3">
@@ -382,9 +389,14 @@ function AbaSaude({ hoje }: { hoje: any }) {
           </ul>
         </div>
         <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[#E5DED4]">
-          <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">Última execução das automações</h3>
+          <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">
+            Última execução das automações
+            {automacoesAoVivo && (
+              <span className="ml-2 text-xs font-normal text-[var(--text-secondary)]">ao vivo (5 em 5 min)</span>
+            )}
+          </h3>
           <ul className="space-y-1 text-sm text-[var(--text-primary)]">
-            {Object.entries((hoje.automacoes ?? {}) as Record<string, string | null>).map(([k, iso]) => (
+            {Object.entries((automacoes ?? {}) as Record<string, string | null>).map(([k, iso]) => (
               <li key={k} className="flex justify-between gap-2">
                 <span>{NOME_AUTOMACAO[k] ?? k}</span>
                 <span className="text-[var(--text-secondary)] whitespace-nowrap">{tempoRelativo(iso)}</span>

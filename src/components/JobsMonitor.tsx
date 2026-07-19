@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-import { SQUAD_API_BASE } from "@/lib/config";
+import { squadFetch } from "@/lib/squadFetch";
 const POLL_INTERVAL_MS = 5000;
 
 interface JobError {
@@ -90,7 +90,7 @@ export default function JobsMonitor() {
 
   const fetchData = useCallback(async () => {
     try {
-      const jobsRes = await fetch(`${SQUAD_API_BASE}/api/jobs`);
+      const jobsRes = await squadFetch(`/api/jobs`);
       if (!jobsRes.ok) return;
       const jobs: Job[] = await jobsRes.json();
       // Job com userStatus (marcação manual da Andréia) sai das listas ativas e vai pra arquivados
@@ -109,7 +109,7 @@ export default function JobsMonitor() {
       const pendingMap: Record<string, PendingCheckpoint[]> = {};
       await Promise.all(running.map(async (j) => {
         try {
-          const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${j.jobId}/pending`);
+          const r = await squadFetch(`/api/jobs/${j.jobId}/pending`);
           if (r.ok) {
             const data = await r.json();
             if (data.pendings && data.pendings.length > 0) {
@@ -136,7 +136,7 @@ export default function JobsMonitor() {
   async function loadPipelineSteps(squad: string) {
     if (pipelineSteps[squad]) return;
     try {
-      const r = await fetch(`${SQUAD_API_BASE}/api/squads/${squad}/pipeline`);
+      const r = await squadFetch(`/api/squads/${squad}/pipeline`);
       if (!r.ok) return;
       const data = await r.json();
       setPipelineSteps((prev) => ({ ...prev, [squad]: data.steps || [] }));
@@ -154,7 +154,7 @@ export default function JobsMonitor() {
     if (!resumeModal || !resumeStepId.trim()) return;
     setActionLoading(resumeModal.jobId);
     try {
-      const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${resumeModal.jobId}/resume`, {
+      const r = await squadFetch(`/api/jobs/${resumeModal.jobId}/resume`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fromStepId: Number(resumeStepId) }),
@@ -184,7 +184,7 @@ export default function JobsMonitor() {
   async function syncToDrive(jobId: string) {
     setActionLoading(`drive-sync:${jobId}`);
     try {
-      const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/sync-drive`, { method: "POST" });
+      const r = await squadFetch(`/api/jobs/${jobId}/sync-drive`, { method: "POST" });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         alert(`Falha ao iniciar sync: ${err.error || r.statusText}`);
@@ -201,7 +201,7 @@ export default function JobsMonitor() {
   async function markJob(jobId: string, userStatus: UserStatus | null) {
     setActionLoading(`user-status:${jobId}`);
     try {
-      const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/user-status`, {
+      const r = await squadFetch(`/api/jobs/${jobId}/user-status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userStatus }),
@@ -221,7 +221,7 @@ export default function JobsMonitor() {
     if (confirmar && !window.confirm("Excluir este registro? Os arquivos de saída dele na VPS também serão apagados.")) return;
     setActionLoading(`delete:${jobId}`);
     try {
-      const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}`, { method: "DELETE" });
+      const r = await squadFetch(`/api/jobs/${jobId}`, { method: "DELETE" });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         alert(`Falha ao excluir: ${err.error || r.statusText}`);
@@ -244,7 +244,7 @@ export default function JobsMonitor() {
     const key = `${jobId}:${stepId}`;
     setActionLoading(key);
     try {
-      await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/approve`, {
+      await squadFetch(`/api/jobs/${jobId}/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stepId, approved, comment: comment || "" }),
@@ -259,7 +259,7 @@ export default function JobsMonitor() {
     if (!confirm("Parar este job? O squad vai ser interrompido e o que já foi produzido continua salvo.")) return;
     setActionLoading(jobId);
     try {
-      await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/stop`, { method: "POST" });
+      await squadFetch(`/api/jobs/${jobId}/stop`, { method: "POST" });
       await fetchData();
     } finally {
       setActionLoading(null);
@@ -267,9 +267,18 @@ export default function JobsMonitor() {
   }
 
   async function openFile(jobId: string, name: string) {
-    const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/files/${encodeURIComponent(name)}`);
+    const r = await squadFetch(`/api/jobs/${jobId}/files/${encodeURIComponent(name)}`);
     const content = await r.text();
     setViewingFile({ jobId, name, content });
+  }
+
+  // Arquivo binário/HTML: baixa autenticado e abre via blob (o link direto não manda header)
+  async function downloadFile(jobId: string, name: string) {
+    const r = await squadFetch(`/api/jobs/${jobId}/files/${encodeURIComponent(name)}`);
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
   async function toggleInlineFiles(jobId: string) {
@@ -284,7 +293,7 @@ export default function JobsMonitor() {
     });
     if (!inlineFiles[jobId]) {
       try {
-        const r = await fetch(`${SQUAD_API_BASE}/api/jobs/${jobId}/files`);
+        const r = await squadFetch(`/api/jobs/${jobId}/files`);
         if (!r.ok) return;
         const data = await r.json();
         setInlineFiles((prev) => ({ ...prev, [jobId]: data.files || [] }));
@@ -367,13 +376,12 @@ export default function JobsMonitor() {
               <span className="flex-1 font-mono truncate text-gray-700">{f.name}</span>
               <span className="text-[9px] text-gray-400 shrink-0">{kb} KB</span>
               {isBinaryOrHtml ? (
-                <a
-                  href={`${SQUAD_API_BASE}/api/jobs/${jobId}/files/${encodeURIComponent(f.name)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="text-[10px] px-2 py-0.5 rounded bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300 no-underline"
+                <button
+                  onClick={() => downloadFile(jobId, f.name)}
+                  className="text-[10px] px-2 py-0.5 rounded bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300"
                 >
                   Abrir ↗
-                </a>
+                </button>
               ) : (
                 <button
                   onClick={() => openFile(jobId, f.name)}

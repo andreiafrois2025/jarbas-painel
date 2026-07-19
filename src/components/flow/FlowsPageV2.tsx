@@ -179,7 +179,7 @@ export default function FlowsPageV2() {
 
   // ─── Modo lista ───
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-4 py-2 flex items-center gap-1 shrink-0">
         {CATEGORIES.map((c) => (
           <button
@@ -200,7 +200,7 @@ export default function FlowsPageV2() {
         </span>
       </div>
 
-      <div className="flex-1 overflow-hidden p-4">
+      <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden p-4">
         {loading ? (
           <div className="text-center text-[var(--text-muted)] py-12">Carregando…</div>
         ) : (

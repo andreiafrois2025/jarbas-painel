@@ -63,7 +63,7 @@ export default function ProducaoPage({ sub }: Props) {
           </span>
         )}
       </div>
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
         {sub === "squads" ? (
           <SquadsPage onNavigate={(p: string) => router.push(pageToPath(p))} />
         ) : sub === "fluxos" ? (
