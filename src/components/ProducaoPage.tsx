@@ -63,7 +63,8 @@ export default function ProducaoPage({ sub }: Props) {
           </span>
         )}
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden">
+      {/* precisa ser flex: os filhos (FlowsPageV2 etc) usam flex-1 pra herdar a altura */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {sub === "squads" ? (
           <SquadsPage onNavigate={(p: string) => router.push(pageToPath(p))} />
         ) : sub === "fluxos" ? (
