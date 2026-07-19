@@ -52,7 +52,7 @@ function ListaProjetos({
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[var(--text-primary)] truncate">{p.name}</span>
+            <span className="text-sm font-medium text-[var(--text-primary)] truncate">{p.titulo || p.name}</span>
             {p.renderizando && <span className="text-xs animate-pulse">⏳</span>}
           </div>
           <span className="text-xs text-[var(--text-muted)]">editado {tempoRelativo(p.criado_em)}</span>
@@ -412,8 +412,9 @@ function DetalheProjeto({
 
   const renomear = async () => {
     if (!projeto || renomeando) return;
-    const novo = window.prompt("Novo nome do projeto:", name)?.trim();
-    if (!novo || novo === name) return;
+    const atual = projeto.titulo || name;
+    const novo = window.prompt("Novo nome do projeto:", atual)?.trim();
+    if (!novo || novo === atual) return;
     setRenomeando(true);
     setErroRender(null);
     try {
@@ -439,7 +440,7 @@ function DetalheProjeto({
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6">
       <div className="flex items-center gap-2 mb-4">
-        <h1 className="text-sm font-semibold text-[var(--text-primary)] truncate">{projeto.name}</h1>
+        <h1 className="text-sm font-semibold text-[var(--text-primary)] truncate">{projeto.titulo || projeto.name}</h1>
         <button
           onClick={renomear}
           disabled={renomeando}

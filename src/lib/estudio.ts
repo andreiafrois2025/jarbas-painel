@@ -9,6 +9,7 @@ import { SQUAD_API_BASE } from "./config";
 
 export interface ProjetoResumo {
   name: string;
+  titulo?: string | null; // apelido amigável (com acento/espaço); name é o id
   criado_em: string;
   reelUrl: string;
   reelMtime: number;
@@ -31,6 +32,7 @@ export interface Punch {
 
 export interface ProjetoDetalhe {
   name: string;
+  titulo?: string | null; // apelido amigável (com acento/espaço); name é o id
   video: string;
   criado_em: string;
   duracao_bruta: number;

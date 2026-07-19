@@ -30,6 +30,8 @@ export interface DadosHoje {
   gerado_em: string;
   agenda: string;
   tarefas: string;
+  agenda_semana?: string;
+  tarefas_semana?: string;
   caixa: CardCaixa[];
   escola: ItemEscola[];
   atividades: Atividade[];

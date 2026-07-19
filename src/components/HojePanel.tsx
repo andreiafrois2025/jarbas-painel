@@ -142,6 +142,16 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                 <pre className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap font-sans">
                   {dados.agenda || "Sem compromissos hoje."}
                 </pre>
+                {dados.agenda_semana && (
+                  <details open className="mt-3 border-t border-[var(--border)] pt-2">
+                    <summary className="text-xs font-semibold text-[var(--text-primary)] cursor-pointer select-none">
+                      🗓️ Semana
+                    </summary>
+                    <pre className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap font-sans max-h-48 overflow-y-auto mt-2">
+                      {dados.agenda_semana}
+                    </pre>
+                  </details>
+                )}
               </section>
               <section className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
                 <div className="flex items-center justify-between mb-2 gap-2">
@@ -151,6 +161,16 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                 <pre className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap font-sans">
                   {dados.tarefas || "Sem tarefas pendentes pra hoje."}
                 </pre>
+                {dados.tarefas_semana && (
+                  <details open className="mt-3 border-t border-[var(--border)] pt-2">
+                    <summary className="text-xs font-semibold text-[var(--text-primary)] cursor-pointer select-none">
+                      🗓️ Tarefas da semana
+                    </summary>
+                    <pre className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap font-sans max-h-48 overflow-y-auto mt-2">
+                      {dados.tarefas_semana}
+                    </pre>
+                  </details>
+                )}
               </section>
             </div>
 
@@ -198,8 +218,10 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                 🎉 Nenhuma notícia esperando você!
               </p>
             ) : (
-              <div className="space-y-2">
-                {caixa.slice(0, 12).map((c) => <CardAprovacao key={c.id} card={c} onDecidir={onDecidir} />)}
+              // Altura limitada + rolagem interna: fila cheia não empurra mais o
+              // escritório lá pra baixo (pedido 19/07). Rola por dentro da coluna.
+              <div className="space-y-2 lg:max-h-[calc(100vh-11rem)] overflow-y-auto pr-1">
+                {caixa.map((c) => <CardAprovacao key={c.id} card={c} onDecidir={onDecidir} />)}
               </div>
             )}
           </section>
