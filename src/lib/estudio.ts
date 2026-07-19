@@ -77,11 +77,18 @@ export async function buscarProjeto(name: string): Promise<ProjetoDetalhe> {
   return r.json();
 }
 
+export interface BlocoMantido {
+  i: number;
+  ini: number;
+  fim: number;
+}
+
 export async function rerenderizar(
   name: string,
-  blocosMantidos: number[],
+  blocosMantidos: BlocoMantido[],
   punches: { t: number }[],
-  correcoes: Correcao[]
+  correcoes: Correcao[],
+  velocidade: number = 1.0
 ): Promise<{ ok: boolean; status: number; erro?: string }> {
   const r = await comToken(`/api/estudio/${encodeURIComponent(name)}/rerender`, {
     method: "POST",
@@ -90,6 +97,7 @@ export async function rerenderizar(
       blocks_mantidos: blocosMantidos,
       punches,
       correcoes,
+      velocidade,
     }),
   });
   if (r.ok) return { ok: true, status: r.status };
@@ -101,6 +109,25 @@ export async function rerenderizar(
     // corpo não é JSON, ignora
   }
   return { ok: false, status: r.status, erro };
+}
+
+export async function renomearProjeto(
+  name: string,
+  novo: string
+): Promise<{ ok: boolean; status: number; erro?: string; name?: string }> {
+  const r = await comToken(`/api/estudio/${encodeURIComponent(name)}/rename`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ novo }),
+  });
+  let data: { erro?: string; name?: string } = {};
+  try {
+    data = await r.json();
+  } catch {
+    // corpo não é JSON, ignora
+  }
+  if (r.ok) return { ok: true, status: r.status, name: data.name };
+  return { ok: false, status: r.status, erro: data.erro };
 }
 
 export async function statusRerender(name: string): Promise<StatusRerender> {

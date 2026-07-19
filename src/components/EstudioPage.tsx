@@ -9,6 +9,7 @@ import {
   listarProjetos,
   buscarProjeto,
   rerenderizar,
+  renomearProjeto,
   statusRerender,
   urlVideo,
   formatarMMSS,
@@ -63,40 +64,73 @@ function ListaProjetos({
 
 // ---------- Blocos de fala ----------
 
-function BlocoCard({ bloco, onToggle }: { bloco: Bloco; onToggle: (i: number) => void }) {
+function BlocoCard({
+  bloco,
+  onToggle,
+  onEditarLimite,
+}: {
+  bloco: Bloco;
+  onToggle: (i: number) => void;
+  onEditarLimite: (i: number, campo: "ini" | "fim", valor: number) => void;
+}) {
   const duracao = Math.max(0, bloco.fim - bloco.ini);
   return (
-    <button
-      onClick={() => onToggle(bloco.i)}
+    <div
       className={`text-left w-full rounded-lg p-2.5 border transition-all ${
         bloco.mantido
           ? "border-[var(--border)] bg-[var(--bg-secondary)]"
           : "border-[var(--border)] bg-[var(--bg-secondary)] opacity-45"
       }`}
     >
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[10px] font-mono text-[var(--text-muted)]">
-          {formatarMMSS(bloco.ini)}–{formatarMMSS(bloco.fim)} · {duracao.toFixed(1)}s
-        </span>
-        <span
-          className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${
-            bloco.mantido ? "bg-[#2D6B6B]" : "bg-[var(--text-muted)]"
+      <button onClick={() => onToggle(bloco.i)} className="text-left w-full">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="text-[10px] font-mono text-[var(--text-muted)]">
+            {formatarMMSS(bloco.ini)}–{formatarMMSS(bloco.fim)} · {duracao.toFixed(1)}s
+          </span>
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${
+              bloco.mantido ? "bg-[#2D6B6B]" : "bg-[var(--text-muted)]"
+            }`}
+          >
+            {bloco.mantido ? "mantido" : "cortado"}
+          </span>
+        </div>
+        <p
+          className={`text-sm text-[var(--text-primary)] ${
+            bloco.mantido ? "" : "line-through text-[var(--text-muted)]"
           }`}
         >
-          {bloco.mantido ? "mantido" : "cortado"}
-        </span>
-      </div>
-      <p
-        className={`text-sm text-[var(--text-primary)] ${
-          bloco.mantido ? "" : "line-through text-[var(--text-muted)]"
-        }`}
-      >
-        {bloco.texto}
-      </p>
-      {!bloco.mantido && bloco.motivo && (
-        <p className="text-xs text-[var(--text-muted)] italic mt-1">motivo: {bloco.motivo}</p>
+          {bloco.texto}
+        </p>
+        {!bloco.mantido && bloco.motivo && (
+          <p className="text-xs text-[var(--text-muted)] italic mt-1">motivo: {bloco.motivo}</p>
+        )}
+      </button>
+      {bloco.mantido && (
+        <div className="flex items-center gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+          <label className="text-[10px] text-[var(--text-muted)]">
+            início
+            <input
+              type="number"
+              step="0.1"
+              value={bloco.ini}
+              onChange={(e) => onEditarLimite(bloco.i, "ini", parseFloat(e.target.value))}
+              className="ml-1 w-20 text-xs px-1.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
+            />
+          </label>
+          <label className="text-[10px] text-[var(--text-muted)]">
+            fim
+            <input
+              type="number"
+              step="0.1"
+              value={bloco.fim}
+              onChange={(e) => onEditarLimite(bloco.i, "fim", parseFloat(e.target.value))}
+              className="ml-1 w-20 text-xs px-1.5 py-1 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
+            />
+          </label>
+        </div>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -214,14 +248,25 @@ function CorrecoesEditor({
 
 // ---------- Detalhe do projeto ----------
 
-function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizadoLista: () => void }) {
+function DetalheProjeto({
+  name,
+  onAtualizadoLista,
+  onRenomeado,
+}: {
+  name: string;
+  onAtualizadoLista: () => void;
+  onRenomeado: (novo: string) => void;
+}) {
   const [projeto, setProjeto] = useState<ProjetoDetalhe | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [blocosMantidos, setBlocosMantidos] = useState<Set<number>>(new Set());
+  const [limites, setLimites] = useState<Record<number, { ini: number; fim: number }>>({});
   const [punches, setPunches] = useState<Punch[]>([]);
   const [correcoes, setCorrecoes] = useState<Correcao[]>([]);
+  const [velocidade, setVelocidade] = useState(1.0);
   const [enviando, setEnviando] = useState(false);
   const [erroRender, setErroRender] = useState<string | null>(null);
+  const [renomeando, setRenomeando] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const carregar = useCallback(async () => {
@@ -230,8 +275,10 @@ function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizad
       const p = await buscarProjeto(name);
       setProjeto(p);
       setBlocosMantidos(new Set(p.blocks.filter((b) => b.mantido).map((b) => b.i)));
+      setLimites(Object.fromEntries(p.blocks.map((b) => [b.i, { ini: b.ini, fim: b.fim }])));
       setPunches(p.punches || []);
       setCorrecoes([]);
+      setVelocidade(1.0);
       setErroRender(null);
     } catch {
       setErro("Não consegui carregar este projeto.");
@@ -282,6 +329,11 @@ function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizad
     });
   };
 
+  const editarLimite = (i: number, campo: "ini" | "fim", valor: number) => {
+    if (isNaN(valor)) return;
+    setLimites((ls) => ({ ...ls, [i]: { ...ls[i], [campo]: valor } }));
+  };
+
   const removerPunch = (t: number) => setPunches((ps) => ps.filter((p) => p.t !== t));
   const adicionarPunch = (t: number) => setPunches((ps) => [...ps, { t }].sort((a, b) => a.t - b.t));
 
@@ -304,12 +356,22 @@ function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizad
     const mesmosBlocos =
       mantidosOriginais.size === blocosMantidos.size &&
       [...mantidosOriginais].every((i) => blocosMantidos.has(i));
+    const mesmosLimites = projeto.blocks.every((b) => {
+      const l = limites[b.i];
+      return !l || (l.ini === b.ini && l.fim === b.fim);
+    });
     const mesmosPunches =
       (projeto.punches || []).length === punches.length &&
       (projeto.punches || []).every((p, idx) => p.t === punches[idx]?.t);
     const correcoesValidas = correcoes.filter((c) => c.de.trim() || c.para.trim());
-    return !mesmosBlocos || !mesmosPunches || correcoesValidas.length > 0;
-  }, [projeto, blocosMantidos, punches, correcoes]);
+    return (
+      !mesmosBlocos ||
+      !mesmosLimites ||
+      !mesmosPunches ||
+      correcoesValidas.length > 0 ||
+      velocidade !== 1.0
+    );
+  }, [projeto, blocosMantidos, limites, punches, correcoes, velocidade]);
 
   const reRenderizar = async () => {
     if (!projeto) return;
@@ -317,11 +379,21 @@ function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizad
     setErroRender(null);
     try {
       const correcoesValidas = correcoes.filter((c) => c.de.trim() && c.para.trim());
+      const blocos = [...blocosMantidos].map((i) => {
+        const original = projeto.blocks.find((b) => b.i === i);
+        const l = limites[i];
+        return {
+          i,
+          ini: l?.ini ?? original?.ini ?? 0,
+          fim: l?.fim ?? original?.fim ?? 0,
+        };
+      });
       const resultado = await rerenderizar(
         name,
-        [...blocosMantidos],
+        blocos,
         punches.map((p) => ({ t: p.t })),
-        correcoesValidas
+        correcoesValidas,
+        velocidade
       );
       if (resultado.ok) {
         setProjeto((p) => (p ? { ...p, renderizando: true } : p));
@@ -338,6 +410,25 @@ function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizad
     }
   };
 
+  const renomear = async () => {
+    if (!projeto || renomeando) return;
+    const novo = window.prompt("Novo nome do projeto:", name)?.trim();
+    if (!novo || novo === name) return;
+    setRenomeando(true);
+    setErroRender(null);
+    try {
+      const resultado = await renomearProjeto(name, novo);
+      if (resultado.ok && resultado.name) {
+        onAtualizadoLista();
+        onRenomeado(resultado.name);
+      } else {
+        setErroRender(resultado.erro || "Não consegui renomear o projeto.");
+      }
+    } finally {
+      setRenomeando(false);
+    }
+  };
+
   if (erro) {
     return <div className="p-6 text-sm text-[var(--text-secondary)]">{erro}</div>;
   }
@@ -347,6 +438,18 @@ function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizad
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <h1 className="text-sm font-semibold text-[var(--text-primary)] truncate">{projeto.name}</h1>
+        <button
+          onClick={renomear}
+          disabled={renomeando}
+          title="Renomear projeto"
+          className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] disabled:opacity-40"
+          aria-label="Renomear projeto"
+        >
+          ✏️
+        </button>
+      </div>
       <div className="flex flex-col lg:flex-row gap-6">
         {/* player */}
         <div className="shrink-0 mx-auto lg:mx-0" style={{ maxWidth: 380, width: "100%" }}>
@@ -360,6 +463,20 @@ function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizad
           <p className="text-xs text-[var(--text-muted)] mt-2">
             {segundosNoReel.toFixed(1)}s no reel final (bruto: {formatarMMSS(projeto.duracao_bruta)})
           </p>
+
+          <div className="mt-3">
+            <label className="text-xs text-[var(--text-muted)] block mb-1">Velocidade</label>
+            <select
+              value={velocidade}
+              onChange={(e) => setVelocidade(parseFloat(e.target.value))}
+              className="w-full text-sm px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
+            >
+              <option value={1.0}>1×</option>
+              <option value={1.1}>1.1×</option>
+              <option value={1.25}>1.25×</option>
+              <option value={1.5}>1.5×</option>
+            </select>
+          </div>
 
           <div className="mt-4">
             <button
@@ -390,8 +507,14 @@ function DetalheProjeto({ name, onAtualizadoLista }: { name: string; onAtualizad
               {projeto.blocks.map((b) => (
                 <BlocoCard
                   key={b.i}
-                  bloco={{ ...b, mantido: blocosMantidos.has(b.i) }}
+                  bloco={{
+                    ...b,
+                    mantido: blocosMantidos.has(b.i),
+                    ini: limites[b.i]?.ini ?? b.ini,
+                    fim: limites[b.i]?.fim ?? b.fim,
+                  }}
                   onToggle={toggleBloco}
+                  onEditarLimite={editarLimite}
                 />
               ))}
             </div>
@@ -456,7 +579,11 @@ export default function EstudioPage() {
       </div>
       <div className="flex-1 overflow-hidden flex flex-col">
         {selecionado ? (
-          <DetalheProjeto name={selecionado} onAtualizadoLista={carregarLista} />
+          <DetalheProjeto
+            name={selecionado}
+            onAtualizadoLista={carregarLista}
+            onRenomeado={setSelecionado}
+          />
         ) : (
           <div className="p-6 text-sm text-[var(--text-secondary)]">
             {projetos.length === 0
