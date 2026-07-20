@@ -1,15 +1,17 @@
 "use client";
 
-// 🎤 Modo palco v2 — interativo: clicar num agente abre o cartão com papel e
-// habilidades; contadores explicam a origem do número ao clicar.
-// ?tema=trabalho → versão serviço público (sem nada de criação de conteúdo,
-// e horas de trabalho só aparecem quando forem medidas de verdade).
+// 🎤 Modo palco v3 (19/07) — espelho enxuto do "Painel Geral" da página normal,
+// COM os mesmos chips de filtro por área na própria tela (não existem mais
+// duas versões por URL). ?area=servidora|conteudo abre já filtrado — útil
+// pra link direto —, mas quem controla é o chip. Clicar num agente abre o
+// cartão com papel, bio e habilidades.
 
 import { useEffect, useState } from "react";
 import { GraficoLinha } from "@/components/charts";
 import { useMetricsHistory, semanasOrdenadas } from "@/lib/metrics";
 import { EQUIPE, fetchEquipePublica, fallbackPublico, type AgentePublico } from "@/lib/equipe";
 import { AUTOMACOES, SEM_IA } from "@/lib/automacoes";
+import { ChipsArea, type Area } from "@/components/MetricasPage";
 
 function Contador({ valor, rotulo, detalhe }: { valor: string | number; rotulo: string; detalhe: string }) {
   const [aberto, setAberto] = useState(false);
@@ -87,12 +89,13 @@ function CartaoAgente({ agente, onFechar }: { agente: AgentePublico; onFechar: (
 
 export default function PalestraPage() {
   const { data, hoje } = useMetricsHistory(5 * 60 * 1000);
-  const [trabalho, setTrabalho] = useState(false);
+  const [area, setArea] = useState<Area>("tudo");
   const [agenteAberto, setAgenteAberto] = useState<AgentePublico | null>(null);
   const [equipe, setEquipe] = useState<AgentePublico[]>(fallbackPublico());
 
   useEffect(() => {
-    setTrabalho(new URLSearchParams(window.location.search).get("tema") === "trabalho");
+    const q = new URLSearchParams(window.location.search).get("area");
+    if (q === "servidora" || q === "conteudo") setArea(q);
     fetchEquipePublica().then((e) => e && setEquipe(e));
   }, []);
 
@@ -104,6 +107,9 @@ export default function PalestraPage() {
     );
   }
 
+  const mostraConteudo = area !== "servidora";
+  const mostraServidora = area !== "conteudo";
+
   const taxaSemanal = semanasOrdenadas(data.radar_semanas)
     .filter((s) => s.valor?.taxa !== null && s.valor?.taxa !== undefined)
     .map((s) => ({ label: s.label, valor: Math.round((s.valor.taxa as number) * 100) }));
@@ -112,21 +118,21 @@ export default function PalestraPage() {
   const horasConteudo = hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0;
   const horasTrabalho = hoje.horas_trabalho; // null até o hub IGAM medir de verdade
 
-  const contadores: { valor: string | number; rotulo: string; detalhe: string }[] = trabalho
-    ? [
-        { valor: EQUIPE.length, rotulo: "agentes na equipe", detalhe: "Especialistas de IA, cada um com papel definido — toca num deles ali embaixo pra conhecer." },
-        { valor: `${hoje.saude?.crons_ok ?? "—"}+`, rotulo: "rotinas automáticas diárias", detalhe: "Verificações, briefings, backups e monitoramentos que rodam sozinhos na VPS, 24h." },
-        { valor: atividadesHoje || "—", rotulo: "ações executadas hoje", detalhe: "Contagem real do dia: envios, curadorias, rondas e avisos registrados pelo sistema." },
-        ...(horasTrabalho != null
-          ? [{ valor: `${Math.round(horasTrabalho)}h`, rotulo: "economizadas no trabalho", detalhe: "Medidas a partir de atas, documentos e automações do serviço público." }]
-          : []),
-      ]
-    : [
-        { valor: EQUIPE.length, rotulo: "agentes na equipe", detalhe: "Especialistas de IA, cada um com papel definido — toca num deles ali embaixo pra conhecer." },
-        { valor: hoje.fila?.cards_gerados_total ?? "—", rotulo: "notícias e dicas curadas", detalhe: "Todo card que a equipe propôs desde o início — a decisão final é sempre humana." },
-        { valor: hoje.enviados_total ?? "—", rotulo: "posts publicados", detalhe: "Posts aprovados por mim que chegaram à comunidade, com agendamento automático." },
-        { valor: `${Math.round(horasConteudo)}h`, rotulo: "economizadas em conteúdo", detalhe: `Fórmula transparente: ${data.formula_horas?.post_grupo_min ?? 25} min por post curado + ${data.formula_horas?.carrossel_min ?? 120} min por carrossel produzido.` },
-      ];
+  const contadores: { valor: string | number; rotulo: string; detalhe: string }[] = [
+    { valor: EQUIPE.length, rotulo: "agentes na equipe", detalhe: "Especialistas de IA, cada um com papel definido — toca num deles ali embaixo pra conhecer." },
+    ...(mostraConteudo ? [
+      { valor: hoje.fila?.cards_gerados_total ?? "—", rotulo: "notícias e dicas curadas", detalhe: "Todo card que a equipe propôs desde o início — a decisão final é sempre humana." },
+      { valor: hoje.enviados_total ?? "—", rotulo: "posts publicados", detalhe: "Posts aprovados por mim que chegaram à comunidade, com agendamento automático." },
+      { valor: `${Math.round(horasConteudo)}h`, rotulo: "economizadas em conteúdo", detalhe: `Fórmula transparente: ${data.formula_horas?.post_grupo_min ?? 25} min por post curado + ${data.formula_horas?.carrossel_min ?? 120} min por carrossel produzido.` },
+    ] : []),
+    ...(mostraServidora ? [
+      { valor: `${hoje.saude?.crons_ok ?? "—"}+`, rotulo: "rotinas automáticas diárias", detalhe: "Verificações, briefings, backups e monitoramentos que rodam sozinhos na VPS, 24h." },
+      { valor: atividadesHoje || "—", rotulo: "ações executadas hoje", detalhe: "Contagem real do dia: envios, curadorias, rondas e avisos registrados pelo sistema." },
+      horasTrabalho != null
+        ? { valor: `${Math.round(horasTrabalho)}h`, rotulo: "economizadas no serviço público", detalhe: "Medidas a partir de atas, documentos e automações do serviço público." }
+        : { valor: "—", rotulo: "economizadas no serviço público", detalhe: "Medição chega com o hub IGAM." },
+    ] : []),
+  ];
 
   return (
     <main className="min-h-screen px-6 py-10 md:px-16 md:py-14 relative" style={{ background: "#F5F0EA", color: "#2D3B3B" }}>
@@ -134,25 +140,29 @@ export default function PalestraPage() {
         ← painel
       </a>
 
-      <header className="text-center mb-10">
+      <header className="text-center mb-8">
         <p className="text-sm uppercase tracking-[0.3em]" style={{ color: "#A0583C" }}>
-          {trabalho ? "Produtividade com IA, na prática" : "IA na prática, de verdade"}
+          {area === "servidora" ? "Produtividade com IA, na prática" : "IA na prática, de verdade"}
         </p>
         <h1 className="text-3xl md:text-5xl font-bold mt-2">
-          {trabalho ? "Meu escritório de agentes de IA" : "Minha fábrica de conteúdo com IA"}
+          {area === "servidora" ? "Meu escritório de agentes de IA" : "Minha fábrica de conteúdo com IA"}
         </h1>
         <p className="mt-2 text-base md:text-lg" style={{ color: "#6B7A7A" }}>
-          {trabalho
+          {area === "servidora"
             ? "agentes especializados trabalhando 24h · decisão sempre humana"
             : "rodando sozinha numa VPS · curadoria sempre humana · @andreiarfrois"}
         </p>
       </header>
 
+      <div className="flex justify-center mb-10">
+        <ChipsArea area={area} setArea={setArea} />
+      </div>
+
       <section className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto mb-12">
         {contadores.map((c) => <Contador key={c.rotulo} {...c} />)}
       </section>
 
-      {!trabalho && (
+      {mostraConteudo && (
         <section className="max-w-3xl mx-auto mb-12 rounded-2xl p-6 md:p-8" style={{ background: "#FFFFFF" }}>
           <h2 className="text-xl md:text-2xl font-semibold text-center mb-1">
             A IA aprendendo o meu gosto 📈
@@ -164,7 +174,7 @@ export default function PalestraPage() {
         </section>
       )}
 
-      {trabalho && (
+      {area === "servidora" && (
         <section className="max-w-3xl mx-auto mb-12 rounded-2xl p-6 md:p-8" style={{ background: "#FFFFFF" }}>
           <h2 className="text-xl md:text-2xl font-semibold text-center mb-4">Como funciona</h2>
           <div className="grid md:grid-cols-3 gap-4 text-center text-sm">
@@ -206,7 +216,7 @@ export default function PalestraPage() {
       {agenteAberto && <CartaoAgente agente={agenteAberto} onFechar={() => setAgenteAberto(null)} />}
 
       <footer className="text-center mt-12 text-sm" style={{ color: "#6B7A7A" }}>
-        {trabalho ? "Andréia Frois · IA aplicada ao serviço público" : "andreiafrois.tech · Imersão IA na Prática"}
+        {area === "servidora" ? "Andréia Frois · IA aplicada ao serviço público" : "andreiafrois.tech · Imersão IA na Prática"}
       </footer>
     </main>
   );

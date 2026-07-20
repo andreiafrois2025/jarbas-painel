@@ -1,10 +1,95 @@
 // Catálogo da Biblioteca: tudo que foi criado (com links diretos) e as
 // skills/capacidades disponíveis. Mantido pelo Claude — pede pra ele
 // adicionar itens novos aqui quando algo for criado.
+//
+// A partir de 19/07/2026 o catálogo também pode vir AO VIVO da squad-api
+// (GET /api/catalogo), lendo skills/automações/squads reais da VPS. Os
+// catálogos estáticos abaixo continuam existindo como FALLBACK — se a API
+// estiver fora do ar ou a sessão não estiver logada, a tela usa esses dados.
+
+import { squadFetch } from "./squadFetch";
 
 export interface LinkItem {
   rotulo: string;
   url: string;
+}
+
+// ── Tipos do catálogo ao vivo (shape de /api/catalogo) ──
+
+export interface SkillApiItem {
+  nome: string;
+  descricao: string;
+  conteudo: string; // SKILL.md inteiro
+}
+
+export interface AutomacaoApiItem {
+  nome: string;
+  agenda: string; // expressão cron
+  comando: string;
+}
+
+export interface CriacaoApiItem {
+  icone: string;
+  nome: string;
+  descricao: string;
+  links: LinkItem[];
+  grupo: string;
+  origem: string;
+  criado_em?: string;
+}
+
+export interface Catalogo {
+  skills: SkillApiItem[];
+  automacoes: AutomacaoApiItem[];
+  squads: string[];
+  criacoes: CriacaoApiItem[];
+}
+
+// Busca o catálogo ao vivo. Retorna null em qualquer falha (API fora,
+// sessão expirada, etc.) para o componente cair no fallback estático.
+export async function fetchCatalogo(): Promise<Catalogo | null> {
+  try {
+    const resp = await squadFetch("/api/catalogo");
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return {
+      skills: Array.isArray(data.skills) ? data.skills : [],
+      automacoes: Array.isArray(data.automacoes) ? data.automacoes : [],
+      squads: Array.isArray(data.squads) ? data.squads : [],
+      criacoes: Array.isArray(data.criacoes) ? data.criacoes : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface NovaCriacaoPayload {
+  icone: string;
+  nome: string;
+  descricao: string;
+  links: LinkItem[];
+  grupo: string;
+  origem: string;
+}
+
+// Cria uma criação manual (ex.: algo feito num GPT, fora da VPS).
+export async function criarCriacao(
+  payload: NovaCriacaoPayload
+): Promise<{ ok: boolean; erro?: string }> {
+  try {
+    const resp = await squadFetch("/api/criacoes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      return { ok: false, erro: data.error || data.erro || `falha (${resp.status})` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "falha ao salvar" };
+  }
 }
 
 export interface Criacao {

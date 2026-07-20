@@ -10,6 +10,89 @@ import {
   useMetricsHistory, semanasOrdenadas, tempoRelativo,
 } from "@/lib/metrics";
 import { AUTOMACOES, SEM_IA } from "@/lib/automacoes";
+import { fetchEquipePublica, fallbackPublico, type AgentePublico } from "@/lib/equipe";
+
+// Grid da equipe clicável: abre a bio do agente num popover. A descrição vinha
+// da página "modo palco"; como ela vai virar espelho do dash (pedido 19/07), a
+// bio passou a viver aqui também. Fonte: equipe-publica.json (com fallback).
+function EquipeGrid() {
+  const [equipe, setEquipe] = useState<AgentePublico[]>(fallbackPublico());
+  const [sel, setSel] = useState<AgentePublico | null>(null);
+
+  useEffect(() => {
+    fetchEquipePublica().then((e) => e && setEquipe(e));
+  }, []);
+
+  useEffect(() => {
+    if (!sel) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSel(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sel]);
+
+  return (
+    <section className="text-center">
+      <h3 className="text-sm font-semibold mb-3 text-[var(--text-secondary)]">A equipe</h3>
+      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+        {equipe.map((a) => (
+          <button
+            key={a.nome}
+            onClick={() => setSel(a)}
+            className="rounded-xl py-2.5 px-1 bg-[var(--bg-secondary)] border border-[#E5DED4] hover:border-[var(--accent)] hover:shadow-sm transition-all cursor-pointer"
+            title={`Ver ${a.nome}`}
+          >
+            <div className="text-xl">{a.icone}</div>
+            <div className="text-[11px] mt-0.5 font-medium text-[var(--text-primary)]">{a.nome}</div>
+          </button>
+        ))}
+      </div>
+
+      {sel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 text-left"
+          style={{ background: "rgba(45,59,59,.45)" }} onClick={() => setSel(null)}>
+          <div className="rounded-2xl p-6 md:p-8 max-w-lg w-full max-h-[85vh] overflow-y-auto"
+            style={{ background: "#F5F0EA", color: "#2D3B3B" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-4">
+              <span className="text-5xl">{sel.icone}</span>
+              <div>
+                <h3 className="text-2xl font-bold">{sel.nome}</h3>
+                {sel.papel && <p className="text-sm uppercase tracking-widest" style={{ color: "#A0583C" }}>{sel.papel}</p>}
+              </div>
+            </div>
+            {sel.bio && <p className="mt-4 text-sm md:text-base leading-relaxed whitespace-pre-line">{sel.bio}</p>}
+            {sel.skills.length > 0 && (
+              <>
+                <p className="mt-5 text-xs font-semibold uppercase tracking-widest" style={{ color: "#6B7A7A" }}>Habilidades</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {sel.skills.map((h) => (
+                    <span key={h} className="text-xs px-3 py-1.5 rounded-full" style={{ background: "#FFFFFF", color: "#2D6B6B", border: "1px solid #2D6B6B" }}>{h}</span>
+                  ))}
+                </div>
+              </>
+            )}
+            {sel.funcoes.length > 0 && (
+              <>
+                <p className="mt-5 text-xs font-semibold uppercase tracking-widest" style={{ color: "#6B7A7A" }}>Funções que executa</p>
+                <ul className="mt-2 space-y-1.5">
+                  {sel.funcoes.map((f, i) => (
+                    <li key={i} className="text-sm rounded-lg px-3 py-2" style={{ background: "#FFFFFF" }}>
+                      <span className="font-medium">{f.descricao || f.nome}</span>
+                      {f.descricao && f.nome && <span className="block text-xs" style={{ color: "#6B7A7A" }}>via {f.nome}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {sel.personalidade && (
+              <p className="mt-4 text-xs italic leading-relaxed" style={{ color: "#6B7A7A" }}>“{sel.personalidade}”</p>
+            )}
+            <button onClick={() => setSel(null)} className="mt-5 text-sm underline opacity-60 hover:opacity-100">fechar</button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 const NOME_AUTOMACAO: Record<string, string> = {
   style_learner: "Aprendiz de estilo (Mike)",
@@ -51,10 +134,42 @@ function CartaoGrafico({ titulo, sub, children }: {
 }
 
 type Aba = "geral" | "producao" | "saude" | "diario";
+// Filtro de área — chip no topo, afeta as abas "Painel Geral" e "Produtividade IA".
+// "tudo" = comportamento de sempre (soma/mostra tudo). "conteudo" = só o que já
+// existe hoje (fila/radar/envios/dicas/reels/horas_conteudo). "servidora" = só
+// horas_trabalho e o que existir de licitação/serviço — sem inventar número.
+export type Area = "tudo" | "conteudo" | "servidora";
+
+export function ChipsArea({ area, setArea }: { area: Area; setArea: (a: Area) => void }) {
+  const opcoes: [Area, string][] = [
+    ["tudo", "Tudo"],
+    ["conteudo", "🎨 Conteúdo"],
+    ["servidora", "🏛️ Servidora"],
+  ];
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {opcoes.map(([id, rotulo]) => (
+        <button
+          key={id}
+          onClick={() => setArea(id)}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+            area === id
+              ? "text-white border-transparent"
+              : "text-[var(--text-secondary)] border-[var(--border)] hover:text-[var(--text-primary)]"
+          }`}
+          style={area === id ? { background: "#2D6B6B" } : undefined}
+        >
+          {rotulo}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function MetricasPage() {
   const { data, erro, hoje } = useMetricsHistory();
   const [aba, setAba] = useState<Aba>("geral");
+  const [area, setArea] = useState<Area>("tudo");
 
   if (erro) {
     return <p className="p-6 text-[var(--text-secondary)]">
@@ -97,14 +212,21 @@ export default function MetricasPage() {
         {botaoAba("diario", "📖 Diário de bordo")}
       </div>
 
+      {/* Filtro de área — só afeta Painel Geral e Produtividade IA */}
+      {(aba === "geral" || aba === "producao") && (
+        <div className="px-3 md:px-5 py-2.5 border-b border-[var(--border)] bg-[var(--bg-primary)]">
+          <ChipsArea area={area} setArea={setArea} />
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
           <p className="text-xs text-[var(--text-secondary)] text-right">
             snapshot diário · atualizado {tempoRelativo(data.updated_at)}
           </p>
 
-          {aba === "geral" && <AbaGeral data={data} hoje={hoje} taxaSemanal={taxaSemanal} />}
-          {aba === "producao" && <AbaProducao data={data} hoje={hoje} taxaSemanal={taxaSemanal} />}
+          {aba === "geral" && <AbaGeral data={data} hoje={hoje} taxaSemanal={taxaSemanal} area={area} />}
+          {aba === "producao" && <AbaProducao data={data} hoje={hoje} taxaSemanal={taxaSemanal} area={area} />}
           {aba === "saude" && <AbaSaude hoje={hoje} />}
           {aba === "diario" && <AbaDiario data={data} />}
         </div>
@@ -148,18 +270,36 @@ function SecaoIAConstroi() {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function AbaGeral({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSemanal: { label: string; valor: number }[] }) {
+function AbaGeral({ data, hoje, taxaSemanal, area }: {
+  data: any; hoje: any; taxaSemanal: { label: string; valor: number }[]; area: Area;
+}) {
+  const mostraConteudo = area !== "servidora";
+
+  // Tiles honestos: só mostra número onde a métrica existe pra área escolhida.
+  const tiles: [string | number, string][] = [[EQUIPE.length, "agentes na equipe"]];
+  if (mostraConteudo) {
+    tiles.push([hoje.fila?.cards_gerados_total ?? "—", "notícias e dicas curadas"]);
+    tiles.push([hoje.enviados_total ?? "—", "posts publicados"]);
+  }
+  if (area === "conteudo") {
+    tiles.push([`${Math.round(hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0)}h`, "economizadas em conteúdo"]);
+  } else if (area === "servidora") {
+    tiles.push(hoje.horas_trabalho != null
+      ? [`${Math.round(hoje.horas_trabalho)}h`, "economizadas no serviço público"]
+      : ["—", "economizadas no serviço público (medição chega com o hub IGAM)"]);
+  } else {
+    tiles.push([`${Math.round(hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0)}h`, "economizadas em conteúdo"]);
+    tiles.push(hoje.horas_trabalho != null
+      ? [`${Math.round(hoje.horas_trabalho)}h`, "economizadas no serviço público"]
+      : ["—", "economizadas no serviço público (medição chega com o hub IGAM)"]);
+  }
+
   return (
     <div className="space-y-6">
       <section className="text-center py-4">
         <p className="text-xs uppercase tracking-[0.3em]" style={{ color: "#A0583C" }}>Minha fábrica com IA</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto mt-6">
-          {[
-            [EQUIPE.length, "agentes na equipe"],
-            [hoje.fila?.cards_gerados_total ?? "—", "notícias e dicas curadas"],
-            [hoje.enviados_total ?? "—", "posts publicados"],
-            [`${Math.round(hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0)}h`, "economizadas em conteúdo"],
-          ].map(([v, r]) => (
+          {tiles.map(([v, r]) => (
             <div key={String(r)}>
               <div className="text-4xl md:text-5xl font-bold" style={{ color: "#2D6B6B" }}>{v}</div>
               <div className="mt-1 text-xs uppercase tracking-wider text-[var(--text-secondary)]">{r}</div>
@@ -168,41 +308,37 @@ function AbaGeral({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSeman
         </div>
       </section>
 
-      {/* A tese dela: IA constrói, Python roda (12/07) */}
+      {/* A tese dela: IA constrói, Python roda (12/07) — vale pras duas áreas */}
       <SecaoIAConstroi />
 
-      <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
-        sub="% das pautas propostas pela IA que eu aprovo, semana a semana">
-        <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
-      </CartaoGrafico>
+      {mostraConteudo ? (
+        <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
+          sub="% das pautas propostas pela IA que eu aprovo, semana a semana">
+          <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
+        </CartaoGrafico>
+      ) : (
+        <CartaoGrafico titulo="Aprovação de pautas 📈"
+          sub="medição chega com o hub IGAM">
+          <p className="text-sm text-[var(--text-secondary)] py-6 text-center">—</p>
+        </CartaoGrafico>
+      )}
 
-      <section className="text-center">
-        <h3 className="text-sm font-semibold mb-3 text-[var(--text-secondary)]">A equipe</h3>
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-          {EQUIPE.map(([icone, nome]) => (
-            <div key={nome} className="rounded-xl py-2.5 px-1 bg-[var(--bg-secondary)] border border-[#E5DED4]">
-              <div className="text-xl">{icone}</div>
-              <div className="text-[11px] mt-0.5 font-medium text-[var(--text-primary)]">{nome}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <EquipeGrid />
 
-      <div className="flex flex-wrap gap-2 justify-center text-sm">
+      <div className="flex justify-center text-sm">
         <a href="/metricas/palestra" target="_blank"
           className="px-4 py-2 rounded-lg text-white font-medium" style={{ background: "#2D6B6B" }}>
           🎤 Modo palco (tela cheia)
-        </a>
-        <a href="/metricas/palestra?tema=trabalho" target="_blank"
-          className="px-4 py-2 rounded-lg font-medium border" style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
-          🏛️ Modo palco — serviço público (sem parte de conteúdo)
         </a>
       </div>
     </div>
   );
 }
 
-function AbaProducao({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSemanal: { label: string; valor: number; detalhe?: string }[] }) {
+function AbaProducao({ data, hoje, taxaSemanal, area }: {
+  data: any; hoje: any; taxaSemanal: { label: string; valor: number; detalhe?: string }[]; area: Area;
+}) {
+  const mostraConteudo = area !== "servidora";
   const enviosSemana = semanasOrdenadas(data.envios_semanas).map((s) => ({
     label: s.label, valor: s.valor as number,
   }));
@@ -213,14 +349,28 @@ function AbaProducao({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSe
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Tile icone="📤" titulo="Posts no grupo IA" valor={hoje.enviados_total ?? "—"}
-          sub={`${hoje.fila?.enviados_7d ?? 0} nos últimos 7 dias`} />
-        <Tile icone="⏱️" titulo="Horas economizadas (conteúdo)" valor={`${hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0}h`}
-          sub={hoje.horas_trabalho != null
-            ? `+ ${hoje.horas_trabalho}h no serviço público`
-            : "serviço público: medição chega com o hub IGAM"} />
-        <Tile icone="💡" titulo="Dicas do banco" valor={`${hoje.dicas?.usadas ?? 0}/${hoje.dicas?.total ?? 0}`}
-          sub="já usadas em posts" />
+        {mostraConteudo ? (
+          <Tile icone="📤" titulo="Posts no grupo IA" valor={hoje.enviados_total ?? "—"}
+            sub={`${hoje.fila?.enviados_7d ?? 0} nos últimos 7 dias`} />
+        ) : (
+          <Tile icone="📤" titulo="Posts no grupo IA" valor="—" sub="métrica de conteúdo" />
+        )}
+        {area === "servidora" ? (
+          <Tile icone="⏱️" titulo="Horas economizadas (serviço público)"
+            valor={hoje.horas_trabalho != null ? `${hoje.horas_trabalho}h` : "—"}
+            sub="medição chega com o hub IGAM" />
+        ) : (
+          <Tile icone="⏱️" titulo="Horas economizadas (conteúdo)" valor={`${hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0}h`}
+            sub={area === "tudo" && hoje.horas_trabalho != null
+              ? `+ ${hoje.horas_trabalho}h no serviço público`
+              : area === "tudo" ? "serviço público: medição chega com o hub IGAM" : undefined} />
+        )}
+        {mostraConteudo ? (
+          <Tile icone="💡" titulo="Dicas do banco" valor={`${hoje.dicas?.usadas ?? 0}/${hoje.dicas?.total ?? 0}`}
+            sub="já usadas em posts" />
+        ) : (
+          <Tile icone="💡" titulo="Dicas do banco" valor="—" sub="métrica de conteúdo" />
+        )}
         <Tile icone="🤖" titulo="Squads (jobs)" valor={hoje.jobs?.concluidos ?? 0}
           sub={`concluídos · ${hoje.jobs?.ultimos_30d ?? 0} nos últimos 30 dias`} />
       </div>
@@ -249,39 +399,47 @@ function AbaProducao({ data, hoje, taxaSemanal }: { data: any; hoje: any; taxaSe
         )}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-3">
-        <CartaoGrafico titulo="Aprendizado geral 📈"
-          sub="Taxa de aprovação dos cards do Radar por semana de criação">
-          <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
+      {mostraConteudo ? (
+        <div className="grid lg:grid-cols-2 gap-3">
+          <CartaoGrafico titulo="Aprendizado geral 📈"
+            sub="Taxa de aprovação dos cards do Radar por semana de criação">
+            <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
+          </CartaoGrafico>
+          <CartaoGrafico titulo="Posts enviados ao grupo por semana"
+            sub="Curadoria aprovada por você que chegou na comunidade">
+            <GraficoBarras pontos={enviosSemana} />
+          </CartaoGrafico>
+        </div>
+      ) : (
+        <CartaoGrafico titulo="Gráficos de conteúdo" sub="medição chega com o hub IGAM">
+          <p className="text-sm text-[var(--text-secondary)] py-6 text-center">—</p>
         </CartaoGrafico>
-        <CartaoGrafico titulo="Posts enviados ao grupo por semana"
-          sub="Curadoria aprovada por você que chegou na comunidade">
-          <GraficoBarras pontos={enviosSemana} />
-        </CartaoGrafico>
-      </div>
+      )}
 
-      {/* Evolução individual por agente (pedido dela 12/07) */}
-      <div className="grid lg:grid-cols-3 gap-3">
-        {([
-          ["mike", "🔍 Mike — notícias", "aprovação das notícias propostas"],
-          ["izzy", "✍️ Izzy — dicas", "aprovação das dicas propostas"],
-          ["reels", "🎬 Reels — pautas", "aprovação das pautas de reel"],
-        ] as const).map(([chave, titulo, sub]) => {
-          const serie = semanasOrdenadas<{ aprovados: number; descartados: number; taxa: number | null }>(
-            data.radar_semanas_por_agente?.[chave])
-            .filter((s) => s.valor?.taxa !== null && s.valor?.taxa !== undefined)
-            .map((s) => ({
-              label: s.label,
-              valor: Math.round((s.valor.taxa as number) * 100),
-              detalhe: `${s.valor.aprovados} aprov. / ${s.valor.descartados} desc.`,
-            }));
-          return (
-            <CartaoGrafico key={chave} titulo={titulo} sub={sub}>
-              <GraficoLinha pontos={serie} unidade="%" maxY={100} altura={170} />
-            </CartaoGrafico>
-          );
-        })}
-      </div>
+      {/* Evolução individual por agente (pedido dela 12/07) — só faz sentido em conteúdo */}
+      {mostraConteudo && (
+        <div className="grid lg:grid-cols-3 gap-3">
+          {([
+            ["mike", "🔍 Mike — notícias", "aprovação das notícias propostas"],
+            ["izzy", "✍️ Izzy — dicas", "aprovação das dicas propostas"],
+            ["reels", "🎬 Reels — pautas", "aprovação das pautas de reel"],
+          ] as const).map(([chave, titulo, sub]) => {
+            const serie = semanasOrdenadas<{ aprovados: number; descartados: number; taxa: number | null }>(
+              data.radar_semanas_por_agente?.[chave])
+              .filter((s) => s.valor?.taxa !== null && s.valor?.taxa !== undefined)
+              .map((s) => ({
+                label: s.label,
+                valor: Math.round((s.valor.taxa as number) * 100),
+                detalhe: `${s.valor.aprovados} aprov. / ${s.valor.descartados} desc.`,
+              }));
+            return (
+              <CartaoGrafico key={chave} titulo={titulo} sub={sub}>
+                <GraficoLinha pontos={serie} unidade="%" maxY={100} altura={170} />
+              </CartaoGrafico>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
