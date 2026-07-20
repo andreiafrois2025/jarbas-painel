@@ -8,7 +8,7 @@
 // reels ficam no kanban do Notion). Notícia UAU (Prioridade) em evidência.
 
 import { useState } from "react";
-import { useHoje, decidirCard, type CardCaixa } from "@/lib/hoje";
+import { useHoje, decidirCard, marcarLido, type CardCaixa, type ItemParaMim } from "@/lib/hoje";
 import { tempoRelativo } from "@/lib/metrics";
 
 const AGENDA_URL = "https://calendar.google.com/calendar/u/0/r";
@@ -66,6 +66,40 @@ function CardAprovacao({ card, onDecidir }: { card: CardCaixa; onDecidir: (id: s
   );
 }
 
+// 📰 "Pra você ficar por dentro" (F4): notícias de IA que NÃO foram pro grupo,
+// só pra ela se manter antenada do mercado. Leitura, não decisão — separado da
+// caixa de aprovação de propósito.
+function ParaVoceFicarPorDentro({ itens, onLido }: { itens: ItemParaMim[]; onLido: (url: string) => void }) {
+  if (itens.length === 0) return null;
+  return (
+    <section>
+      <details open>
+        <summary className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2 cursor-pointer select-none">
+          📰 Pra você ficar por dentro <span className="text-[var(--text-muted)] font-normal normal-case">({itens.length}) · só notícia de mercado, não vai pro grupo</span>
+        </summary>
+        <div className="bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)] mt-2 max-h-72 overflow-y-auto space-y-1.5">
+          {itens.map((n) => (
+            <div key={n.url} className="flex items-start gap-2 text-sm border-b border-[var(--border)] last:border-0 pb-1.5 last:pb-0">
+              <div className="flex-1 min-w-0">
+                <a href={n.url} target="_blank" rel="noreferrer" className="text-[var(--text-primary)] hover:text-[var(--accent)] hover:underline">
+                  {n.titulo}
+                </a>
+                <span className="block text-[11px] text-[var(--text-muted)]">
+                  {n.fonte}{n.tema ? ` · ${n.tema}` : ""}
+                </span>
+              </div>
+              <button onClick={() => onLido(n.url)} title="Marcar como lido"
+                className="text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] whitespace-nowrap shrink-0">
+                ✓ lido
+              </button>
+            </div>
+          ))}
+        </div>
+      </details>
+    </section>
+  );
+}
+
 function LinkCanto({ href, rotulo }: { href: string; rotulo: string }) {
   return (
     <a
@@ -82,10 +116,16 @@ function LinkCanto({ href, rotulo }: { href: string; rotulo: string }) {
 export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
   const { dados, erro, recarregar } = useHoje();
   const [feitos, setFeitos] = useState<Set<string>>(new Set());
+  const [lidos, setLidos] = useState<Set<string>>(new Set());
 
   const onDecidir = async (id: string, acao: "aprovar" | "prioridade" | "descartar") => {
     const ok = await decidirCard(id, acao);
     if (ok) setFeitos((s) => new Set(s).add(id));
+  };
+
+  const onLido = async (url: string) => {
+    setLidos((s) => new Set(s).add(url)); // some da vista na hora
+    marcarLido(url); // remove no servidor (melhor esforço)
   };
 
   if (erro) {
@@ -206,6 +246,12 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                 </ul>
               </div>
             </section>
+
+            {/* Notícias de mercado (só leitura, separado da caixa do grupo) */}
+            <ParaVoceFicarPorDentro
+              itens={(dados.para_mim || []).filter((n) => !lidos.has(n.url))}
+              onLido={onLido}
+            />
           </div>
 
           {/* Coluna direita: caixa de aprovação (fila única, só notícias) */}

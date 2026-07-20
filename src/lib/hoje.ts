@@ -26,6 +26,15 @@ export interface Atividade {
   texto: string;
 }
 
+export interface ItemParaMim {
+  url: string;
+  titulo: string;
+  fonte: string;
+  preview?: string;
+  tema?: string;
+  quando?: string;
+}
+
 export interface DadosHoje {
   gerado_em: string;
   agenda: string;
@@ -35,6 +44,7 @@ export interface DadosHoje {
   caixa: CardCaixa[];
   escola: ItemEscola[];
   atividades: Atividade[];
+  para_mim?: ItemParaMim[];
   nivel?: string;
   erro?: string;
 }
@@ -99,6 +109,15 @@ export function useFinancas() {
     })();
   }, []);
   return { financas, erroFin };
+}
+
+export async function marcarLido(url: string) {
+  const r = await comToken(`/api/para-mim/lido`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  return r.ok;
 }
 
 export async function decidirCard(pageId: string, acao: "aprovar" | "prioridade" | "descartar") {
