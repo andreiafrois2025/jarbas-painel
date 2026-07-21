@@ -33,6 +33,7 @@ export interface ItemParaMim {
   preview?: string;
   tema?: string;
   quando?: string;
+  lido?: boolean;
 }
 
 export interface DadosHoje {
@@ -111,8 +112,18 @@ export function useFinancas() {
   return { financas, erroFin };
 }
 
-export async function marcarLido(url: string) {
+export async function marcarLido(url: string, lido: boolean) {
   const r = await comToken(`/api/para-mim/lido`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, lido }),
+  });
+  return r.ok;
+}
+
+// promove uma notícia do feed pessoal pra caixa de aprovação do grupo
+export async function promoverProGrupo(url: string) {
+  const r = await comToken(`/api/para-mim/pro-grupo`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
