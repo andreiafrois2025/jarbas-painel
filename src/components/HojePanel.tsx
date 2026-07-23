@@ -277,7 +277,9 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                 .map((n) => ({
                   ...n,
                   lido: lidosOverride.has(n.url) ? !!lidosOverride.get(n.url) : !!n.lido,
-                }))}
+                }))
+                // lidas vão pro fim da lista na hora, sem esperar recarregar
+                .sort((a, b) => Number(a.lido) - Number(b.lido))}
               onToggleLido={onToggleLido}
               onProGrupo={onProGrupo}
               onProConteudo={onProConteudo}
