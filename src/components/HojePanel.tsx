@@ -206,7 +206,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                   {dados.agenda || "Sem compromissos hoje."}
                 </pre>
                 {dados.agenda_semana && (
-                  <details open className="mt-3 border-t border-[var(--border)] pt-2">
+                  <details className="mt-3 border-t border-[var(--border)] pt-2">
                     <summary className="text-xs font-semibold text-[var(--text-primary)] cursor-pointer select-none">
                       🗓️ Semana
                     </summary>
@@ -225,7 +225,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                   {dados.tarefas || "Sem tarefas pendentes pra hoje."}
                 </pre>
                 {dados.tarefas_semana && (
-                  <details open className="mt-3 border-t border-[var(--border)] pt-2">
+                  <details className="mt-3 border-t border-[var(--border)] pt-2">
                     <summary className="text-xs font-semibold text-[var(--text-primary)] cursor-pointer select-none">
                       🗓️ Tarefas da semana
                     </summary>
@@ -237,20 +237,8 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
               </section>
             </div>
 
-            {/* Escola do Luiz (se houver) */}
-            {dados.escola.length > 0 && (
-              <section className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-2">🎒 Próximas do Luiz</h2>
-                <ul className="space-y-1 text-sm text-[var(--text-primary)]">
-                  {dados.escola.slice(0, 6).map((e, i) => (
-                    <li key={i}>
-                      <span className="text-[var(--text-muted)]">{new Date(e.data + "T00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
-                      {" · "}{{ prova: "🔴", avaliativa: "🟡", paracasa: "🟢" }[e.tipo] || "📌"} {e.disciplina} {e.nome ? `— ${e.nome}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            {/* Escola do Luiz (23/07: card tirado da home a pedido da Andréia —
+                fica só em Pessoal → Luiz escola) */}
 
             {/* Feed do que os agentes fizeram */}
             <section>
