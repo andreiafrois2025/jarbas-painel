@@ -131,6 +131,16 @@ export async function promoverProGrupo(url: string) {
   return r.ok;
 }
 
+// manda a notícia do feed pessoal pro banco Conteúdos como ideia (Status IDEIAS)
+export async function promoverProConteudo(url: string) {
+  const r = await comToken(`/api/para-mim/conteudo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  return r.ok;
+}
+
 export async function decidirCard(pageId: string, acao: "aprovar" | "prioridade" | "descartar") {
   const r = await comToken(`/api/radar/${pageId}/decidir`, {
     method: "POST",

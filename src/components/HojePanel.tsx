@@ -8,7 +8,7 @@
 // reels ficam no kanban do Notion). Notícia UAU (Prioridade) em evidência.
 
 import { useState } from "react";
-import { useHoje, decidirCard, marcarLido, promoverProGrupo, type CardCaixa, type ItemParaMim } from "@/lib/hoje";
+import { useHoje, decidirCard, marcarLido, promoverProGrupo, promoverProConteudo, type CardCaixa, type ItemParaMim } from "@/lib/hoje";
 import { tempoRelativo } from "@/lib/metrics";
 
 const AGENDA_URL = "https://calendar.google.com/calendar/u/0/r";
@@ -69,10 +69,11 @@ function CardAprovacao({ card, onDecidir }: { card: CardCaixa; onDecidir: (id: s
 // 📰 "Pra você ficar por dentro" (F4): notícias de IA que NÃO foram pro grupo,
 // só pra ela se manter antenada do mercado. Leitura, não decisão — separado da
 // caixa de aprovação de propósito.
-function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo }: {
+function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProConteudo }: {
   itens: ItemParaMim[];
   onToggleLido: (url: string, lido: boolean) => void;
   onProGrupo: (url: string) => void;
+  onProConteudo: (url: string) => void;
 }) {
   if (itens.length === 0) return null;
   const naoLidas = itens.filter((n) => !n.lido).length;
@@ -105,6 +106,11 @@ function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo }: {
                 title="Mandar pra caixa de aprovação do grupo"
                 className="text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] whitespace-nowrap shrink-0 border border-[var(--border)] rounded px-1.5 py-0.5">
                 ↑ grupo
+              </button>
+              <button onClick={() => onProConteudo(n.url)}
+                title="Mandar pro banco de Conteúdos como ideia"
+                className="text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] whitespace-nowrap shrink-0 border border-[var(--border)] rounded px-1.5 py-0.5">
+                ↑ Conteúdo
               </button>
             </div>
           ))}
@@ -149,6 +155,12 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
     setPromovidos((s) => new Set(s).add(url)); // some do feed pessoal na hora
     const ok = await promoverProGrupo(url);
     if (ok) setTimeout(recarregar, 800); // traz o novo card pra caixa
+  };
+
+  // manda a notícia pro banco de Conteúdos como ideia (Status IDEIAS, sem Formato)
+  const onProConteudo = async (url: string) => {
+    setPromovidos((s) => new Set(s).add(url)); // some do feed pessoal na hora
+    await promoverProConteudo(url);
   };
 
   if (erro) {
@@ -268,6 +280,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                 }))}
               onToggleLido={onToggleLido}
               onProGrupo={onProGrupo}
+              onProConteudo={onProConteudo}
             />
           </div>
 
