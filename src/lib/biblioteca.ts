@@ -233,3 +233,146 @@ export const SKILLS: { grupo: string; itens: SkillItem[] }[] = [
     ],
   },
 ];
+
+// ── Catálogo externo (referência) — 24/07/2026 ──
+// Material que a Andréia trouxe de fora pra avaliar. NADA aqui está
+// instalado — é só uma vitrine de referência com passo a passo, no mesmo
+// formato de card+modal das skills de verdade. Ver avaliação completa em
+// /root/docs/skills-externas-avaliacao-2026-07-24.md.
+export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
+  {
+    nome: "claude-code-setup (Anthropic)",
+    descricao: "Plugin oficial que audita um projeto e recomenda hooks, skills, subagents e MCPs.",
+    descricao_simples: "Escaneia seu projeto e sugere o que falta configurar — só leitura, não instala nada sozinho.",
+    fonte_nome: "Anthropic (oficial)",
+    fonte_url: "https://claude.ai/code",
+    conteudo:
+      "# claude-code-setup — plugin oficial da Anthropic\n\n" +
+      "**Risco: baixo** — é só leitura, não instala nem modifica nada sozinho.\n\n" +
+      "**O que é:** audita um projeto e recomenda hooks, skills, subagents e MCPs certos pro caso.\n\n" +
+      "**Passo a passo:**\n" +
+      "1. Abra o Claude Code dentro da pasta do projeto que quer auditar.\n" +
+      "2. Cole no chat: `/plugin install claude-code-setup@claude-plugins-official`\n" +
+      "3. Deixe ele escanear o projeto — devolve uma lista sob medida (MCP servers, skills, hooks, subagents, slash commands).\n" +
+      "4. Você decide o que implementar depois; nada é aplicado automaticamente.\n\n" +
+      "**Confiança:** aparece \"By: Anthropic\" na tela — é o próprio criador do Claude Code.\n\n" +
+      "**Recomendação:** pode testar sem medo, num projeto não-crítico primeiro.",
+  },
+  {
+    nome: "frontend-design + impeccable",
+    descricao: "Skills de gosto de design pro Claude: direção estética antes do CSS, passe de qualidade determinístico.",
+    descricao_simples: "Ajuda o Claude a ter mais \"olho\" de design em telas e interfaces (grid, cor, tipografia, contraste).",
+    fonte_nome: "Anthropic + Paul Bakaus",
+    fonte_url: "https://github.com/anthropics/skills",
+    conteudo:
+      "# frontend-design (Anthropic) + impeccable (Paul Bakaus)\n\n" +
+      "**Risco: baixo** — são prompts de estilo, não scripts com comandos livres.\n\n" +
+      "**O que fazem:** obrigam a escolher uma direção estética antes de codar, banem fonte padrão genérica, " +
+      "e rodam um \"passe de qualidade\" (grid de 4px, cor OKLCH, tipografia fluida, contraste acessível).\n\n" +
+      "**Por que importa:** relevante pro nosso painel — evita cara de protótipo.\n\n" +
+      "**Passo a passo:**\n" +
+      "```\nnpx skills add anthropics/skills --skill frontend-design\n```\n" +
+      "```\nnpx impeccable install\n# depois, dentro do Claude Code:\n/impeccable init\n```\n" +
+      "Uso depois de instalado: comandos de uma palavra — `polish`, `critique`, `animate`.\n\n" +
+      "**Recomendação:** dá pra testar no painel.",
+  },
+  {
+    nome: "Find Skills / npx skills (Vercel Labs)",
+    descricao: "Busca entre +700 mil skills prontas e instala a certa a partir do que você descrever.",
+    descricao_simples: "Você diz o que está construindo, ela acha a skill certa numa biblioteca gigante e instala sozinha.",
+    fonte_nome: "Vercel Labs",
+    fonte_url: "https://github.com/vercel-labs/skills",
+    conteudo:
+      "# Find Skills / npx skills (vercel-labs/skills)\n\n" +
+      "**Risco: médio** — instala skills de terceiro automaticamente, sem revisão manual prévia.\n\n" +
+      "**O que é:** vasculha um diretório com +700 mil skills prontas, filtra as mais confiáveis e instala sozinha.\n\n" +
+      "**Passo a passo:**\n" +
+      "1. No terminal, dentro do projeto: `npx skills`\n" +
+      "2. Peça em português o que precisa (ex: \"skill pra revisar PR\", \"skill pra landing page\").\n" +
+      "3. Ela busca, filtra as \"seguras\" e instala.\n\n" +
+      "**Ressalva:** o filtro de segurança é dela, não nosso — prefiro revisar manualmente antes de aceitar " +
+      "instalação automática em massa.\n\n" +
+      "**Recomendação:** posso usar pra buscar e sugerir, decidindo com você antes de deixar instalar sozinha.",
+  },
+  {
+    nome: "Superpowers",
+    descricao: "Força o Claude a planejar e revisar o próprio trabalho antes de tocar no projeto de verdade.",
+    descricao_simples: "Deixa o Claude mais metódico: planeja e revisa antes de agir, em vez de sair fazendo.",
+    fonte_nome: "obra (GitHub)",
+    fonte_url: "https://github.com/obra/superpowers",
+    conteudo:
+      "# Superpowers (obra/superpowers)\n\n" +
+      "**Risco: médio-baixo** — repo de terceiro sem tanto histórico ainda pra atestar reputação/manutenção.\n\n" +
+      "**O que é:** obriga o Claude a ir mais devagar — planejar, revisar o próprio trabalho antes de tocar " +
+      "no projeto de verdade.\n\n" +
+      "**Por que importa:** parecido com o que já praticamos juntos (plano antes de mudança estrutural), " +
+      "formalizado como skill instalável.\n\n" +
+      "**Passo a passo:** instala via `npx skills` (Find Skills) ou clonando " +
+      "`github.com/obra/superpowers` na pasta `.claude/skills/`.\n\n" +
+      "**Recomendação:** deixaria pra depois de testar o claude-code-setup oficial.",
+  },
+  {
+    nome: "ClaudeMem",
+    descricao: "Memória entre sessões: lembra do projeto e arquivos sem reexplicar do zero.",
+    descricao_simples: "Dá memória entre conversas — mas você já tem isso com a gente.",
+    fonte_nome: "thedotmack (GitHub)",
+    fonte_url: "https://github.com/thedotmack/claude-mem",
+    conteudo:
+      "# ClaudeMem (thedotmack/claude-mem)\n\n" +
+      "**Risco: não recomendo instalar.**\n\n" +
+      "**O que é:** dá memória entre sessões — lembra do projeto e arquivos sem você reexplicar tudo.\n\n" +
+      "**Por que NÃO:** você já tem isso — é o sistema de memória automática que o Jarbas usa " +
+      "(arquivos em `/root/.claude/projects/-root/memory/`, que alimenta o `MEMORY.md`). Instalar uma " +
+      "segunda camada de memória pode duplicar ou conflitar com o que já está funcionando.",
+  },
+  {
+    nome: "Task Observer",
+    descricao: "Observa como você trabalha e melhora as outras skills sozinho, em background.",
+    descricao_simples: "Fica de olho no seu jeito de trabalhar e mexe nas outras skills sozinho — autonomia alta demais por ora.",
+    fonte_nome: "rebelytics (GitHub)",
+    fonte_url: "https://github.com/rebelytics/one-skill-to-rule-them-all",
+    conteudo:
+      "# Task Observer (rebelytics/one-skill-to-rule-them-all)\n\n" +
+      "**Risco: não recomendo por ora.**\n\n" +
+      "**O que é:** fica observando como você trabalha, aprende seu estilo, e melhora as OUTRAS skills " +
+      "sozinho em background — inclusive a si mesma.\n\n" +
+      "**Por que NÃO por ora:** autonomia alta demais pra um repo que ainda não conhecemos a fundo, " +
+      "rodando persistentemente na VPS. Antes de considerar, precisaríamos entender exatamente o que " +
+      "ele lê/grava e se tem algum controle de permissão.",
+  },
+  {
+    nome: "Ruflo",
+    descricao: "Camada de coordenação em cima do Claude Code: transforma ele num maestro de dezenas de agentes.",
+    descricao_simples: "Orquestra vários agentes trabalhando juntos — mas isso já é o que o OpenSquad faz por aqui.",
+    fonte_nome: "ruvnet (GitHub)",
+    fonte_url: "https://github.com/ruvnet/ruflo",
+    conteudo:
+      "# Ruflo (ruvnet/ruflo)\n\n" +
+      "**Risco: redundante, não recomendo.**\n\n" +
+      "**O que é:** \"camada de coordenação\" em cima do Claude Code — 60 agentes em paralelo, memória " +
+      "compartilhada, aprende a cada rodada, corta até 75% do custo de API (tarefa simples pro modelo " +
+      "grátis, difícil pro modelo certo).\n\n" +
+      "**Por que NÃO:** é exatamente o papel que o OpenSquad já cumpre pra você (orquestração de squads " +
+      "de agentes). Rodar os dois juntos seria redundante e arriscaria os dois brigarem por controle do " +
+      "mesmo processo.",
+  },
+  {
+    nome: "obsidian-skills",
+    descricao: "5 skills pra trabalhar com Obsidian: Markdown, bases, canvas espacial, CLI, extração web.",
+    descricao_simples: "Skills pra quem usa o Obsidian como segundo cérebro — não é o seu caso hoje (você usa Notion).",
+    fonte_nome: "kepano (GitHub)",
+    fonte_url: "https://github.com/kepano/obsidian-skills",
+    conteudo:
+      "# obsidian-skills (kepano/obsidian-skills)\n\n" +
+      "**Risco: não se aplica hoje.**\n\n" +
+      "**O que vem no repo:**\n" +
+      "- `obsidian-markdown` — escreve Markdown no padrão Obsidian (wikilinks, frontmatter, callouts)\n" +
+      "- `obsidian-bases` — trabalha com os bancos de dados do Obsidian (.base)\n" +
+      "- `json-canvas` — cria e edita canvas espacial (.canvas)\n" +
+      "- `obsidian-cli` — usa o Obsidian pelo terminal\n" +
+      "- `defuddle` — extrai conteúdo web e converte em Markdown limpo pro vault\n\n" +
+      "**Instalação:** `npx skills add https://github.com/kepano/obsidian-skills` na raiz do vault.\n\n" +
+      "**Por que não se aplica:** seu \"segundo cérebro\" é o Notion, não o Obsidian. Só faria sentido " +
+      "se você decidisse migrar ou usar os dois em paralelo.",
+  },
+];

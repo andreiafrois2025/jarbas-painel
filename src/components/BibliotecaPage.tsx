@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   CRIACOES,
   SKILLS,
+  REFERENCIAS_EXTERNAS,
   fetchCatalogo,
   criarCriacao,
   type Catalogo,
@@ -239,6 +240,15 @@ export default function BibliotecaPage() {
                           🌐 Outras fontes
                         </h2>
                         {grade(outras)}
+                      </section>
+                      <section>
+                        <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                          📋 Catálogo externo — referência (nada instalado)
+                        </h2>
+                        <p className="text-xs text-[var(--text-muted)] mb-2">
+                          Material trazido de fora pra avaliar. Clique num card pra ver o passo a passo completo.
+                        </p>
+                        {grade(REFERENCIAS_EXTERNAS)}
                       </section>
                     </>
                   );
