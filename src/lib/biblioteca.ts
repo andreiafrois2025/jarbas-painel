@@ -19,6 +19,9 @@ export interface LinkItem {
 export interface SkillApiItem {
   nome: string;
   descricao: string;
+  descricao_simples?: string; // versão não-técnica, pra mostrar no card
+  fonte_nome?: string; // "Andréia Frois" (padrão) ou nome da fonte externa
+  fonte_url?: string; // link da fonte externa, se houver
   conteudo: string; // SKILL.md inteiro
 }
 
@@ -53,7 +56,13 @@ export async function fetchCatalogo(): Promise<Catalogo | null> {
     if (!resp.ok) return null;
     const data = await resp.json();
     return {
-      skills: Array.isArray(data.skills) ? data.skills : [],
+      skills: Array.isArray(data.skills)
+        ? data.skills.map((s: SkillApiItem) => ({
+            ...s,
+            descricao_simples: s.descricao_simples || s.descricao,
+            fonte_nome: s.fonte_nome || "Andréia Frois",
+          }))
+        : [],
       automacoes: Array.isArray(data.automacoes) ? data.automacoes : [],
       squads: Array.isArray(data.squads) ? data.squads : [],
       criacoes: Array.isArray(data.criacoes) ? data.criacoes : [],

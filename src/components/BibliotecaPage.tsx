@@ -39,7 +39,14 @@ export default function BibliotecaPage() {
   const [aba, setAba] = useState<Aba>("criacoes");
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [skillAberta, setSkillAberta] = useState<{ nome: string; descricao: string; conteudo: string } | null>(null);
+  const [skillAberta, setSkillAberta] = useState<{
+    nome: string;
+    descricao: string;
+    descricao_simples?: string;
+    fonte_nome?: string;
+    fonte_url?: string;
+    conteudo: string;
+  } | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
 
@@ -77,6 +84,8 @@ export default function BibliotecaPage() {
     : SKILLS.flatMap((g) => g.itens).map((s) => ({
         nome: s.nome,
         descricao: `${s.descricao} Como usar: ${s.como}`,
+        descricao_simples: s.descricao,
+        fonte_nome: "Andréia Frois",
         conteudo: `# ${s.nome}\n\n${s.descricao}\n\nComo usar: ${s.como}`,
       }));
 
@@ -201,8 +210,8 @@ export default function BibliotecaPage() {
                         <span className="text-xl shrink-0">🧩</span>
                         <p className="font-semibold text-[var(--text-primary)] text-sm truncate">{s.nome}</p>
                       </div>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-1">
-                        {s.descricao.split("\n")[0]}
+                      <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
+                        {(s.descricao_simples || s.descricao).split("\n")[0]}
                       </p>
                     </button>
                   ))}
@@ -258,7 +267,9 @@ export default function BibliotecaPage() {
             <div className="flex items-start justify-between gap-3 p-4 border-b border-[var(--border)]">
               <div className="min-w-0">
                 <p className="font-semibold text-[var(--text-primary)]">{skillAberta.nome}</p>
-                <p className="text-sm text-[var(--text-secondary)]">{skillAberta.descricao}</p>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  {skillAberta.descricao_simples || skillAberta.descricao}
+                </p>
               </div>
               <button
                 onClick={() => setSkillAberta(null)}
@@ -276,6 +287,21 @@ export default function BibliotecaPage() {
               >
                 {copiado ? "copiado!" : "📋 Copiar"}
               </button>
+              <div className="text-xs text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)] flex items-center gap-1.5">
+                <span className="font-semibold text-[var(--text-primary)]">Fonte:</span>
+                {skillAberta.fonte_url ? (
+                  <a
+                    href={skillAberta.fonte_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="hover:text-[var(--accent)] underline"
+                  >
+                    {skillAberta.fonte_nome || "Andréia Frois"} ↗
+                  </a>
+                ) : (
+                  <span>{skillAberta.fonte_nome || "Andréia Frois"}</span>
+                )}
+              </div>
               <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap font-mono text-xs bg-[var(--bg-secondary)] rounded-lg p-3 border border-[var(--border)]">
                 {skillAberta.conteudo}
               </pre>
