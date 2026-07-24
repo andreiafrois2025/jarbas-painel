@@ -23,6 +23,7 @@ export interface SkillApiItem {
   fonte_nome?: string; // "Andréia Frois" (padrão) ou nome da fonte externa
   fonte_url?: string; // link da fonte externa, se houver
   instalado?: boolean; // true = roda de verdade no ecossistema; false = só referência
+  tipo?: "skill" | "plugin" | "prompt"; // default "skill" quando ausente
   conteudo: string; // SKILL.md inteiro
 }
 
@@ -244,6 +245,7 @@ export const SKILLS: { grupo: string; itens: SkillItem[] }[] = [
 export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   {
     nome: "claude-code-setup (Anthropic)",
+    tipo: "plugin",
     descricao: "Plugin oficial que audita um projeto e recomenda hooks, skills, subagents e MCPs.",
     descricao_simples: "Escaneia seu projeto e sugere o que falta configurar — só leitura, não instala nada sozinho.",
     fonte_nome: "Anthropic (oficial)",
@@ -282,6 +284,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Find Skills / npx skills (Vercel Labs)",
+    tipo: "plugin",
     descricao: "Busca entre +700 mil skills prontas e instala a certa a partir do que você descrever.",
     descricao_simples: "Você diz o que está construindo, ela acha a skill certa numa biblioteca gigante e instala sozinha.",
     fonte_nome: "Vercel Labs",
@@ -319,6 +322,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "ClaudeMem",
+    tipo: "plugin",
     descricao: "Memória entre sessões: lembra do projeto e arquivos sem reexplicar do zero.",
     descricao_simples: "Dá memória entre conversas — mas você já tem isso com a gente.",
     fonte_nome: "thedotmack (GitHub)",
@@ -334,6 +338,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Task Observer",
+    tipo: "plugin",
     descricao: "Observa como você trabalha e melhora as outras skills sozinho, em background.",
     descricao_simples: "Fica de olho no seu jeito de trabalhar e mexe nas outras skills sozinho — autonomia alta demais por ora.",
     fonte_nome: "rebelytics (GitHub)",
@@ -350,6 +355,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Ruflo",
+    tipo: "plugin",
     descricao: "Camada de coordenação em cima do Claude Code: transforma ele num maestro de dezenas de agentes.",
     descricao_simples: "Orquestra vários agentes trabalhando juntos — mas isso já é o que o OpenSquad faz por aqui.",
     fonte_nome: "ruvnet (GitHub)",
@@ -387,6 +393,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Prompt: biblioteca de prompts de imagem (YouMind)",
+    tipo: "prompt",
     descricao: "Meta-prompt pronto: escolhe o melhor prompt de imagem da biblioteca YouMind e adapta pro seu caso.",
     descricao_simples: "Um prompt pronto pra usar: você descreve a imagem que quer, ele escolhe e adapta o melhor modelo pronto.",
     fonte_nome: "YouMind",
@@ -438,6 +445,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "theme-factory",
+    tipo: "plugin",
     descricao: "Gera sistema de tokens real como variáveis CSS.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Cria a paleta/tema do zero como código reutilizável.",
     fonte_nome: "Composio",
@@ -447,6 +455,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "figma → code (Figma MCP)",
+    tipo: "plugin",
     descricao: "Traduz arquivos Figma em código de produção fiel.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Pega um design pronto no Figma e transforma em código.",
     fonte_nome: "GLips (GitHub)",
@@ -456,6 +465,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "playwright-mcp",
+    tipo: "plugin",
     descricao: "Oferece visão ao agente via screenshots e comparação com referências.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Deixa o Claude \"ver\" a tela de verdade e comparar com o modelo desejado.",
     fonte_nome: "Microsoft (GitHub)",
@@ -474,6 +484,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "designer-skills",
+    tipo: "plugin",
     descricao: "Trabalho de processo: discovery, UX strategy, specs e QA.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Conduz o processo inteiro de design, não só a arte final.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -483,6 +494,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "nano-banana",
+    tipo: "plugin",
     descricao: "Gera e edita imagens no terminal via Gemini.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria/edita imagem direto no terminal.",
     fonte_nome: "Devon Jones (GitHub)",
@@ -492,6 +504,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "banana-claude",
+    tipo: "plugin",
     descricao: "Wrapper de imagem que interpreta intenção e monta prompts.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Entende o que você quer e monta o prompt de imagem sozinho.",
     fonte_nome: "Daniel Agrici (GitHub)",
@@ -519,6 +532,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "remotion-superpowers",
+    tipo: "plugin",
     descricao: "Estúdio de vídeo: locução, trilha, legenda e loop render-revisão.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Monta vídeo completo (voz, música, legenda) e revisa sozinho.",
     fonte_nome: "Dojo Coding (GitHub)",
@@ -528,6 +542,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "claude-remotion (Remotion Skills)",
+    tipo: "plugin",
     descricao: "Porta leve para vídeo programático com React → MP4.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria vídeo a partir de código (pra quem programa).",
     fonte_nome: "Remotion",
@@ -555,6 +570,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Claude Design — Mockups de alta fidelidade",
+    tipo: "plugin",
     descricao: "Telas prontas para iterar elemento por elemento.",
     descricao_simples: "Camada 03 · O produto. Ferramenta paga da própria Anthropic pra desenhar telas.",
     fonte_nome: "Anthropic · Claude Design",
@@ -564,6 +580,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Claude Design — Design systems",
+    tipo: "plugin",
     descricao: "Treina canvas na marca e aplica sistema em tudo.",
     descricao_simples: "Camada 03 · O produto. Ensina a IA a manter a sua marca consistente em tudo que ela desenha.",
     fonte_nome: "Anthropic · Claude Design",
@@ -573,6 +590,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Claude Design — Templates",
+    tipo: "plugin",
     descricao: "Salva versão perfeita como template reutilizável.",
     descricao_simples: "Camada 03 · O produto. Guarda um design bom como modelo pra usar de novo depois.",
     fonte_nome: "Anthropic · Claude Design",
@@ -582,6 +600,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Claude Design — Slide decks",
+    tipo: "plugin",
     descricao: "Apresentações a partir de template e cores da marca.",
     descricao_simples: "Camada 03 · O produto. Gera apresentação já na cor/estilo da sua marca.",
     fonte_nome: "Anthropic · Claude Design",
@@ -591,6 +610,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "composio-mcp",
+    tipo: "plugin",
     descricao: "Liga Claude a Figma, Slides, GitHub e 1.000+ apps.",
     descricao_simples: "Camada 03 · O produto. Conecta o Claude a mais de 1.000 outros aplicativos de uma vez.",
     fonte_nome: "Composio",

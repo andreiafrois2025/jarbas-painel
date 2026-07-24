@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NOS, ARESTAS, type No, type TipoNo } from "@/lib/grafo";
+import GrafoConteudoView from "./GrafoConteudoView";
 
 const COR: Record<TipoNo, string> = {
   agente: "#2D6B6B",     // Petróleo
@@ -17,7 +18,7 @@ const COR: Record<TipoNo, string> = {
   area: "#9B7BB8",       // Roxo — áreas da vida
 };
 
-type Modo = "tudo" | "ecossistema" | "notion";
+type Modo = "tudo" | "ecossistema" | "notion" | "conhecimento";
 
 interface Pos { x: number; y: number; vx: number; vy: number }
 
@@ -138,26 +139,42 @@ export default function GrafoView() {
     { k: "tudo", label: "Tudo" },
     { k: "ecossistema", label: "🤖 Ecossistema" },
     { k: "notion", label: "🧠 Segundo Cérebro" },
+    { k: "conhecimento", label: "🧩 Conhecimento" },
   ];
+
+  const toggle = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="inline-flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
+        {botoes.map((b) => (
+          <button key={b.k} onClick={() => setModo(b.k)}
+            className={`px-3 py-1.5 transition-colors ${
+              modo === b.k
+                ? "bg-[var(--accent,#2D6B6B)] text-white"
+                : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary,#00000008)]"
+            }`}>
+            {b.label}
+          </button>
+        ))}
+      </div>
+      {modo !== "conhecimento" && (
+        <span className="ml-auto text-xs text-[var(--text-secondary)]">clique num nó 👇</span>
+      )}
+    </div>
+  );
+
+  if (modo === "conhecimento") {
+    return (
+      <div className="space-y-3">
+        <div className="p-4 md:p-6 pb-0 max-w-5xl mx-auto">{toggle}</div>
+        <GrafoConteudoView />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-3">
       {/* Toggle de camadas */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
-          {botoes.map((b) => (
-            <button key={b.k} onClick={() => setModo(b.k)}
-              className={`px-3 py-1.5 transition-colors ${
-                modo === b.k
-                  ? "bg-[var(--accent,#2D6B6B)] text-white"
-                  : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary,#00000008)]"
-              }`}>
-              {b.label}
-            </button>
-          ))}
-        </div>
-        <span className="ml-auto text-xs text-[var(--text-secondary)]">clique num nó 👇</span>
-      </div>
+      {toggle}
 
       {/* Legenda */}
       <div className="flex flex-wrap gap-3 text-xs text-[var(--text-secondary)]">

@@ -12,7 +12,6 @@ import {
   type NovaCriacaoPayload,
 } from "@/lib/biblioteca";
 import GrafoView from "./GrafoView";
-import GrafoConteudoView from "./GrafoConteudoView";
 
 // Biblioteca: acesso rápido a tudo que existe (links diretos) e o catálogo
 // de skills/capacidades do ecossistema, com como acionar cada uma.
@@ -23,7 +22,7 @@ import GrafoConteudoView from "./GrafoConteudoView";
 // criadas fora da VPS (GPT, outras IAs). Se a API cair, tudo volta pro
 // catálogo estático de sempre — a tela nunca quebra.
 
-type Aba = "criacoes" | "skills" | "grafo" | "conhecimento";
+type Aba = "criacoes" | "skills" | "automacoes" | "prompts" | "plugins" | "grafo";
 
 const ORIGENS = ["Claude VPS", "Claude fora", "GPT", "Outra IA"];
 
@@ -92,6 +91,38 @@ export default function BibliotecaPage() {
         conteudo: `# ${s.nome}\n\n${s.descricao}\n\nComo usar: ${s.como}`,
       }));
 
+  // Referência externa por tipo — só skill entra na aba Skills; prompt/plugin
+  // ganharam aba própria (pedido 24/07: "skill é pra ter só skill").
+  const referenciasSkill = REFERENCIAS_EXTERNAS.filter((r) => (r.tipo || "skill") === "skill");
+  const referenciasPrompt = REFERENCIAS_EXTERNAS.filter((r) => r.tipo === "prompt");
+  const referenciasPlugin = REFERENCIAS_EXTERNAS.filter((r) => r.tipo === "plugin");
+
+  const grade = (lista: typeof skillsExibidas) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      {lista.map((s) => (
+        <button
+          key={s.nome}
+          onClick={() => setSkillAberta(s)}
+          className="text-left bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-xl shrink-0">🧩</span>
+            <p className="font-semibold text-[var(--text-primary)] text-sm truncate">{s.nome}</p>
+          </div>
+          <p className="text-xs text-[var(--text-secondary)] mt-1.5 line-clamp-3">
+            {(s.descricao_simples || s.descricao).split("\n")[0]}
+          </p>
+          <p className={`text-[10px] mt-2 font-medium ${s.instalado ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-muted)]"}`}>
+            {s.instalado ? "🟢 Instalado no ecossistema" : "⚪ Não instalado"}
+          </p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+            Fonte: {s.fonte_nome || "Andréia Frois"}
+          </p>
+        </button>
+      ))}
+    </div>
+  );
+
   // Criações: mescla API + estáticas, agrupando por `grupo`.
   const gruposCriacoes = new Map<string, CriacaoUnificada[]>();
   for (const g of CRIACOES) {
@@ -124,17 +155,17 @@ export default function BibliotecaPage() {
         <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">📚 Biblioteca</h1>
         {botao("criacoes", "🔗 Criações")}
         {botao("skills", "🧰 Skills")}
+        {botao("automacoes", "⚙️ Automações")}
+        {botao("prompts", "💬 Prompts")}
+        {botao("plugins", "🔌 Plugins")}
         {botao("grafo", "🕸️ Grafo")}
-        {botao("conhecimento", "🧠 Conhecimento")}
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {aba === "conhecimento" ? (
-          <GrafoConteudoView />
-        ) : aba === "grafo" ? (
+        {aba === "grafo" ? (
           <GrafoView />
         ) : (
-          <div className={`p-4 md:p-6 mx-auto space-y-6 ${aba === "skills" ? "max-w-7xl" : "max-w-4xl"}`}>
+          <div className={`p-4 md:p-6 mx-auto space-y-6 ${aba === "skills" || aba === "prompts" || aba === "plugins" ? "max-w-7xl" : "max-w-4xl"}`}>
             {aba === "criacoes" ? (
               <>
                 <div className="flex items-center justify-between gap-2">
@@ -197,7 +228,7 @@ export default function BibliotecaPage() {
                   Pra adicionar itens feitos na VPS, é só me pedir no chat. Pra coisas criadas fora (GPT, outra IA), use o botão “+ Nova criação”.
                 </p>
               </>
-            ) : (
+            ) : aba === "skills" ? (
               <>
                 <p className="text-xs text-[var(--text-muted)]">
                   {carregando ? "carregando…" : aoVivo ? "lido ao vivo da VPS" : "catálogo local"}
@@ -205,31 +236,6 @@ export default function BibliotecaPage() {
                 {(() => {
                   const nossas = skillsExibidas.filter((s) => (s.fonte_nome || "Andréia Frois") === "Andréia Frois");
                   const outras = skillsExibidas.filter((s) => (s.fonte_nome || "Andréia Frois") !== "Andréia Frois");
-                  const grade = (lista: typeof skillsExibidas) => (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                      {lista.map((s) => (
-                        <button
-                          key={s.nome}
-                          onClick={() => setSkillAberta(s)}
-                          className="text-left bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl shrink-0">🧩</span>
-                            <p className="font-semibold text-[var(--text-primary)] text-sm truncate">{s.nome}</p>
-                          </div>
-                          <p className="text-xs text-[var(--text-secondary)] mt-1.5 line-clamp-3">
-                            {(s.descricao_simples || s.descricao).split("\n")[0]}
-                          </p>
-                          <p className={`text-[10px] mt-2 font-medium ${s.instalado ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-muted)]"}`}>
-                            {s.instalado ? "🟢 Instalado no ecossistema" : "⚪ Não instalado"}
-                          </p>
-                          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                            Fonte: {s.fonte_nome || "Andréia Frois"}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  );
                   return (
                     <>
                       <section>
@@ -253,13 +259,28 @@ export default function BibliotecaPage() {
                         <p className="text-xs text-[var(--text-muted)] mb-2">
                           Material trazido de fora pra avaliar. Clique num card pra ver o passo a passo completo.
                         </p>
-                        {grade(REFERENCIAS_EXTERNAS)}
+                        {grade(referenciasSkill)}
                       </section>
                     </>
                   );
                 })()}
 
-                {catalogo && catalogo.automacoes.length > 0 && (
+                {catalogo && catalogo.squads.length > 0 && (
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    🤖 Squads: {catalogo.squads.join(", ")}
+                  </p>
+                )}
+
+                <p className="text-xs text-[var(--text-muted)] pb-4">
+                  Clique num card pra ver o documento completo da skill e copiar.
+                </p>
+              </>
+            ) : aba === "automacoes" ? (
+              <>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {carregando ? "carregando…" : aoVivo ? "lido ao vivo da VPS" : "catálogo local"}
+                </p>
+                {catalogo && catalogo.automacoes.length > 0 ? (
                   <section>
                     <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                       ⚙️ Automações reais (cron)
@@ -279,17 +300,27 @@ export default function BibliotecaPage() {
                       ))}
                     </div>
                   </section>
+                ) : (
+                  <p className="text-xs text-[var(--text-muted)]">Nenhuma automação encontrada.</p>
                 )}
-
-                {catalogo && catalogo.squads.length > 0 && (
-                  <p className="text-xs text-[var(--text-secondary)]">
-                    🤖 Squads: {catalogo.squads.join(", ")}
-                  </p>
-                )}
-
-                <p className="text-xs text-[var(--text-muted)] pb-4">
-                  Clique num card pra ver o documento completo da skill e copiar.
+              </>
+            ) : aba === "prompts" ? (
+              <>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Prompts prontos — cola direto no chat, não é código pra instalar.
                 </p>
+                {referenciasPrompt.length > 0 ? grade(referenciasPrompt) : (
+                  <p className="text-xs text-[var(--text-muted)]">Nenhum prompt guardado ainda.</p>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Plugins e ferramentas de terceiro (MCP, marketplace de plugins) — referência, nada instalado.
+                </p>
+                {referenciasPlugin.length > 0 ? grade(referenciasPlugin) : (
+                  <p className="text-xs text-[var(--text-muted)]">Nenhum plugin guardado ainda.</p>
+                )}
               </>
             )}
           </div>
