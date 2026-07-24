@@ -149,7 +149,7 @@ export interface Criacao {
 
 export const CRIACOES: { grupo: string; itens: Criacao[] }[] = [
   {
-    grupo: "Pessoal",
+    grupo: "Painéis e sites",
     itens: [
       {
         icone: "🖥️", nome: "Painel Jarbas (este painel)",
@@ -161,15 +161,15 @@ export const CRIACOES: { grupo: string; itens: Criacao[] }[] = [
           { rotulo: "Banco (Supabase)", url: "https://supabase.com/dashboard/project/pmmyqljiuslstwbmiron" },
         ],
       },
+    ],
+  },
+  {
+    grupo: "Pessoal",
+    itens: [
       {
         icone: "🌐", nome: "Site pessoal",
         descricao: "andreiafrois.tech — destino do funil (palestras, imersão).",
         links: [{ rotulo: "Abrir site", url: "https://andreiafrois.tech" }],
-      },
-      {
-        icone: "🎤", nome: "Modo palco — versão conteúdo",
-        descricao: "Tela pública pra projetar em palestras sobre IA/conteúdo pessoal.",
-        links: [{ rotulo: "Abrir", url: "https://painel.andreiafrois.tech/metricas/palestra" }],
       },
     ],
   },
@@ -177,9 +177,12 @@ export const CRIACOES: { grupo: string; itens: Criacao[] }[] = [
     grupo: "Igam",
     itens: [
       {
-        icone: "🎤", nome: "Modo palco — versão serviço público",
-        descricao: "Tela pública pra projetar em palestras/eventos do Igam.",
-        links: [{ rotulo: "Abrir", url: "https://painel.andreiafrois.tech/metricas/palestra?tema=trabalho" }],
+        icone: "🎤", nome: "Modo palco (métricas de palestra)",
+        descricao: "Tela pública pra projetar em apresentações, em 2 versões.",
+        links: [
+          { rotulo: "Versão conteúdo", url: "https://painel.andreiafrois.tech/metricas/palestra" },
+          { rotulo: "Versão serviço público", url: "https://painel.andreiafrois.tech/metricas/palestra?tema=trabalho" },
+        ],
       },
     ],
   },
