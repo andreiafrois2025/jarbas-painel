@@ -7,6 +7,8 @@ import {
   REFERENCIAS_EXTERNAS,
   fetchCatalogo,
   criarCriacao,
+  atualizarCriacao,
+  excluirCriacao,
   type Catalogo,
   type LinkItem,
   type NovaCriacaoPayload,
@@ -25,14 +27,20 @@ import GrafoView from "./GrafoView";
 type Aba = "criacoes" | "skills" | "automacoes" | "prompts" | "plugins" | "grafo";
 
 const ORIGENS = ["Claude VPS", "Claude fora", "GPT", "Outra IA"];
+const ICONES_SUGERIDOS = [
+  "✨", "🖥️", "🌐", "📡", "🏭", "✅", "📈", "☁️", "⚡", "🎤",
+  "🎨", "🎬", "🖼️", "📄", "📊", "🔗", "🤖", "📚", "💡", "🎒",
+];
 
 // Item unificado de criação (estático ou vindo da API) pra renderizar junto.
 interface CriacaoUnificada {
+  id?: string; // só as vindas da API têm id — só essas são editáveis/excluíveis
   icone: string;
   nome: string;
   descricao: string;
   links: LinkItem[];
   origem?: string;
+  grupo?: string;
 }
 
 export default function BibliotecaPage() {
@@ -50,6 +58,7 @@ export default function BibliotecaPage() {
   } | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
+  const [criacaoEditando, setCriacaoEditando] = useState<CriacaoUnificada | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -155,10 +164,12 @@ export default function BibliotecaPage() {
   if (catalogo) {
     for (const c of catalogo.criacoes) {
       const lista = gruposCriacoes.get(c.grupo) || [];
-      lista.push({ icone: c.icone, nome: c.nome, descricao: c.descricao, links: c.links, origem: c.origem });
+      lista.push({ id: c.id, icone: c.icone, nome: c.nome, descricao: c.descricao, links: c.links, origem: c.origem, grupo: c.grupo });
       gruposCriacoes.set(c.grupo, lista);
     }
   }
+  // nomes de grupo já existentes, pra sugerir no formulário (evita duplicar/digitar errado)
+  const gruposExistentes = [...gruposCriacoes.keys()].sort();
 
   const botao = (id: Aba, rotulo: string) => (
     <button
@@ -227,7 +238,7 @@ export default function BibliotecaPage() {
                                 )}
                               </div>
                               <p className="text-sm text-[var(--text-secondary)]">{c.descricao}</p>
-                              <div className="flex flex-wrap gap-2 mt-2">
+                              <div className="flex flex-wrap gap-2 mt-2 items-center">
                                 {c.links.map((l) => (
                                   <a
                                     key={l.url}
@@ -240,6 +251,26 @@ export default function BibliotecaPage() {
                                     {l.rotulo} ↗
                                   </a>
                                 ))}
+                                {c.id && (
+                                  <>
+                                    <button
+                                      onClick={() => setCriacaoEditando(c)}
+                                      className="text-xs px-3 py-1.5 rounded-full border font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] border-[var(--border)]"
+                                    >
+                                      ✏️ Editar
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        if (!confirm(`Excluir "${c.nome}"?`)) return;
+                                        await excluirCriacao(c.id!);
+                                        await recarregar();
+                                      }}
+                                      className="text-xs px-3 py-1.5 rounded-full border font-medium text-red-500 hover:text-red-600 border-[var(--border)]"
+                                    >
+                                      🗑️ Excluir
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -424,11 +455,17 @@ export default function BibliotecaPage() {
         </div>
       )}
 
-      {formAberto && (
+      {(formAberto || criacaoEditando) && (
         <FormNovaCriacao
-          onFechar={() => setFormAberto(false)}
+          gruposExistentes={gruposExistentes}
+          editando={criacaoEditando}
+          onFechar={() => {
+            setFormAberto(false);
+            setCriacaoEditando(null);
+          }}
           onSalvo={async () => {
             setFormAberto(false);
+            setCriacaoEditando(null);
             await recarregar();
           }}
         />
@@ -438,14 +475,24 @@ export default function BibliotecaPage() {
 }
 
 // Formulário de criação manual — pra registrar coisas feitas fora da VPS
-// (GPT, outra IA) que o Claude não teria como enxergar sozinho.
-function FormNovaCriacao({ onFechar, onSalvo }: { onFechar: () => void; onSalvo: () => void }) {
-  const [nome, setNome] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [icone, setIcone] = useState("✨");
-  const [grupo, setGrupo] = useState("Outras criações");
-  const [origem, setOrigem] = useState(ORIGENS[0]);
-  const [links, setLinks] = useState<LinkItem[]>([{ rotulo: "", url: "" }]);
+// (GPT, outra IA) que o Claude não teria como enxergar sozinho. 24/07: também
+// serve pra EDITAR uma criação já existente (só as com id, vindas da API).
+function FormNovaCriacao({
+  onFechar, onSalvo, gruposExistentes, editando,
+}: {
+  onFechar: () => void;
+  onSalvo: () => void;
+  gruposExistentes: string[];
+  editando: CriacaoUnificada | null;
+}) {
+  const [nome, setNome] = useState(editando?.nome || "");
+  const [descricao, setDescricao] = useState(editando?.descricao || "");
+  const [icone, setIcone] = useState(editando?.icone || "✨");
+  const [grupo, setGrupo] = useState(editando?.grupo || "Outras criações");
+  const [origem, setOrigem] = useState(editando?.origem || ORIGENS[0]);
+  const [links, setLinks] = useState<LinkItem[]>(
+    editando?.links?.length ? editando.links : [{ rotulo: "", url: "" }]
+  );
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -465,10 +512,12 @@ function FormNovaCriacao({ onFechar, onSalvo }: { onFechar: () => void; onSalvo:
       nome: nome.trim(),
       descricao: descricao.trim(),
       grupo: grupo.trim() || "Outras criações",
-      origem,
+      origem: origem.trim() || "Claude VPS",
       links: links.filter((l) => l.url.trim()).map((l) => ({ rotulo: l.rotulo.trim() || "Abrir", url: l.url.trim() })),
     };
-    const resultado = await criarCriacao(payload);
+    const resultado = editando?.id
+      ? await atualizarCriacao(editando.id, payload)
+      : await criarCriacao(payload);
     setSalvando(false);
     if (!resultado.ok) {
       setErro(resultado.erro || "falha ao salvar");
@@ -484,30 +533,44 @@ function FormNovaCriacao({ onFechar, onSalvo }: { onFechar: () => void; onSalvo:
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-          <p className="font-semibold text-[var(--text-primary)]">+ Nova criação</p>
+          <p className="font-semibold text-[var(--text-primary)]">{editando ? "✏️ Editar criação" : "+ Nova criação"}</p>
           <button onClick={onFechar} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none">
             ✕
           </button>
         </div>
         <div className="p-4 space-y-3">
-          <div className="flex gap-2">
-            <div className="w-20 shrink-0">
-              <label className="text-xs text-[var(--text-secondary)]">Ícone</label>
-              <input
-                value={icone}
-                onChange={(e) => setIcone(e.target.value)}
-                maxLength={4}
-                className="w-full mt-1 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] text-center"
-              />
+          <div>
+            <label className="text-xs text-[var(--text-secondary)]">Ícone</label>
+            <div className="flex flex-wrap gap-1.5 mt-1 mb-2">
+              {ICONES_SUGERIDOS.map((ic) => (
+                <button
+                  key={ic}
+                  type="button"
+                  onClick={() => setIcone(ic)}
+                  className={`w-8 h-8 rounded-lg border flex items-center justify-center text-base hover:border-[var(--accent)] ${
+                    icone === ic ? "border-[var(--accent)] bg-[var(--accent-soft,rgba(45,107,107,0.12))]" : "border-[var(--border)] bg-[var(--bg-secondary)]"
+                  }`}
+                >
+                  {ic}
+                </button>
+              ))}
             </div>
-            <div className="flex-1 min-w-0">
-              <label className="text-xs text-[var(--text-secondary)]">Nome *</label>
-              <input
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                className="w-full mt-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)]"
-              />
-            </div>
+            <input
+              value={icone}
+              onChange={(e) => setIcone(e.target.value)}
+              maxLength={4}
+              placeholder="ou digite/cole outro emoji"
+              className="w-24 px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] text-center"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-[var(--text-secondary)]">Nome *</label>
+            <input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="w-full mt-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)]"
+            />
           </div>
 
           <div>
@@ -526,22 +589,30 @@ function FormNovaCriacao({ onFechar, onSalvo }: { onFechar: () => void; onSalvo:
               <input
                 value={grupo}
                 onChange={(e) => setGrupo(e.target.value)}
+                list="grupos-existentes"
+                placeholder="escolha ou digite um novo"
                 className="w-full mt-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)]"
               />
+              <datalist id="grupos-existentes">
+                {gruposExistentes.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
             </div>
             <div className="flex-1 min-w-0">
               <label className="text-xs text-[var(--text-secondary)]">Origem</label>
-              <select
+              <input
                 value={origem}
                 onChange={(e) => setOrigem(e.target.value)}
+                list="origens-sugeridas"
+                placeholder="escolha ou digite"
                 className="w-full mt-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)]"
-              >
+              />
+              <datalist id="origens-sugeridas">
                 {ORIGENS.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
+                  <option key={o} value={o} />
                 ))}
-              </select>
+              </datalist>
             </div>
           </div>
 
@@ -592,7 +663,7 @@ function FormNovaCriacao({ onFechar, onSalvo }: { onFechar: () => void; onSalvo:
               className="text-sm px-4 py-2 rounded-lg font-medium text-white disabled:opacity-50"
               style={{ background: "var(--accent, #2D6B6B)" }}
             >
-              {salvando ? "salvando…" : "Salvar"}
+              {salvando ? "salvando…" : editando ? "Salvar alterações" : "Salvar"}
             </button>
           </div>
         </div>

@@ -36,6 +36,7 @@ export interface AutomacaoApiItem {
 }
 
 export interface CriacaoApiItem {
+  id?: string; // presente só nas criadas via formulário — só essas são editáveis
   icone: string;
   nome: string;
   descricao: string;
@@ -103,6 +104,39 @@ export async function criarCriacao(
     return { ok: true };
   } catch (e) {
     return { ok: false, erro: e instanceof Error ? e.message : "falha ao salvar" };
+  }
+}
+
+export async function atualizarCriacao(
+  id: string,
+  payload: NovaCriacaoPayload
+): Promise<{ ok: boolean; erro?: string }> {
+  try {
+    const resp = await squadFetch(`/api/criacoes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      return { ok: false, erro: data.error || data.erro || `falha (${resp.status})` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "falha ao salvar" };
+  }
+}
+
+export async function excluirCriacao(id: string): Promise<{ ok: boolean; erro?: string }> {
+  try {
+    const resp = await squadFetch(`/api/criacoes/${id}`, { method: "DELETE" });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      return { ok: false, erro: data.error || data.erro || `falha (${resp.status})` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "falha ao excluir" };
   }
 }
 
