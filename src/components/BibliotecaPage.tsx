@@ -156,16 +156,18 @@ export default function BibliotecaPage() {
     </div>
   );
 
-  // Criações: mescla API + estáticas, agrupando por `grupo`.
+  // Criações: 24/07 — tudo migrou pro backend (editável). O catálogo estático
+  // (CRIACOES) só entra como FALLBACK se a API cair, igual já fazia com Skills.
   const gruposCriacoes = new Map<string, CriacaoUnificada[]>();
-  for (const g of CRIACOES) {
-    gruposCriacoes.set(g.grupo, g.itens.map((c) => ({ ...c })));
-  }
   if (catalogo) {
     for (const c of catalogo.criacoes) {
       const lista = gruposCriacoes.get(c.grupo) || [];
       lista.push({ id: c.id, icone: c.icone, nome: c.nome, descricao: c.descricao, links: c.links, origem: c.origem, grupo: c.grupo });
       gruposCriacoes.set(c.grupo, lista);
+    }
+  } else if (!carregando) {
+    for (const g of CRIACOES) {
+      gruposCriacoes.set(g.grupo, g.itens.map((c) => ({ ...c })));
     }
   }
   // nomes de grupo já existentes, pra sugerir no formulário (evita duplicar/digitar errado)
