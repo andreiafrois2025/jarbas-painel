@@ -199,23 +199,47 @@ export default function BibliotecaPage() {
                 <p className="text-xs text-[var(--text-muted)]">
                   {carregando ? "carregando…" : aoVivo ? "lido ao vivo da VPS" : "catálogo local"}
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {skillsExibidas.map((s) => (
-                    <button
-                      key={s.nome}
-                      onClick={() => setSkillAberta(s)}
-                      className="text-left bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl shrink-0">🧩</span>
-                        <p className="font-semibold text-[var(--text-primary)] text-sm truncate">{s.nome}</p>
-                      </div>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
-                        {(s.descricao_simples || s.descricao).split("\n")[0]}
-                      </p>
-                    </button>
-                  ))}
-                </div>
+                {(() => {
+                  const nossas = skillsExibidas.filter((s) => (s.fonte_nome || "Andréia Frois") === "Andréia Frois");
+                  const outras = skillsExibidas.filter((s) => (s.fonte_nome || "Andréia Frois") !== "Andréia Frois");
+                  const grade = (lista: typeof skillsExibidas) => (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {lista.map((s) => (
+                        <button
+                          key={s.nome}
+                          onClick={() => setSkillAberta(s)}
+                          className="text-left bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] hover:border-[var(--accent)] transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl shrink-0">🧩</span>
+                            <p className="font-semibold text-[var(--text-primary)] text-sm truncate">{s.nome}</p>
+                          </div>
+                          <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                            {(s.descricao_simples || s.descricao).split("\n")[0]}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                  return (
+                    <>
+                      <section>
+                        <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                          💎 Andréia Frois
+                        </h2>
+                        {nossas.length > 0 ? grade(nossas) : (
+                          <p className="text-xs text-[var(--text-muted)]">Nenhuma skill nossa ainda.</p>
+                        )}
+                      </section>
+                      <section>
+                        <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                          🌐 Outras fontes
+                        </h2>
+                        {grade(outras)}
+                      </section>
+                    </>
+                  );
+                })()}
 
                 {catalogo && catalogo.automacoes.length > 0 && (
                   <section>
