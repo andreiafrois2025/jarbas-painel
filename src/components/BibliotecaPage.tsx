@@ -46,6 +46,7 @@ export default function BibliotecaPage() {
     descricao_simples?: string;
     fonte_nome?: string;
     fonte_url?: string;
+    instalado?: boolean;
     conteudo: string;
   } | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -87,6 +88,7 @@ export default function BibliotecaPage() {
         descricao: `${s.descricao} Como usar: ${s.como}`,
         descricao_simples: s.descricao,
         fonte_nome: "Andréia Frois",
+        instalado: true,
         conteudo: `# ${s.nome}\n\n${s.descricao}\n\nComo usar: ${s.como}`,
       }));
 
@@ -132,7 +134,7 @@ export default function BibliotecaPage() {
         ) : aba === "grafo" ? (
           <GrafoView />
         ) : (
-          <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
+          <div className={`p-4 md:p-6 mx-auto space-y-6 ${aba === "skills" ? "max-w-7xl" : "max-w-4xl"}`}>
             {aba === "criacoes" ? (
               <>
                 <div className="flex items-center justify-between gap-2">
@@ -204,7 +206,7 @@ export default function BibliotecaPage() {
                   const nossas = skillsExibidas.filter((s) => (s.fonte_nome || "Andréia Frois") === "Andréia Frois");
                   const outras = skillsExibidas.filter((s) => (s.fonte_nome || "Andréia Frois") !== "Andréia Frois");
                   const grade = (lista: typeof skillsExibidas) => (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                       {lista.map((s) => (
                         <button
                           key={s.nome}
@@ -218,7 +220,10 @@ export default function BibliotecaPage() {
                           <p className="text-xs text-[var(--text-secondary)] mt-1.5 line-clamp-3">
                             {(s.descricao_simples || s.descricao).split("\n")[0]}
                           </p>
-                          <p className="text-[10px] text-[var(--text-muted)] mt-2">
+                          <p className={`text-[10px] mt-2 font-medium ${s.instalado ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-muted)]"}`}>
+                            {s.instalado ? "🟢 Instalado no ecossistema" : "⚪ Não instalado"}
+                          </p>
+                          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
                             Fonte: {s.fonte_nome || "Andréia Frois"}
                           </p>
                         </button>
@@ -324,6 +329,9 @@ export default function BibliotecaPage() {
               >
                 {copiado ? "copiado!" : "📋 Copiar"}
               </button>
+              <p className={`text-xs font-medium ${skillAberta.instalado ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-muted)]"}`}>
+                {skillAberta.instalado ? "🟢 Instalado no ecossistema" : "⚪ Não instalado — só referência"}
+              </p>
               <div className="text-xs text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)] flex items-center gap-1.5">
                 <span className="font-semibold text-[var(--text-primary)]">Fonte:</span>
                 {skillAberta.fonte_url ? (

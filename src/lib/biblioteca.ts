@@ -22,6 +22,7 @@ export interface SkillApiItem {
   descricao_simples?: string; // versão não-técnica, pra mostrar no card
   fonte_nome?: string; // "Andréia Frois" (padrão) ou nome da fonte externa
   fonte_url?: string; // link da fonte externa, se houver
+  instalado?: boolean; // true = roda de verdade no ecossistema; false = só referência
   conteudo: string; // SKILL.md inteiro
 }
 
@@ -61,6 +62,7 @@ export async function fetchCatalogo(): Promise<Catalogo | null> {
             ...s,
             descricao_simples: s.descricao_simples || s.descricao,
             fonte_nome: s.fonte_nome || "Andréia Frois",
+            instalado: true, // vieram da varredura real (VPS/container) — rodam de verdade
           }))
         : [],
       automacoes: Array.isArray(data.automacoes) ? data.automacoes : [],
@@ -246,6 +248,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
     descricao_simples: "Escaneia seu projeto e sugere o que falta configurar — só leitura, não instala nada sozinho.",
     fonte_nome: "Anthropic (oficial)",
     fonte_url: "https://claude.ai/code",
+    instalado: false,
     conteudo:
       "# claude-code-setup — plugin oficial da Anthropic\n\n" +
       "**Risco: baixo** — é só leitura, não instala nem modifica nada sozinho.\n\n" +
@@ -264,6 +267,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
     descricao_simples: "Ajuda o Claude a ter mais \"olho\" de design em telas e interfaces (grid, cor, tipografia, contraste).",
     fonte_nome: "Anthropic + Paul Bakaus",
     fonte_url: "https://github.com/anthropics/skills",
+    instalado: false,
     conteudo:
       "# frontend-design (Anthropic) + impeccable (Paul Bakaus)\n\n" +
       "**Risco: baixo** — são prompts de estilo, não scripts com comandos livres.\n\n" +
@@ -282,6 +286,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
     descricao_simples: "Você diz o que está construindo, ela acha a skill certa numa biblioteca gigante e instala sozinha.",
     fonte_nome: "Vercel Labs",
     fonte_url: "https://github.com/vercel-labs/skills",
+    instalado: false,
     conteudo:
       "# Find Skills / npx skills (vercel-labs/skills)\n\n" +
       "**Risco: médio** — instala skills de terceiro automaticamente, sem revisão manual prévia.\n\n" +
@@ -300,6 +305,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
     descricao_simples: "Deixa o Claude mais metódico: planeja e revisa antes de agir, em vez de sair fazendo.",
     fonte_nome: "obra (GitHub)",
     fonte_url: "https://github.com/obra/superpowers",
+    instalado: false,
     conteudo:
       "# Superpowers (obra/superpowers)\n\n" +
       "**Risco: médio-baixo** — repo de terceiro sem tanto histórico ainda pra atestar reputação/manutenção.\n\n" +
@@ -317,6 +323,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
     descricao_simples: "Dá memória entre conversas — mas você já tem isso com a gente.",
     fonte_nome: "thedotmack (GitHub)",
     fonte_url: "https://github.com/thedotmack/claude-mem",
+    instalado: false,
     conteudo:
       "# ClaudeMem (thedotmack/claude-mem)\n\n" +
       "**Risco: não recomendo instalar.**\n\n" +
@@ -331,6 +338,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
     descricao_simples: "Fica de olho no seu jeito de trabalhar e mexe nas outras skills sozinho — autonomia alta demais por ora.",
     fonte_nome: "rebelytics (GitHub)",
     fonte_url: "https://github.com/rebelytics/one-skill-to-rule-them-all",
+    instalado: false,
     conteudo:
       "# Task Observer (rebelytics/one-skill-to-rule-them-all)\n\n" +
       "**Risco: não recomendo por ora.**\n\n" +
@@ -346,6 +354,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
     descricao_simples: "Orquestra vários agentes trabalhando juntos — mas isso já é o que o OpenSquad faz por aqui.",
     fonte_nome: "ruvnet (GitHub)",
     fonte_url: "https://github.com/ruvnet/ruflo",
+    instalado: false,
     conteudo:
       "# Ruflo (ruvnet/ruflo)\n\n" +
       "**Risco: redundante, não recomendo.**\n\n" +
@@ -362,6 +371,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
     descricao_simples: "Skills pra quem usa o Obsidian como segundo cérebro — não é o seu caso hoje (você usa Notion).",
     fonte_nome: "kepano (GitHub)",
     fonte_url: "https://github.com/kepano/obsidian-skills",
+    instalado: false,
     conteudo:
       "# obsidian-skills (kepano/obsidian-skills)\n\n" +
       "**Risco: não se aplica hoje.**\n\n" +
@@ -374,5 +384,389 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
       "**Instalação:** `npx skills add https://github.com/kepano/obsidian-skills` na raiz do vault.\n\n" +
       "**Por que não se aplica:** seu \"segundo cérebro\" é o Notion, não o Obsidian. Só faria sentido " +
       "se você decidisse migrar ou usar os dois em paralelo.",
+  },
+  {
+    nome: "Prompt: biblioteca de prompts de imagem (YouMind)",
+    descricao: "Meta-prompt pronto: escolhe o melhor prompt de imagem da biblioteca YouMind e adapta pro seu caso.",
+    descricao_simples: "Um prompt pronto pra usar: você descreve a imagem que quer, ele escolhe e adapta o melhor modelo pronto.",
+    fonte_nome: "YouMind",
+    fonte_url: "https://youmind.com/pt-BR/prompts",
+    instalado: false,
+    conteudo:
+      "# Prompt: biblioteca de prompts de imagem (YouMind)\n\n" +
+      "**Tipo:** prompt pronto, não é uma skill instalável — cola direto no chat.\n\n" +
+      "**Como usar:** cole este texto (trocando a parte em colchetes) em qualquer conversa com IA de imagem:\n\n" +
+      "> Tenho acesso a esta biblioteca de prompts de imagem: https://youmind.com/pt-BR/prompts\n" +
+      ">\n" +
+      "> Quero gerar a seguinte imagem: [DESCREVE EM PORTUGUÊS O QUE VOCÊ QUER — ex: \"um retrato de " +
+      "perfil profissional, fundo neutro, luz suave\"].\n" +
+      ">\n" +
+      "> Escolhe o prompt mais adequado dessa biblioteca, adapta pro meu caso e me devolve o prompt " +
+      "final em inglês, pronto pra colar no Nano Banana. Explica em 1 linha por que escolheu esse.\n\n" +
+      "**Recomendação:** útil direto, sem instalar nada — é só um texto de apoio.",
+  },
+
+  // ── 42 skills de design (central-felipe-tambara.vercel.app/design-42-skills) ──
+  // Organizadas nas mesmas 6 camadas da página original.
+
+  {
+    nome: "design-taste-frontend",
+    descricao: "Três botões que aplicam gosto de verdade (layout assimétrico, movimento).",
+    descricao_simples: "Camada 01 · Núcleo anti-slop. Aplica \"bom gosto\" visual com 3 comandos simples.",
+    fonte_nome: "Leonxlnx (GitHub)",
+    fonte_url: "https://github.com/Leonxlnx/taste-skill",
+    instalado: false,
+    conteudo: "# design-taste-frontend\n\nAutor: Leonxlnx\n\nComando: `npx skills add Leonxlnx/taste-skill --skill design-taste-frontend`",
+  },
+  {
+    nome: "animate",
+    descricao: "Regras de movimento embutidas para 60fps respeitando reduced-motion.",
+    descricao_simples: "Camada 01 · Núcleo anti-slop. Deixa animações suaves e acessíveis (respeita quem prefere menos movimento).",
+    fonte_nome: "Emil Kowalski (GitHub)",
+    fonte_url: "https://github.com/delphi-ai/animate-skill",
+    instalado: false,
+    conteudo: "# animate\n\nAutor: Emil Kowalski\n\nComando: `npx skills add delphi-ai/animate-skill --skill animate`",
+  },
+  {
+    nome: "design-motion-principles",
+    descricao: "Auditor de movimento que pesa contenção, polimento e diversão.",
+    descricao_simples: "Camada 01 · Núcleo anti-slop. Revisa se a animação está no ponto certo (nem exagerada, nem sem graça).",
+    fonte_nome: "kylezantos (GitHub)",
+    fonte_url: "https://github.com/kylezantos/design-motion-principles",
+    instalado: false,
+    conteudo: "# design-motion-principles\n\nAutor: kylezantos\n\nComando: `npx skills add kylezantos/design-motion-principles`",
+  },
+  {
+    nome: "theme-factory",
+    descricao: "Gera sistema de tokens real como variáveis CSS.",
+    descricao_simples: "Camada 01 · Núcleo anti-slop. Cria a paleta/tema do zero como código reutilizável.",
+    fonte_nome: "Composio",
+    fonte_url: "https://github.com/ComposioHQ/awesome-codex-skills",
+    instalado: false,
+    conteudo: "# theme-factory\n\nAutor: Composio\n\nComando: `/plugin marketplace add ComposioHQ/awesome-codex-skills`",
+  },
+  {
+    nome: "figma → code (Figma MCP)",
+    descricao: "Traduz arquivos Figma em código de produção fiel.",
+    descricao_simples: "Camada 01 · Núcleo anti-slop. Pega um design pronto no Figma e transforma em código.",
+    fonte_nome: "GLips (GitHub)",
+    fonte_url: "https://github.com/GLips/Figma-Context-MCP",
+    instalado: false,
+    conteudo: "# figma → code (Figma MCP)\n\nAutor: GLips\n\nComando: `claude mcp add figma -- npx figma-developer-mcp --stdio`",
+  },
+  {
+    nome: "playwright-mcp",
+    descricao: "Oferece visão ao agente via screenshots e comparação com referências.",
+    descricao_simples: "Camada 01 · Núcleo anti-slop. Deixa o Claude \"ver\" a tela de verdade e comparar com o modelo desejado.",
+    fonte_nome: "Microsoft (GitHub)",
+    fonte_url: "https://github.com/microsoft/playwright-mcp",
+    instalado: false,
+    conteudo: "# playwright-mcp\n\nAutor: Microsoft\n\nComando: `claude mcp add playwright -s user -- npx @playwright/mcp@latest`",
+  },
+  {
+    nome: "brandkit",
+    descricao: "Boards de marca com direções de logo, paleta e tipografia.",
+    descricao_simples: "Camada 01 · Núcleo anti-slop. Monta um mini-guia de marca (logo, cores, fontes) pronto.",
+    fonte_nome: "Leonxlnx (GitHub)",
+    fonte_url: "https://github.com/Leonxlnx/taste-skill",
+    instalado: false,
+    conteudo: "# brandkit\n\nAutor: Leonxlnx\n\nComando: `npx skills add Leonxlnx/taste-skill --skill brandkit`",
+  },
+  {
+    nome: "designer-skills",
+    descricao: "Trabalho de processo: discovery, UX strategy, specs e QA.",
+    descricao_simples: "Camada 01 · Núcleo anti-slop. Conduz o processo inteiro de design, não só a arte final.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/designer-skills",
+    instalado: false,
+    conteudo: "# designer-skills\n\nAutor: Owl Listener\n\nComando: `/plugin marketplace add Owl-Listener/designer-skills`",
+  },
+  {
+    nome: "nano-banana",
+    descricao: "Gera e edita imagens no terminal via Gemini.",
+    descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria/edita imagem direto no terminal.",
+    fonte_nome: "Devon Jones (GitHub)",
+    fonte_url: "",
+    instalado: false,
+    conteudo: "# nano-banana\n\nAutor: Devon Jones\n\nComando: `/plugin install nano-banana@devon-claude-skills`",
+  },
+  {
+    nome: "banana-claude",
+    descricao: "Wrapper de imagem que interpreta intenção e monta prompts.",
+    descricao_simples: "Camada 02 · Pixels, movimento & 3D. Entende o que você quer e monta o prompt de imagem sozinho.",
+    fonte_nome: "Daniel Agrici (GitHub)",
+    fonte_url: "https://github.com/AgriciDaniel/banana-claude",
+    instalado: false,
+    conteudo: "# banana-claude\n\nAutor: Daniel Agrici\n\nComando: `/plugin marketplace add AgriciDaniel/banana-claude`",
+  },
+  {
+    nome: "canvas-design",
+    descricao: "Gera PNG e PDF editável (carrossel, quote card, infográfico).",
+    descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria carrossel/card/infográfico pronto pra exportar.",
+    fonte_nome: "Anthropic",
+    fonte_url: "https://github.com/anthropics/skills",
+    instalado: false,
+    conteudo: "# canvas-design\n\nAutor: Anthropic\n\nComando: `npx skills add anthropics/skills --skill canvas-design`",
+  },
+  {
+    nome: "algorithmic-art",
+    descricao: "Visual generativo por código (flow fields, ruído, partículas).",
+    descricao_simples: "Camada 02 · Pixels, movimento & 3D. Gera arte abstrata por código (sem precisar desenhar).",
+    fonte_nome: "Anthropic",
+    fonte_url: "https://github.com/anthropics/skills",
+    instalado: false,
+    conteudo: "# algorithmic-art\n\nAutor: Anthropic\n\nComando: `npx skills add anthropics/skills --skill algorithmic-art`",
+  },
+  {
+    nome: "remotion-superpowers",
+    descricao: "Estúdio de vídeo: locução, trilha, legenda e loop render-revisão.",
+    descricao_simples: "Camada 02 · Pixels, movimento & 3D. Monta vídeo completo (voz, música, legenda) e revisa sozinho.",
+    fonte_nome: "Dojo Coding (GitHub)",
+    fonte_url: "https://github.com/DojoCodingLabs/remotion-superpowers",
+    instalado: false,
+    conteudo: "# remotion-superpowers\n\nAutor: Dojo Coding\n\nComando: `/plugin marketplace add DojoCodingLabs/remotion-superpowers`",
+  },
+  {
+    nome: "claude-remotion (Remotion Skills)",
+    descricao: "Porta leve para vídeo programático com React → MP4.",
+    descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria vídeo a partir de código (pra quem programa).",
+    fonte_nome: "Remotion",
+    fonte_url: "https://github.com/remotion-dev/remotion",
+    instalado: false,
+    conteudo: "# claude-remotion (Remotion Skills)\n\nAutor: Remotion\n\nComando: `npx create-video@latest` (instala as Skills)",
+  },
+  {
+    nome: "blender-motion",
+    descricao: "Controla Blender por texto via MCP sem precisar saber 3D.",
+    descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria animação 3D só descrevendo o que quer, sem saber usar o programa.",
+    fonte_nome: "LobzyJay · ahujasid (GitHub)",
+    fonte_url: "https://github.com/LobzyJay/motion-design-with-claude",
+    instalado: false,
+    conteudo: "# blender-motion\n\nAutor: LobzyJay · ahujasid (MCP)\n\nComando: `npx skills add LobzyJay/motion-design-with-claude --skill blender-motion`",
+  },
+  {
+    nome: "aftereffects-motion",
+    descricao: "Anima dentro do After Effects por prompt com efeitos.",
+    descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria animações no After Effects só pedindo por texto.",
+    fonte_nome: "LobzyJay · TheLlamainator (GitHub)",
+    fonte_url: "https://github.com/LobzyJay/motion-design-with-claude",
+    instalado: false,
+    conteudo: "# aftereffects-motion\n\nAutor: LobzyJay · TheLlamainator (MCP)\n\nComando: `npx skills add LobzyJay/motion-design-with-claude --skill aftereffects-motion`",
+  },
+  {
+    nome: "Claude Design — Mockups de alta fidelidade",
+    descricao: "Telas prontas para iterar elemento por elemento.",
+    descricao_simples: "Camada 03 · O produto. Ferramenta paga da própria Anthropic pra desenhar telas.",
+    fonte_nome: "Anthropic · Claude Design",
+    fonte_url: "https://claude.ai/design",
+    instalado: false,
+    conteudo: "# Claude Design — Mockups de alta fidelidade\n\nAutor: Anthropic · Claude Design\n\nAcesso: claude.ai/design (plano pago, web)",
+  },
+  {
+    nome: "Claude Design — Design systems",
+    descricao: "Treina canvas na marca e aplica sistema em tudo.",
+    descricao_simples: "Camada 03 · O produto. Ensina a IA a manter a sua marca consistente em tudo que ela desenha.",
+    fonte_nome: "Anthropic · Claude Design",
+    fonte_url: "https://claude.ai/design",
+    instalado: false,
+    conteudo: "# Claude Design — Design systems\n\nAutor: Anthropic · Claude Design\n\nAcesso: claude.ai/design",
+  },
+  {
+    nome: "Claude Design — Templates",
+    descricao: "Salva versão perfeita como template reutilizável.",
+    descricao_simples: "Camada 03 · O produto. Guarda um design bom como modelo pra usar de novo depois.",
+    fonte_nome: "Anthropic · Claude Design",
+    fonte_url: "https://claude.ai/design",
+    instalado: false,
+    conteudo: "# Claude Design — Templates\n\nAutor: Anthropic · Claude Design\n\nAcesso: claude.ai/design",
+  },
+  {
+    nome: "Claude Design — Slide decks",
+    descricao: "Apresentações a partir de template e cores da marca.",
+    descricao_simples: "Camada 03 · O produto. Gera apresentação já na cor/estilo da sua marca.",
+    fonte_nome: "Anthropic · Claude Design",
+    fonte_url: "https://claude.ai/design",
+    instalado: false,
+    conteudo: "# Claude Design — Slide decks\n\nAutor: Anthropic · Claude Design\n\nAcesso: claude.ai/design",
+  },
+  {
+    nome: "composio-mcp",
+    descricao: "Liga Claude a Figma, Slides, GitHub e 1.000+ apps.",
+    descricao_simples: "Camada 03 · O produto. Conecta o Claude a mais de 1.000 outros aplicativos de uma vez.",
+    fonte_nome: "Composio",
+    fonte_url: "https://composio.dev",
+    instalado: false,
+    conteudo: "# composio-mcp\n\nAutor: Composio\n\nComando: `claude mcp add composio -- npx @composio/mcp@latest`",
+  },
+  {
+    nome: "context-window-design",
+    descricao: "Trata janela de contexto como material de design.",
+    descricao_simples: "Camada 04 · Comportamento, não pixel. Organiza o que a IA \"lembra\" durante a conversa.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# context-window-design\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill context-window-design`",
+  },
+  {
+    nome: "conversation-patterns",
+    descricao: "Desenha turnos, sequências de reparo e checkpoints.",
+    descricao_simples: "Camada 04 · Comportamento, não pixel. Organiza como a conversa flui e se corrige.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# conversation-patterns\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill conversation-patterns`",
+  },
+  {
+    nome: "generative-ui",
+    descricao: "Regras de quando renderizar componentes vs. texto puro.",
+    descricao_simples: "Camada 04 · Comportamento, não pixel. Decide quando mostrar botão/gráfico em vez de só texto.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# generative-ui\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill generative-ui`",
+  },
+  {
+    nome: "progressive-disclosure",
+    descricao: "Escalona revelação de poder da IA ao longo das mensagens.",
+    descricao_simples: "Camada 04 · Comportamento, não pixel. Vai mostrando mais recursos aos poucos, sem sobrecarregar.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# progressive-disclosure\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill progressive-disclosure`",
+  },
+  {
+    nome: "multimodal-orchestration",
+    descricao: "Sequencia texto, imagem e ferramentas num fluxo coordenado.",
+    descricao_simples: "Camada 04 · Comportamento, não pixel. Coordena texto + imagem + ferramentas trabalhando juntos.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# multimodal-orchestration\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill multimodal-orchestration`",
+  },
+  {
+    nome: "mixed-initiative-flow",
+    descricao: "Define quando agente lidera e quando usuário lidera.",
+    descricao_simples: "Camada 04 · Comportamento, não pixel. Decide quando a IA toma a frente e quando espera você.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# mixed-initiative-flow\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill mixed-initiative-flow`",
+  },
+  {
+    nome: "frustration-detection",
+    descricao: "Lê frustração e adapta (simplifica, desacelera, oferece humano).",
+    descricao_simples: "Camada 04 · Comportamento, não pixel. Percebe quando você está frustrada e ajusta o jeito de responder.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# frustration-detection\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill frustration-detection`",
+  },
+  {
+    nome: "feedback-loops",
+    descricao: "Mecanismo de correção que muda comportamento de verdade.",
+    descricao_simples: "Camada 04 · Comportamento, não pixel. Faz a IA aprender de verdade com sua correção, não só pedir desculpa.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# feedback-loops\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill feedback-loops`",
+  },
+  {
+    nome: "system-prompt-structure",
+    descricao: "Anatomia limpa (identidade, contexto, regras, output, exemplos).",
+    descricao_simples: "Camada 05 · O prompt é o produto. Organiza a \"receita\" que define como um agente se comporta.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# system-prompt-structure\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill system-prompt-structure`",
+  },
+  {
+    nome: "persona-architecture",
+    descricao: "Define personagem, voz e limites para comportamento consistente.",
+    descricao_simples: "Camada 05 · O prompt é o produto. Constrói uma persona de IA consistente (parecido com nossos 16 especialistas).",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# persona-architecture\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill persona-architecture`",
+  },
+  {
+    nome: "tone-calibration",
+    descricao: "Botões de tom por contexto (formalidade, calor, confiança).",
+    descricao_simples: "Camada 05 · O prompt é o produto. Ajusta o tom da resposta conforme a situação.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# tone-calibration\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill tone-calibration`",
+  },
+  {
+    nome: "emotional-design",
+    descricao: "Mapa de resposta para frustração, confusão, alegria e angústia.",
+    descricao_simples: "Camada 05 · O prompt é o produto. Guia de como reagir a diferentes emoções do usuário.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# emotional-design\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill emotional-design`",
+  },
+  {
+    nome: "template-design",
+    descricao: "Templates parametrizados com variáveis tipadas e condições.",
+    descricao_simples: "Camada 05 · O prompt é o produto. Cria modelos de texto reutilizáveis com partes que trocam.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# template-design\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill template-design`",
+  },
+  {
+    nome: "few-shot-patterns",
+    descricao: "Conjuntos de exemplo que miram erros recorrentes do modelo.",
+    descricao_simples: "Camada 05 · O prompt é o produto. Usa exemplos prontos pra corrigir erros que a IA sempre comete.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# few-shot-patterns\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill few-shot-patterns`",
+  },
+  {
+    nome: "chain-of-thought-design",
+    descricao: "Cadeias de raciocínio deliberadas estruturadas.",
+    descricao_simples: "Camada 05 · O prompt é o produto. Organiza o \"passo a passo de pensar\" da IA antes de responder.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# chain-of-thought-design\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill chain-of-thought-design`",
+  },
+  {
+    nome: "constraint-specification",
+    descricao: "Limites testáveis (formato, tamanho, tom, conteúdo).",
+    descricao_simples: "Camada 05 · O prompt é o produto. Define regras claras de formato/tamanho que dá pra checar se foram seguidas.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# constraint-specification\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill constraint-specification`",
+  },
+  {
+    nome: "guardrail-design",
+    descricao: "Limites de comportamento e padrões de recusa explícitos.",
+    descricao_simples: "Camada 06 · Entrega com segurança. Define claramente o que a IA deve recusar a fazer.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# guardrail-design\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill guardrail-design`",
+  },
+  {
+    nome: "trust-calibration",
+    descricao: "Sinais de confiança e fonte para o usuário calibrar expectativas.",
+    descricao_simples: "Camada 06 · Entrega com segurança. Mostra o quanto confiar na resposta e de onde ela veio.",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# trust-calibration\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill trust-calibration`",
+  },
+  {
+    nome: "transparency-patterns",
+    descricao: "Mostra o que o modelo sabe, não sabe e nível de certeza.",
+    descricao_simples: "Camada 06 · Entrega com segurança. Deixa claro o que a IA tem certeza e o que está \"chutando\".",
+    fonte_nome: "Owl Listener (GitHub)",
+    fonte_url: "https://github.com/Owl-Listener/ai-design-skills",
+    instalado: false,
+    conteudo: "# transparency-patterns\n\nAutor: Owl Listener\n\nComando: `npx skills add Owl-Listener/ai-design-skills --skill transparency-patterns`",
   },
 ];
