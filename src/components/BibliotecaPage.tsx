@@ -88,6 +88,7 @@ export default function BibliotecaPage() {
         descricao_simples: s.descricao,
         fonte_nome: "Andréia Frois",
         instalado: true,
+        categoria: "⚙️ Sistema & Automação",
         conteudo: `# ${s.nome}\n\n${s.descricao}\n\nComo usar: ${s.como}`,
       }));
 
@@ -96,6 +97,29 @@ export default function BibliotecaPage() {
   const referenciasSkill = REFERENCIAS_EXTERNAS.filter((r) => (r.tipo || "skill") === "skill");
   const referenciasPrompt = REFERENCIAS_EXTERNAS.filter((r) => r.tipo === "prompt");
   const referenciasPlugin = REFERENCIAS_EXTERNAS.filter((r) => r.tipo === "plugin");
+
+  // Agrupa por categoria (design, vídeo, imagem, sistema...) em vez de
+  // listar tudo junto — pedido 24/07: "achar o que eu quero mais rápido".
+  const gradeAgrupada = (lista: typeof skillsExibidas) => {
+    const grupos = new Map<string, typeof skillsExibidas>();
+    for (const item of lista) {
+      const cat = item.categoria || "🧩 Outros";
+      grupos.set(cat, [...(grupos.get(cat) || []), item]);
+    }
+    const ordem = [...grupos.keys()].sort();
+    return (
+      <div className="space-y-5">
+        {ordem.map((cat) => (
+          <div key={cat}>
+            <h3 className="text-xs font-semibold text-[var(--text-secondary)] mb-2">
+              {cat} <span className="text-[var(--text-muted)] font-normal">({grupos.get(cat)!.length})</span>
+            </h3>
+            {grade(grupos.get(cat)!)}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const grade = (lista: typeof skillsExibidas) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -242,7 +266,7 @@ export default function BibliotecaPage() {
                         <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                           💎 Andréia Frois
                         </h2>
-                        {nossas.length > 0 ? grade(nossas) : (
+                        {nossas.length > 0 ? gradeAgrupada(nossas) : (
                           <p className="text-xs text-[var(--text-muted)]">Nenhuma skill nossa ainda.</p>
                         )}
                       </section>
@@ -250,7 +274,7 @@ export default function BibliotecaPage() {
                         <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                           🌐 Outras fontes
                         </h2>
-                        {grade(outras)}
+                        {gradeAgrupada(outras)}
                       </section>
                       <section>
                         <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
@@ -259,7 +283,7 @@ export default function BibliotecaPage() {
                         <p className="text-xs text-[var(--text-muted)] mb-2">
                           Material trazido de fora pra avaliar. Clique num card pra ver o passo a passo completo.
                         </p>
-                        {grade(referenciasSkill)}
+                        {gradeAgrupada(referenciasSkill)}
                       </section>
                     </>
                   );
@@ -278,28 +302,42 @@ export default function BibliotecaPage() {
             ) : aba === "automacoes" ? (
               <>
                 <p className="text-xs text-[var(--text-muted)]">
-                  {carregando ? "carregando…" : aoVivo ? "lido ao vivo da VPS" : "catálogo local"}
+                  {carregando ? "carregando…" : aoVivo ? "lido ao vivo da VPS" : "catálogo local"} · nome amigável em cima, comando técnico embaixo
                 </p>
                 {catalogo && catalogo.automacoes.length > 0 ? (
-                  <section>
-                    <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                      ⚙️ Automações reais (cron)
-                    </h2>
-                    <div className="space-y-2">
-                      {catalogo.automacoes.map((a, i) => (
-                        <div
-                          key={`${a.nome}-${i}`}
-                          className="bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)]"
-                        >
-                          <p className="font-medium text-sm text-[var(--text-primary)]">{a.nome}</p>
-                          <p className="text-xs mt-1 font-mono text-[var(--text-muted)]">{a.agenda}</p>
-                          <p className="text-xs mt-0.5 font-mono text-[var(--text-secondary)] truncate">
-                            {a.comando}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
+                  (() => {
+                    const grupos = new Map<string, typeof catalogo.automacoes>();
+                    for (const a of catalogo.automacoes) {
+                      const cat = a.categoria || "🩺 Sistema & Saúde";
+                      grupos.set(cat, [...(grupos.get(cat) || []), a]);
+                    }
+                    const ordem = [...grupos.keys()].sort();
+                    return (
+                      <div className="space-y-5">
+                        {ordem.map((cat) => (
+                          <section key={cat}>
+                            <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
+                              {cat} <span className="text-[var(--text-muted)] font-normal normal-case">({grupos.get(cat)!.length})</span>
+                            </h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                              {grupos.get(cat)!.map((a, i) => (
+                                <div
+                                  key={`${a.nome}-${i}`}
+                                  className="bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)]"
+                                >
+                                  <p className="font-medium text-sm text-[var(--text-primary)]">{a.nome}</p>
+                                  <p className="text-xs mt-1 font-mono text-[var(--text-muted)]">{a.agenda}</p>
+                                  <p className="text-xs mt-0.5 font-mono text-[var(--text-secondary)] truncate" title={a.comando}>
+                                    {a.comando}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </section>
+                        ))}
+                      </div>
+                    );
+                  })()
                 ) : (
                   <p className="text-xs text-[var(--text-muted)]">Nenhuma automação encontrada.</p>
                 )}
@@ -318,7 +356,7 @@ export default function BibliotecaPage() {
                 <p className="text-xs text-[var(--text-muted)]">
                   Plugins e ferramentas de terceiro (MCP, marketplace de plugins) — referência, nada instalado.
                 </p>
-                {referenciasPlugin.length > 0 ? grade(referenciasPlugin) : (
+                {referenciasPlugin.length > 0 ? gradeAgrupada(referenciasPlugin) : (
                   <p className="text-xs text-[var(--text-muted)]">Nenhum plugin guardado ainda.</p>
                 )}
               </>

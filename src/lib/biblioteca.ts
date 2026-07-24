@@ -24,11 +24,13 @@ export interface SkillApiItem {
   fonte_url?: string; // link da fonte externa, se houver
   instalado?: boolean; // true = roda de verdade no ecossistema; false = só referência
   tipo?: "skill" | "plugin" | "prompt"; // default "skill" quando ausente
+  categoria?: string; // "🎨 Design & Frontend", "🎬 Vídeo" etc — pra agrupar no painel
   conteudo: string; // SKILL.md inteiro
 }
 
 export interface AutomacaoApiItem {
   nome: string;
+  categoria?: string;
   agenda: string; // expressão cron
   comando: string;
 }
@@ -245,6 +247,7 @@ export const SKILLS: { grupo: string; itens: SkillItem[] }[] = [
 export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   {
     nome: "claude-code-setup (Anthropic)",
+    categoria: "⚙️ Sistema & Automação",
     tipo: "plugin",
     descricao: "Plugin oficial que audita um projeto e recomenda hooks, skills, subagents e MCPs.",
     descricao_simples: "Escaneia seu projeto e sugere o que falta configurar — só leitura, não instala nada sozinho.",
@@ -265,6 +268,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "frontend-design + impeccable",
+    categoria: "🎨 Design & Frontend",
     descricao: "Skills de gosto de design pro Claude: direção estética antes do CSS, passe de qualidade determinístico.",
     descricao_simples: "Ajuda o Claude a ter mais \"olho\" de design em telas e interfaces (grid, cor, tipografia, contraste).",
     fonte_nome: "Anthropic + Paul Bakaus",
@@ -284,6 +288,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Find Skills / npx skills (Vercel Labs)",
+    categoria: "⚙️ Sistema & Automação",
     tipo: "plugin",
     descricao: "Busca entre +700 mil skills prontas e instala a certa a partir do que você descrever.",
     descricao_simples: "Você diz o que está construindo, ela acha a skill certa numa biblioteca gigante e instala sozinha.",
@@ -304,6 +309,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Superpowers",
+    categoria: "⚙️ Sistema & Automação",
     descricao: "Força o Claude a planejar e revisar o próprio trabalho antes de tocar no projeto de verdade.",
     descricao_simples: "Deixa o Claude mais metódico: planeja e revisa antes de agir, em vez de sair fazendo.",
     fonte_nome: "obra (GitHub)",
@@ -322,6 +328,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "ClaudeMem",
+    categoria: "⚙️ Sistema & Automação",
     tipo: "plugin",
     descricao: "Memória entre sessões: lembra do projeto e arquivos sem reexplicar do zero.",
     descricao_simples: "Dá memória entre conversas — mas você já tem isso com a gente.",
@@ -338,6 +345,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Task Observer",
+    categoria: "⚙️ Sistema & Automação",
     tipo: "plugin",
     descricao: "Observa como você trabalha e melhora as outras skills sozinho, em background.",
     descricao_simples: "Fica de olho no seu jeito de trabalhar e mexe nas outras skills sozinho — autonomia alta demais por ora.",
@@ -355,6 +363,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Ruflo",
+    categoria: "⚙️ Sistema & Automação",
     tipo: "plugin",
     descricao: "Camada de coordenação em cima do Claude Code: transforma ele num maestro de dezenas de agentes.",
     descricao_simples: "Orquestra vários agentes trabalhando juntos — mas isso já é o que o OpenSquad faz por aqui.",
@@ -373,6 +382,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "obsidian-skills",
+    categoria: "📝 Produtividade & Notas",
     descricao: "5 skills pra trabalhar com Obsidian: Markdown, bases, canvas espacial, CLI, extração web.",
     descricao_simples: "Skills pra quem usa o Obsidian como segundo cérebro — não é o seu caso hoje (você usa Notion).",
     fonte_nome: "kepano (GitHub)",
@@ -393,6 +403,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Prompt: biblioteca de prompts de imagem (YouMind)",
+    categoria: "🖼️ Imagem",
     tipo: "prompt",
     descricao: "Meta-prompt pronto: escolhe o melhor prompt de imagem da biblioteca YouMind e adapta pro seu caso.",
     descricao_simples: "Um prompt pronto pra usar: você descreve a imagem que quer, ele escolhe e adapta o melhor modelo pronto.",
@@ -418,6 +429,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
 
   {
     nome: "design-taste-frontend",
+    categoria: "🎨 Design & Frontend",
     descricao: "Três botões que aplicam gosto de verdade (layout assimétrico, movimento).",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Aplica \"bom gosto\" visual com 3 comandos simples.",
     fonte_nome: "Leonxlnx (GitHub)",
@@ -427,6 +439,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "animate",
+    categoria: "🎨 Design & Frontend",
     descricao: "Regras de movimento embutidas para 60fps respeitando reduced-motion.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Deixa animações suaves e acessíveis (respeita quem prefere menos movimento).",
     fonte_nome: "Emil Kowalski (GitHub)",
@@ -436,6 +449,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "design-motion-principles",
+    categoria: "🎨 Design & Frontend",
     descricao: "Auditor de movimento que pesa contenção, polimento e diversão.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Revisa se a animação está no ponto certo (nem exagerada, nem sem graça).",
     fonte_nome: "kylezantos (GitHub)",
@@ -445,6 +459,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "theme-factory",
+    categoria: "🎨 Design & Frontend",
     tipo: "plugin",
     descricao: "Gera sistema de tokens real como variáveis CSS.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Cria a paleta/tema do zero como código reutilizável.",
@@ -455,6 +470,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "figma → code (Figma MCP)",
+    categoria: "🎨 Design & Frontend",
     tipo: "plugin",
     descricao: "Traduz arquivos Figma em código de produção fiel.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Pega um design pronto no Figma e transforma em código.",
@@ -465,6 +481,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "playwright-mcp",
+    categoria: "🎨 Design & Frontend",
     tipo: "plugin",
     descricao: "Oferece visão ao agente via screenshots e comparação com referências.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Deixa o Claude \"ver\" a tela de verdade e comparar com o modelo desejado.",
@@ -475,6 +492,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "brandkit",
+    categoria: "🎨 Design & Frontend",
     descricao: "Boards de marca com direções de logo, paleta e tipografia.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Monta um mini-guia de marca (logo, cores, fontes) pronto.",
     fonte_nome: "Leonxlnx (GitHub)",
@@ -484,6 +502,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "designer-skills",
+    categoria: "🎨 Design & Frontend",
     tipo: "plugin",
     descricao: "Trabalho de processo: discovery, UX strategy, specs e QA.",
     descricao_simples: "Camada 01 · Núcleo anti-slop. Conduz o processo inteiro de design, não só a arte final.",
@@ -494,6 +513,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "nano-banana",
+    categoria: "🖼️ Imagem",
     tipo: "plugin",
     descricao: "Gera e edita imagens no terminal via Gemini.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria/edita imagem direto no terminal.",
@@ -504,6 +524,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "banana-claude",
+    categoria: "🖼️ Imagem",
     tipo: "plugin",
     descricao: "Wrapper de imagem que interpreta intenção e monta prompts.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Entende o que você quer e monta o prompt de imagem sozinho.",
@@ -514,6 +535,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "canvas-design",
+    categoria: "🖼️ Imagem",
     descricao: "Gera PNG e PDF editável (carrossel, quote card, infográfico).",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria carrossel/card/infográfico pronto pra exportar.",
     fonte_nome: "Anthropic",
@@ -523,6 +545,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "algorithmic-art",
+    categoria: "🖼️ Imagem",
     descricao: "Visual generativo por código (flow fields, ruído, partículas).",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Gera arte abstrata por código (sem precisar desenhar).",
     fonte_nome: "Anthropic",
@@ -532,6 +555,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "remotion-superpowers",
+    categoria: "🎬 Vídeo",
     tipo: "plugin",
     descricao: "Estúdio de vídeo: locução, trilha, legenda e loop render-revisão.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Monta vídeo completo (voz, música, legenda) e revisa sozinho.",
@@ -542,6 +566,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "claude-remotion (Remotion Skills)",
+    categoria: "🎬 Vídeo",
     tipo: "plugin",
     descricao: "Porta leve para vídeo programático com React → MP4.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria vídeo a partir de código (pra quem programa).",
@@ -552,6 +577,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "blender-motion",
+    categoria: "🎬 Vídeo",
     descricao: "Controla Blender por texto via MCP sem precisar saber 3D.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria animação 3D só descrevendo o que quer, sem saber usar o programa.",
     fonte_nome: "LobzyJay · ahujasid (GitHub)",
@@ -561,6 +587,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "aftereffects-motion",
+    categoria: "🎬 Vídeo",
     descricao: "Anima dentro do After Effects por prompt com efeitos.",
     descricao_simples: "Camada 02 · Pixels, movimento & 3D. Cria animações no After Effects só pedindo por texto.",
     fonte_nome: "LobzyJay · TheLlamainator (GitHub)",
@@ -570,6 +597,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Claude Design — Mockups de alta fidelidade",
+    categoria: "🖥️ Produto (Claude Design)",
     tipo: "plugin",
     descricao: "Telas prontas para iterar elemento por elemento.",
     descricao_simples: "Camada 03 · O produto. Ferramenta paga da própria Anthropic pra desenhar telas.",
@@ -580,6 +608,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Claude Design — Design systems",
+    categoria: "🖥️ Produto (Claude Design)",
     tipo: "plugin",
     descricao: "Treina canvas na marca e aplica sistema em tudo.",
     descricao_simples: "Camada 03 · O produto. Ensina a IA a manter a sua marca consistente em tudo que ela desenha.",
@@ -590,6 +619,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Claude Design — Templates",
+    categoria: "🖥️ Produto (Claude Design)",
     tipo: "plugin",
     descricao: "Salva versão perfeita como template reutilizável.",
     descricao_simples: "Camada 03 · O produto. Guarda um design bom como modelo pra usar de novo depois.",
@@ -600,6 +630,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "Claude Design — Slide decks",
+    categoria: "🖥️ Produto (Claude Design)",
     tipo: "plugin",
     descricao: "Apresentações a partir de template e cores da marca.",
     descricao_simples: "Camada 03 · O produto. Gera apresentação já na cor/estilo da sua marca.",
@@ -610,6 +641,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "composio-mcp",
+    categoria: "⚙️ Sistema & Automação",
     tipo: "plugin",
     descricao: "Liga Claude a Figma, Slides, GitHub e 1.000+ apps.",
     descricao_simples: "Camada 03 · O produto. Conecta o Claude a mais de 1.000 outros aplicativos de uma vez.",
@@ -620,6 +652,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "context-window-design",
+    categoria: "🧠 Comportamento de IA",
     descricao: "Trata janela de contexto como material de design.",
     descricao_simples: "Camada 04 · Comportamento, não pixel. Organiza o que a IA \"lembra\" durante a conversa.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -629,6 +662,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "conversation-patterns",
+    categoria: "🧠 Comportamento de IA",
     descricao: "Desenha turnos, sequências de reparo e checkpoints.",
     descricao_simples: "Camada 04 · Comportamento, não pixel. Organiza como a conversa flui e se corrige.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -638,6 +672,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "generative-ui",
+    categoria: "🧠 Comportamento de IA",
     descricao: "Regras de quando renderizar componentes vs. texto puro.",
     descricao_simples: "Camada 04 · Comportamento, não pixel. Decide quando mostrar botão/gráfico em vez de só texto.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -647,6 +682,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "progressive-disclosure",
+    categoria: "🧠 Comportamento de IA",
     descricao: "Escalona revelação de poder da IA ao longo das mensagens.",
     descricao_simples: "Camada 04 · Comportamento, não pixel. Vai mostrando mais recursos aos poucos, sem sobrecarregar.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -656,6 +692,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "multimodal-orchestration",
+    categoria: "🧠 Comportamento de IA",
     descricao: "Sequencia texto, imagem e ferramentas num fluxo coordenado.",
     descricao_simples: "Camada 04 · Comportamento, não pixel. Coordena texto + imagem + ferramentas trabalhando juntos.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -665,6 +702,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "mixed-initiative-flow",
+    categoria: "🧠 Comportamento de IA",
     descricao: "Define quando agente lidera e quando usuário lidera.",
     descricao_simples: "Camada 04 · Comportamento, não pixel. Decide quando a IA toma a frente e quando espera você.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -674,6 +712,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "frustration-detection",
+    categoria: "🧠 Comportamento de IA",
     descricao: "Lê frustração e adapta (simplifica, desacelera, oferece humano).",
     descricao_simples: "Camada 04 · Comportamento, não pixel. Percebe quando você está frustrada e ajusta o jeito de responder.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -683,6 +722,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "feedback-loops",
+    categoria: "🧠 Comportamento de IA",
     descricao: "Mecanismo de correção que muda comportamento de verdade.",
     descricao_simples: "Camada 04 · Comportamento, não pixel. Faz a IA aprender de verdade com sua correção, não só pedir desculpa.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -692,6 +732,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "system-prompt-structure",
+    categoria: "💬 Arquitetura de Prompt",
     descricao: "Anatomia limpa (identidade, contexto, regras, output, exemplos).",
     descricao_simples: "Camada 05 · O prompt é o produto. Organiza a \"receita\" que define como um agente se comporta.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -701,6 +742,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "persona-architecture",
+    categoria: "💬 Arquitetura de Prompt",
     descricao: "Define personagem, voz e limites para comportamento consistente.",
     descricao_simples: "Camada 05 · O prompt é o produto. Constrói uma persona de IA consistente (parecido com nossos 16 especialistas).",
     fonte_nome: "Owl Listener (GitHub)",
@@ -710,6 +752,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "tone-calibration",
+    categoria: "💬 Arquitetura de Prompt",
     descricao: "Botões de tom por contexto (formalidade, calor, confiança).",
     descricao_simples: "Camada 05 · O prompt é o produto. Ajusta o tom da resposta conforme a situação.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -719,6 +762,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "emotional-design",
+    categoria: "💬 Arquitetura de Prompt",
     descricao: "Mapa de resposta para frustração, confusão, alegria e angústia.",
     descricao_simples: "Camada 05 · O prompt é o produto. Guia de como reagir a diferentes emoções do usuário.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -728,6 +772,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "template-design",
+    categoria: "💬 Arquitetura de Prompt",
     descricao: "Templates parametrizados com variáveis tipadas e condições.",
     descricao_simples: "Camada 05 · O prompt é o produto. Cria modelos de texto reutilizáveis com partes que trocam.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -737,6 +782,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "few-shot-patterns",
+    categoria: "💬 Arquitetura de Prompt",
     descricao: "Conjuntos de exemplo que miram erros recorrentes do modelo.",
     descricao_simples: "Camada 05 · O prompt é o produto. Usa exemplos prontos pra corrigir erros que a IA sempre comete.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -746,6 +792,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "chain-of-thought-design",
+    categoria: "💬 Arquitetura de Prompt",
     descricao: "Cadeias de raciocínio deliberadas estruturadas.",
     descricao_simples: "Camada 05 · O prompt é o produto. Organiza o \"passo a passo de pensar\" da IA antes de responder.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -755,6 +802,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "constraint-specification",
+    categoria: "💬 Arquitetura de Prompt",
     descricao: "Limites testáveis (formato, tamanho, tom, conteúdo).",
     descricao_simples: "Camada 05 · O prompt é o produto. Define regras claras de formato/tamanho que dá pra checar se foram seguidas.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -764,6 +812,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "guardrail-design",
+    categoria: "🔒 Segurança & Confiança",
     descricao: "Limites de comportamento e padrões de recusa explícitos.",
     descricao_simples: "Camada 06 · Entrega com segurança. Define claramente o que a IA deve recusar a fazer.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -773,6 +822,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "trust-calibration",
+    categoria: "🔒 Segurança & Confiança",
     descricao: "Sinais de confiança e fonte para o usuário calibrar expectativas.",
     descricao_simples: "Camada 06 · Entrega com segurança. Mostra o quanto confiar na resposta e de onde ela veio.",
     fonte_nome: "Owl Listener (GitHub)",
@@ -782,6 +832,7 @@ export const REFERENCIAS_EXTERNAS: SkillApiItem[] = [
   },
   {
     nome: "transparency-patterns",
+    categoria: "🔒 Segurança & Confiança",
     descricao: "Mostra o que o modelo sabe, não sabe e nível de certeza.",
     descricao_simples: "Camada 06 · Entrega com segurança. Deixa claro o que a IA tem certeza e o que está \"chutando\".",
     fonte_nome: "Owl Listener (GitHub)",
