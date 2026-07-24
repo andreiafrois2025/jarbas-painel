@@ -214,8 +214,11 @@ export default function BibliotecaPage() {
                             <span className="text-xl shrink-0">🧩</span>
                             <p className="font-semibold text-[var(--text-primary)] text-sm truncate">{s.nome}</p>
                           </div>
-                          <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                          <p className="text-xs text-[var(--text-secondary)] mt-1.5 line-clamp-3">
                             {(s.descricao_simples || s.descricao).split("\n")[0]}
+                          </p>
+                          <p className="text-[10px] text-[var(--text-muted)] mt-2">
+                            Fonte: {s.fonte_nome || "Andréia Frois"}
                           </p>
                         </button>
                       ))}
