@@ -29,13 +29,15 @@ export default function FlowsPageV2() {
   const [newTitle, setNewTitle] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
-  const load = async () => {
+  const load = async (): Promise<FlowDoc[]> => {
     setLoading(true);
     try {
       const list = await getFlowDocs();
       setFlows(list);
+      return list;
     } catch (e) {
       console.error("Erro ao carregar fluxos:", e);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -48,7 +50,14 @@ export default function FlowsPageV2() {
     if (cat === "automation" || cat === "squad" || cat === "manual") setCategory(cat);
     const fluxo = params.get("fluxo");
     if (fluxo) setSelectedId(fluxo);
-    load();
+    // Deep-link por TÍTULO (?titulo=…): usado pelos cards de Biblioteca ›
+    // Automações, que sabem o nome do fluxo mas não o id do banco.
+    const titulo = params.get("titulo");
+    load().then((lista) => {
+      if (!titulo || fluxo) return;
+      const alvo = lista.find((f) => f.title.toLowerCase() === titulo.toLowerCase());
+      if (alvo) setSelectedId(alvo.id);
+    });
   }, []);
 
   useEffect(() => {
@@ -213,7 +222,7 @@ export default function FlowsPageV2() {
               setCreatingCat(category);
               setCreatingInColumn(colName);
             }}
-            onFlowsChanged={load}
+            onFlowsChanged={async () => { await load(); }}
           />
         )}
       </div>

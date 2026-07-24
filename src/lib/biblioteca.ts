@@ -33,6 +33,9 @@ export interface AutomacaoApiItem {
   categoria?: string;
   agenda: string; // expressão cron
   comando: string;
+  descricao?: string; // o que a automação faz, em português
+  script?: string | null; // caminho do script principal
+  flow?: string | null; // título do fluxo correspondente em Produção › Fluxos
 }
 
 export interface CriacaoApiItem {
