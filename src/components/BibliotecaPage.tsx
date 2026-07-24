@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CRIACOES,
   SKILLS,
@@ -12,9 +12,7 @@ import {
   type Catalogo,
   type LinkItem,
   type NovaCriacaoPayload,
-  type AutomacaoApiItem,
 } from "@/lib/biblioteca";
-import { interpretaCron, formataProxima } from "@/lib/cron";
 import GrafoView from "./GrafoView";
 
 // Biblioteca: acesso rápido a tudo que existe (links diretos) e o catálogo
@@ -194,7 +192,6 @@ export default function BibliotecaPage() {
         <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">📚 Biblioteca</h1>
         {botao("criacoes", "🔗 Criações")}
         {botao("skills", "🧰 Skills")}
-        {botao("automacoes", "⚙️ Automações")}
         {botao("prompts", "💬 Prompts")}
         {botao("plugins", "🔌 Plugins")}
         {botao("grafo", "🕸️ Grafo")}
@@ -335,11 +332,7 @@ export default function BibliotecaPage() {
                 </p>
               </>
             ) : aba === "automacoes" ? (
-              <AbaAutomacoes
-                automacoes={catalogo?.automacoes || []}
-                carregando={carregando}
-                aoVivo={aoVivo}
-              />
+              <PonteiroAutomacoes />
             ) : aba === "prompts" ? (
               <>
                 <p className="text-xs text-[var(--text-muted)]">
@@ -639,224 +632,29 @@ function FormNovaCriacao({
   );
 }
 
-// =============================================================
-// Aba ⚙️ Automações — o inventário do relógio do ecossistema.
-// 24/07/2026: reescrita. Antes era um grid de 4 colunas com o cron cru e o
-// comando cortado (não dava pra ler nada). Agora:
-//   · o cron vira português, já convertido pra horário de Brasília
-//   · lista larga, ordenada da mais frequente pra mais rara
-//   · clique abre o detalhe com o comando INTEIRO
-//   · botão "ver o fluxo" liga com o desenho em Produção › Fluxos
-// =============================================================
-
-function AbaAutomacoes({
-  automacoes, carregando, aoVivo,
-}: {
-  automacoes: AutomacaoApiItem[];
-  carregando: boolean;
-  aoVivo: boolean;
-}) {
-  const [aberta, setAberta] = useState<AutomacaoApiItem | null>(null);
-  const [legendaAberta, setLegendaAberta] = useState(false);
-  const [copiado, setCopiado] = useState(false);
-
-  // Interpreta o cron uma vez só por automação.
-  const itens = useMemo(
-    () => automacoes.map((a) => ({ ...a, cron: interpretaCron(a.agenda) })),
-    [automacoes],
-  );
-
-  const grupos = useMemo(() => {
-    const m = new Map<string, typeof itens>();
-    for (const a of itens) {
-      const cat = a.categoria || "🩺 Sistema & Saúde";
-      m.set(cat, [...(m.get(cat) || []), a]);
-    }
-    // Dentro de cada categoria: da que roda mais vezes pra que roda menos.
-    for (const [, lista] of m) lista.sort((x, y) => x.cron.frequenciaMin - y.cron.frequenciaMin);
-    return m;
-  }, [itens]);
-
-  async function copiar(texto: string) {
-    try {
-      await navigator.clipboard.writeText(texto);
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 1500);
-    } catch { /* clipboard bloqueado — ignora */ }
-  }
-
-  const detalhe = aberta ? interpretaCron(aberta.agenda) : null;
-
+// Ponteiro: a aba ⚙️ Automações saiu daqui em 24/07/2026 e virou uma tela
+// própria em Produção › Automações, unificada com o desenho dos fluxos.
+// Biblioteca é ACERVO (o que você consulta); automação que roda sozinha é
+// MAQUINÁRIO EM OPERAÇÃO, e isso mora em Produção.
+// O botão do menu sumiu, mas o estado da aba continua existindo pra não
+// quebrar link antigo — quem cair aqui recebe o caminho novo.
+function PonteiroAutomacoes() {
   return (
-    <>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <p className="text-sm text-[var(--text-primary)]">
-          Tudo que dispara <strong>sozinho</strong> na VPS — {itens.length} agendamentos.
-        </p>
-        <p className="text-xs text-[var(--text-muted)]">
-          {carregando ? "carregando…" : aoVivo ? "lido ao vivo do crontab" : "catálogo local"} · horários em Brasília
-        </p>
-        <button
-          onClick={() => setLegendaAberta(!legendaAberta)}
-          className="text-xs underline decoration-dotted text-[var(--text-secondary)] cursor-pointer"
-        >
-          o que são os números com *?
-        </button>
-      </div>
-
-      {legendaAberta && (
-        <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] text-sm space-y-2">
-          <p className="text-[var(--text-primary)]">
-            É <strong>cron</strong>, a linguagem que o Linux usa pra agendar tarefas. São 5 campos,
-            sempre nesta ordem — e o <code className="font-mono">*</code> quer dizer
-            &ldquo;qualquer&rdquo;, como deixar um campo do formulário em branco:
-          </p>
-          <pre className="font-mono text-xs bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border)] overflow-x-auto">
-{`minuto   hora   dia do mês   mês   dia da semana
-  *       *          *         *          *`}
-          </pre>
-          <ul className="text-xs text-[var(--text-secondary)] space-y-1">
-            <li><code className="font-mono">*/5 * * * *</code> → a cada 5 minutos</li>
-            <li><code className="font-mono">0 * * * *</code> → de hora em hora, no minuto 0</li>
-            <li><code className="font-mono">30 9 * * *</code> → todo dia às 9h30 <em>UTC</em> = 6h30 aqui</li>
-            <li><code className="font-mono">0 12 * * 0</code> → domingo ao meio-dia UTC</li>
-          </ul>
-          <p className="text-xs text-[var(--text-muted)]">
-            O crontab da VPS roda em UTC. Nesta tela a tradução já sai em horário de Brasília (UTC−3);
-            o cron cru fica ao lado, pra conferência.
-          </p>
-        </div>
-      )}
-
-      {itens.length === 0 ? (
-        <p className="text-xs text-[var(--text-muted)]">
-          {carregando ? "" : "Nenhuma automação encontrada."}
-        </p>
-      ) : (
-        <div className="space-y-6">
-          {[...grupos.keys()].sort().map((cat) => (
-            <section key={cat}>
-              <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                {cat}{" "}
-                <span className="text-[var(--text-muted)] font-normal normal-case">
-                  ({grupos.get(cat)!.length})
-                </span>
-              </h2>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                {grupos.get(cat)!.map((a, i) => (
-                  <button
-                    key={`${a.nome}-${i}`}
-                    onClick={() => setAberta(a)}
-                    className="text-left bg-[var(--bg-secondary)] rounded-xl px-4 py-3 border border-[var(--border)] hover:border-[var(--accent,#2D6B6B)] transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-medium text-sm text-[var(--text-primary)]">{a.nome}</p>
-                      <span
-                        className="shrink-0 text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap"
-                        style={{ background: "var(--bg-primary)", color: "var(--text-secondary)" }}
-                      >
-                        {a.cron.descricao}
-                      </span>
-                    </div>
-                    {a.descricao && (
-                      <p className="text-xs text-[var(--text-secondary)] mt-1">{a.descricao}</p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-[var(--text-muted)]">
-                      <span>⏭️ próxima: {formataProxima(a.cron.proxima)}</span>
-                      <span className="font-mono">{a.agenda}</span>
-                      {a.flow && <span className="text-[var(--accent,#2D6B6B)]">🗺️ tem fluxo desenhado</span>}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-      )}
-
-      {aberta && detalhe && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-          onClick={() => setAberta(null)}
-        >
-          <div
-            className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border)] max-w-2xl w-full max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 p-4 border-b border-[var(--border)]">
-              <div className="min-w-0">
-                <p className="font-semibold text-[var(--text-primary)]">{aberta.nome}</p>
-                <p className="text-xs text-[var(--text-muted)]">{aberta.categoria}</p>
-              </div>
-              <button
-                onClick={() => setAberta(null)}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none shrink-0 cursor-pointer"
-                aria-label="Fechar"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-4 space-y-3">
-              {aberta.descricao && (
-                <p className="text-sm text-[var(--text-primary)]">{aberta.descricao}</p>
-              )}
-
-              <div className="grid sm:grid-cols-2 gap-2">
-                <div className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)]">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Quando roda</p>
-                  <p className="text-sm text-[var(--text-primary)]">{detalhe.descricao}</p>
-                  <p className="text-[11px] font-mono text-[var(--text-muted)] mt-0.5">
-                    cron: {aberta.agenda} (UTC)
-                  </p>
-                </div>
-                <div className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)]">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Próxima execução</p>
-                  <p className="text-sm text-[var(--text-primary)]">{formataProxima(detalhe.proxima)}</p>
-                  {aberta.script && (
-                    <p className="text-[11px] font-mono text-[var(--text-muted)] mt-0.5 break-all">
-                      {aberta.script}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
-                    Comando completo
-                  </p>
-                  <button
-                    onClick={() => copiar(aberta.comando)}
-                    className="text-xs px-3 py-1 rounded-full font-medium text-white hover:opacity-90 cursor-pointer"
-                    style={{ background: "var(--accent, #2D6B6B)" }}
-                  >
-                    {copiado ? "copiado!" : "📋 Copiar"}
-                  </button>
-                </div>
-                <pre className="whitespace-pre-wrap break-all font-mono text-xs bg-[var(--bg-secondary)] rounded-lg p-3 border border-[var(--border)]">
-                  {aberta.comando}
-                </pre>
-              </div>
-
-              {aberta.flow ? (
-                <a
-                  href={`/producao/fluxos?titulo=${encodeURIComponent(aberta.flow)}`}
-                  className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-full font-medium text-white hover:opacity-90"
-                  style={{ background: "var(--accent, #2D6B6B)" }}
-                >
-                  🗺️ Ver o fluxo: {aberta.flow}
-                </a>
-              ) : (
-                <p className="text-xs text-[var(--text-muted)]">
-                  Ainda não tem um fluxo desenhado pra essa automação. Peça pro Claude criar em
-                  Produção › Fluxos.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)] max-w-lg">
+      <p className="text-sm text-[var(--text-primary)] font-medium">
+        As automações se mudaram ⚡
+      </p>
+      <p className="text-sm text-[var(--text-secondary)] mt-1">
+        Agora ficam em <strong>Produção › Automações</strong>, junto com o desenho de
+        como cada uma funciona e o sinal de vida (se rodou mesmo).
+      </p>
+      <a
+        href="/producao/automacoes"
+        className="inline-block mt-3 text-sm px-4 py-2 rounded-full font-medium text-white hover:opacity-90"
+        style={{ background: "var(--accent, #2D6B6B)" }}
+      >
+        Ir pra Automações
+      </a>
+    </div>
   );
 }

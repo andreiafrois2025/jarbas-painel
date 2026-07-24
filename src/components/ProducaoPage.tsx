@@ -2,11 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import SquadsPage from "./SquadsPage";
+import AutomacoesPage from "./AutomacoesPage";
 import FlowsPageV2 from "./flow/FlowsPageV2";
 import EstudioPage from "./EstudioPage";
 import { pageToPath } from "@/lib/painel-context";
 
-type SubPage = "squads" | "fluxos" | "estudio";
+type SubPage = "squads" | "automacoes" | "fluxos" | "estudio";
 
 interface Props {
   sub: SubPage;
@@ -32,6 +33,16 @@ export default function ProducaoPage({ sub }: Props) {
           🤖 Squads
         </button>
         <button
+          onClick={() => router.push("/producao/automacoes")}
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
+            sub === "automacoes"
+              ? "border-[var(--accent)] text-[var(--text-primary)]"
+              : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          ⚡ Automações
+        </button>
+        <button
           onClick={() => router.push("/producao/fluxos")}
           className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
             sub === "fluxos"
@@ -52,6 +63,11 @@ export default function ProducaoPage({ sub }: Props) {
           🎬 Estúdio
         </button>
         <div className="flex-1" />
+        {sub === "automacoes" && (
+          <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
+            o que roda sozinho, quando roda e se está vivo
+          </span>
+        )}
         {sub === "fluxos" && (
           <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
             editor visual — desenho de automações e squads
@@ -67,6 +83,8 @@ export default function ProducaoPage({ sub }: Props) {
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {sub === "squads" ? (
           <SquadsPage onNavigate={(p: string) => router.push(pageToPath(p))} />
+        ) : sub === "automacoes" ? (
+          <AutomacoesPage />
         ) : sub === "fluxos" ? (
           <FlowsPageV2 />
         ) : (

@@ -495,6 +495,186 @@ const rotinaSemanal: SeedFlow = {
   ],
 };
 
+
+// ─────────────────────────────────────────────────────────────
+// AUTOMAÇÕES SEM DESENHO até 24/07/2026 — desenhadas lendo os scripts
+// reais (não é chute: cada nó reflete o que o .sh/.py faz de fato).
+// ─────────────────────────────────────────────────────────────
+
+const backupDiario: SeedFlow = {
+  title: "Backup diário da VPS pro Drive",
+  category: "automation",
+  description:
+    "Todo dia às 2h BRT, empacota o que não dá pra reinstalar (memória do Claude, config do OpenClaw, scripts, banco) e manda pro Google Drive do Jarbas. Guarda 3 cópias aqui e 7 dias lá. Zero IA.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "2h BRT — todo dia", icon: "⏰", details: "cron 0 5 * * * (UTC).", executor: "cron → backup-vps.sh" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Empacotar Claude Code", icon: "🧠", details: "Memória, CLAUDE.md, docs e scripts do /root.\nPlugins e cache ficam de fora: são reinstaláveis.", executor: "backup-vps.sh" } },
+    { id: "3", type: "action", position: col(2), data: { label: "Empacotar OpenClaw", icon: "🤖", details: "openclaw.json, credenciais OAuth, workspaces e agentes.\nBinários e libs Python ficam de fora (volumosos).", executor: "backup-vps.sh" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Faxina local", icon: "🧹", details: "Mantém só os 3 snapshots mais recentes em /root/backups.", executor: "backup-vps.sh" } },
+    { id: "5", type: "condition", position: col(4), data: { label: "Drive conectado?", icon: "❓", details: "Se o remote JarbasDrive2 não responde, o backup fica só local e o log avisa.", executor: "rclone" } },
+    { id: "6", type: "end", position: col(5), data: { label: "Enviado pro Drive", icon: "💾", details: "JarbasDrive2:backup-vps/<data>.\nRetenção remota: 7 dias.", executor: "rclone", tags: ["Google Drive"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" }, { id: "e4-5", source: "4", target: "5" },
+    { id: "e5-6", source: "5", target: "6" },
+  ],
+};
+
+const watchdogTelegram: SeedFlow = {
+  title: "Watchdog do bot Telegram",
+  category: "automation",
+  description:
+    "De 30 em 30 min confere se o bot do Telegram está mesmo respondendo — não basta o serviço estar 'ligado'. Se achar sessão travada, menu preso ou login expirado, reinicia sozinho.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "A cada 30 min", icon: "⏰", executor: "cron → watchdog-claude-telegram.sh" } },
+    { id: "2", type: "condition", position: col(1), data: { label: "Serviço no ar?", icon: "❓", details: "systemctl is-active claude-telegram.", executor: "watchdog-claude-telegram.sh" } },
+    { id: "3", type: "condition", position: col(2), data: { label: "Sessão tmux existe?", icon: "❓", details: "tmux has-session -t claude-telegram.", executor: "watchdog-claude-telegram.sh" } },
+    { id: "4", type: "condition", position: col(3), data: { label: "Vivo mas quebrado?", icon: "🔍", details: "Lê a tela do tmux procurando: prompt vazio parado, menu inicial preso, sessão/auth expirada, limite de uso, crash do CLI.", executor: "tmux capture-pane" } },
+    { id: "5", type: "end", position: col(4), data: { label: "Reinicia e registra", icon: "🔄", details: "systemctl restart + linha no log dizendo o motivo.", executor: "systemd", tags: ["Telegram"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" }, { id: "e4-5", source: "4", target: "5" },
+  ],
+};
+
+const restartPreventivoTelegram: SeedFlow = {
+  title: "Restart preventivo do bot Telegram",
+  category: "automation",
+  description:
+    "Todo dia às 5h BRT o bot é reiniciado mesmo estando bem. É higiene: sessão longa acumula lixo e trava justo quando você vai usar de manhã.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "5h BRT — todo dia", icon: "⏰", details: "cron 0 8 * * * (UTC). Antes do seu dia começar.", executor: "cron" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Reinicia o serviço", icon: "🔄", details: "systemctl restart claude-telegram — sem perguntar se está travado.", executor: "systemd" } },
+    { id: "3", type: "end", position: col(2), data: { label: "Bot fresco pro dia", icon: "💬", details: "Registrado no mesmo log do watchdog.", executor: "claude-telegram", tags: ["Telegram"] } },
+  ],
+  edges: [{ id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" }],
+};
+
+const dispatcherFinancas: SeedFlow = {
+  title: "Dispatcher de finanças do Jarbas (ensure)",
+  category: "automation",
+  description:
+    "De minuto em minuto verifica se o processo que entrega as mensagens de finanças (Louis) está de pé dentro do container. Se caiu, sobe de novo. É a automação mais frequente do ecossistema — e a mais barata: não faz nada quando está tudo certo.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "A cada 1 minuto", icon: "⏰", executor: "cron → ensure-jarbas-dispatcher.sh" } },
+    { id: "2", type: "condition", position: col(1), data: { label: "Processo rodando?", icon: "❓", details: "pgrep wa_finances_dispatcher.py dentro do container do OpenClaw.", executor: "docker exec" } },
+    { id: "3", type: "action", position: col(2), data: { label: "Sim → não faz nada", icon: "😌", details: "Custo zero. O caso normal.", executor: "ensure-jarbas-dispatcher.sh" } },
+    { id: "4", type: "end", position: col(3), data: { label: "Não → sobe de novo", icon: "🔄", details: "nohup python3 wa_finances_dispatcher.py, log em /tmp/wa_finances.log.", executor: "docker exec", tags: ["WhatsApp"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" },
+    { id: "e2-4", source: "2", target: "4" },
+  ],
+};
+
+const equipePublica: SeedFlow = {
+  title: "Equipe pública do modo palco",
+  category: "automation",
+  description:
+    "Toda madrugada publica uma versão PÚBLICA da sua equipe de agentes — a mesma do RH, mas sem os links dos seus GPTs e sem ids. É o que aparece quando você mostra o painel numa palestra.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "23h10 BRT — todo dia", icon: "⏰", details: "cron 10 2 * * * (UTC).", executor: "cron → equipe-sync.py" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Ler equipe no Supabase", icon: "📖", details: "Tabelas collaborators + assignments (as mesmas da tela de RH).", executor: "equipe-sync.py", tags: ["Supabase"] } },
+    { id: "3", type: "action", position: col(2), data: { label: "Tirar o que é privado", icon: "🔒", details: "Links dos GPTs dela e ids internos ficam de fora.", executor: "equipe-sync.py" } },
+    { id: "4", type: "end", position: col(3), data: { label: "Publica equipe-publica.json", icon: "🎤", details: "Bucket público status — é dele que o modo palco lê.", executor: "Supabase Storage" } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+  ],
+};
+
+const grafoConhecimento: SeedFlow = {
+  title: "Grafo de conhecimento (coletor diário)",
+  category: "automation",
+  description:
+    "Toda manhã varre o Notion e remonta o mapa que liga temas, conteúdos e agentes — o grafo que você vê na Biblioteca. Roda dentro do container do OpenClaw, que é onde mora a chave do Notion.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "5h10 BRT — todo dia", icon: "⏰", details: "cron 10 8 * * * (UTC).", executor: "cron → grafo-conteudo-cron.sh" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Pegar credenciais", icon: "🔑", details: "Lê Supabase do .env.local do painel e injeta no container (a chave do Notion já vive lá dentro).", executor: "grafo-conteudo-cron.sh" } },
+    { id: "3", type: "action", position: col(2), data: { label: "Varrer o Notion", icon: "🕸️", details: "Até 250 páginas, últimos 120 dias. Monta nós e ligações entre temas, conteúdos e agentes.", executor: "grafo_conteudo.py", tags: ["Notion"] } },
+    { id: "4", type: "end", position: col(3), data: { label: "Publica grafo_conteudo.json", icon: "📊", details: "Bucket público status → aba 🕸️ Grafo da Biblioteca.", executor: "Supabase Storage" } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+  ],
+};
+
+const checagemIzzy: SeedFlow = {
+  title: "Checagem da 1ª rodada da Izzy",
+  category: "automation",
+  description:
+    "Depois que a Izzy passou a escrever pelo Claude, esta checagem confere de manhã se a primeira rodada saiu certo e te conta pelo Telegram. Auto-desativa depois do primeiro aviso: era pra tranquilizar uma vez, não virar rotina.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "7h30 BRT", icon: "⏰", details: "cron 30 10 * * * (UTC).", executor: "cron → check-izzy-primeira-rodada.sh" } },
+    { id: "2", type: "condition", position: col(1), data: { label: "Já avisou uma vez?", icon: "❓", details: "Se /tmp/izzy-check-done existe, sai calado.", executor: "check-izzy-primeira-rodada.sh" } },
+    { id: "3", type: "action", position: col(2), data: { label: "Contar acertos e erros", icon: "🔢", details: "Lê o log da ponte: quantas escritas OK pelo Claude, quantos erros, se houve queda pro Gemini.", executor: "check-izzy-primeira-rodada.sh" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Pegar 2 títulos gerados", icon: "📰", details: "Últimas notícias da fila (ia_queue.json) — pra você ver o resultado, não só o número.", executor: "check-izzy-primeira-rodada.sh" } },
+    { id: "5", type: "end", position: col(4), data: { label: "Avisa e se aposenta", icon: "💬", details: "Manda no Telegram e cria /tmp/izzy-check-done — não roda mais.", executor: "Bot API", tags: ["Telegram"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" }, { id: "e4-5", source: "4", target: "5" },
+  ],
+};
+
+const escolaAvisoD2: SeedFlow = {
+  title: "Escola do Luiz: aviso D-2",
+  category: "automation",
+  description:
+    "Todo dia às 7h30 avisa o que o Luiz tem daqui a 2 dias: prova, trabalho, entrega. A agenda vem das fotos que você manda pra Donna; o cálculo de prazo é Python puro, sem gastar IA.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "7h30 BRT — todo dia", icon: "⏰", details: "cron 30 10 * * * (UTC).", executor: "cron → escola_luiz.py avisos" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Ler a agenda salva", icon: "🎒", details: "escola-agenda.json — alimentado quando você manda foto do caderno pra Donna.", executor: "escola_luiz.py" } },
+    { id: "3", type: "action", position: col(2), data: { label: "Calcular prazos", icon: "🧮", details: "Para-casa sem data usa a PRÓXIMA AULA da disciplina. Dedup pra não repetir aviso. Zero token.", executor: "escola_luiz.py" } },
+    { id: "4", type: "condition", position: col(3), data: { label: "Tem algo em 2 dias?", icon: "❓", executor: "escola_luiz.py" } },
+    { id: "5", type: "end", position: col(4), data: { label: "Avisa você", icon: "📣", details: "Mensagem com o que é, de qual matéria e quantos pontos vale. Também vira tarefa no Notion.", executor: "Donna", tags: ["Notion"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" }, { id: "e4-5", source: "4", target: "5" },
+  ],
+};
+
+const escolaRelatorioSemana: SeedFlow = {
+  title: "Escola do Luiz: relatório da semana",
+  category: "automation",
+  description:
+    "Domingo às 19h fecha a semana escolar do Luiz num resumo só: o que teve, o que vem, o que ficou pendente. Pra você começar a semana sabendo.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Domingo, 19h BRT", icon: "⏰", details: "cron 0 22 * * 0 (UTC).", executor: "cron → escola_luiz.py relatorio-semana" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Juntar a semana", icon: "📅", details: "Provas, trabalhos e entregas dos últimos 7 dias e dos próximos.", executor: "escola_luiz.py" } },
+    { id: "3", type: "end", position: col(2), data: { label: "Manda o resumo", icon: "📊", details: "Um texto só, sem gastar IA — template fixo.", executor: "Donna" } },
+  ],
+  edges: [{ id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" }],
+};
+
+const lembreteGravarReels: SeedFlow = {
+  title: "Lembrete de gravar os reels (sexta)",
+  category: "automation",
+  description:
+    "Sexta às 18h a Donna te lembra no WhatsApp que é hora de gravar — os roteiros já chegaram nos cards. A mensagem é fixa e carinhosa, inclusive com o plano B do sábado. Zero IA.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Sexta, 18h BRT", icon: "⏰", details: "cron 0 21 * * 5 (UTC).", executor: "cron" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Mensagem pronta", icon: "✍️", details: "Texto fixo: onde estão os roteiros, o truque do \"corta isso\", e o plano B do sábado sem culpa.", executor: "openclaw message send" } },
+    { id: "3", type: "end", position: col(2), data: { label: "Chega no seu WhatsApp", icon: "🎥", details: "Número pessoal — nunca no grupo.", executor: "Donna", tags: ["WhatsApp"] } },
+  ],
+  edges: [{ id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" }],
+};
+
 export const SEED_FLOWS: SeedFlow[] = [
   // Automações
   briefingTelegram,
@@ -513,6 +693,17 @@ export const SEED_FLOWS: SeedFlow[] = [
   aprendizEstilo,
   snapshotMetricas,
   alertaFalhasDonna,
+  // Automações desenhadas em 24/07 (antes só existiam no crontab)
+  backupDiario,
+  watchdogTelegram,
+  restartPreventivoTelegram,
+  dispatcherFinancas,
+  equipePublica,
+  grafoConhecimento,
+  checagemIzzy,
+  escolaAvisoD2,
+  escolaRelatorioSemana,
+  lembreteGravarReels,
   // Squads
   squadInstagramCarrossel,
   squadLicitacao,

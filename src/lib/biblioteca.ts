@@ -36,6 +36,9 @@ export interface AutomacaoApiItem {
   descricao?: string; // o que a automação faz, em português
   script?: string | null; // caminho do script principal
   flow?: string | null; // título do fluxo correspondente em Produção › Fluxos
+  log?: string | null; // arquivo de log de onde sai o sinal de vida
+  log_compartilhado?: boolean; // outro cron escreve no mesmo log → sinal indireto
+  ultima_execucao?: string | null; // ISO do mtime do log; null = não dá pra saber
 }
 
 export interface CriacaoApiItem {
