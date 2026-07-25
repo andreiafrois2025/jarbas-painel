@@ -16,7 +16,7 @@ function Contador({ valor, rotulo, detalhe }: { valor: string | number; rotulo: 
   const [aberto, setAberto] = useState(false);
   return (
     <button className="text-center cursor-pointer group" onClick={() => setAberto(!aberto)}>
-      <div className="text-5xl md:text-7xl font-bold group-hover:opacity-80 transition-opacity" style={{ color: "#2D6B6B" }}>{valor}</div>
+      <div className="text-4xl md:text-5xl font-bold group-hover:opacity-80 transition-opacity" style={{ color: "#2D6B6B" }}>{valor}</div>
       <div className="mt-2 text-sm md:text-base uppercase tracking-widest" style={{ color: "#6B7A7A" }}>
         {rotulo}
       </div>
@@ -143,7 +143,7 @@ export default function PalestraPage() {
         <p className="text-sm uppercase tracking-[0.3em]" style={{ color: "#A0583C" }}>
           {area === "servidora" ? "Produtividade com IA, na prática" : "IA na prática, de verdade"}
         </p>
-        <h1 className="text-3xl md:text-5xl font-bold mt-2">
+        <h1 className="text-2xl md:text-4xl font-bold mt-2">
           {area === "servidora" ? "Meu escritório de agentes de IA" : "Minha fábrica de conteúdo com IA"}
         </h1>
         <p className="mt-2 text-base md:text-lg" style={{ color: "#6B7A7A" }}>
@@ -157,26 +157,27 @@ export default function PalestraPage() {
         <ChipsArea area={area} setArea={setArea} />
       </div>
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-5xl mx-auto mb-12">
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl mx-auto mb-8">
         {contadores.map((c) => <Contador key={c.rotulo} {...c} />)}
       </section>
 
+      <div className="grid gap-5 lg:grid-cols-3 items-start max-w-6xl mx-auto mb-10">
       {mostraConteudo && (
-        <section className="max-w-3xl mx-auto mb-12 rounded-2xl p-6 md:p-8" style={{ background: "#FFFFFF" }}>
+        <section className="rounded-2xl p-6" style={{ background: "#FFFFFF" }}>
           <h2 className="text-xl md:text-2xl font-semibold text-center mb-1">
             A IA aprendendo o meu gosto 📈
           </h2>
           <p className="text-center text-sm mb-4" style={{ color: "#6B7A7A" }}>
             % das pautas propostas pela IA que eu aprovo, semana a semana
           </p>
-          <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} altura={260} />
+          <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} altura={200} />
         </section>
       )}
 
       {area === "servidora" && (
-        <section className="max-w-3xl mx-auto mb-12 rounded-2xl p-6 md:p-8" style={{ background: "#FFFFFF" }}>
+        <section className="rounded-2xl p-6" style={{ background: "#FFFFFF" }}>
           <h2 className="text-xl md:text-2xl font-semibold text-center mb-4">Como funciona</h2>
-          <div className="grid md:grid-cols-3 gap-4 text-center text-sm">
+          <div className="grid gap-3 text-center text-sm">
             <div><div className="text-3xl mb-2">🤖</div>Agentes especializados monitoram, organizam e preparam o trabalho repetitivo</div>
             <div><div className="text-3xl mb-2">👩🏽</div>A decisão é sempre humana: eu aprovo, ajusto ou descarto num quadro simples</div>
             <div><div className="text-3xl mb-2">📱</div>O sistema me avisa no WhatsApp e se monitora sozinho, 24h por dia</div>
@@ -185,8 +186,8 @@ export default function PalestraPage() {
       )}
 
       {/* A tese: IA constrói, Python roda — contra o mito do "gastar rios com IA" */}
-      <section className="max-w-3xl mx-auto mb-12 rounded-2xl p-6 md:p-8 text-center" style={{ background: "#2D6B6B", color: "#F5F0EA" }}>
-        <p className="text-2xl md:text-4xl font-bold">
+      <section className="rounded-2xl p-6 text-center" style={{ background: "#2D6B6B", color: "#F5F0EA" }}>
+        <p className="text-xl md:text-2xl font-bold">
           {hoje?.resumo_automacoes
             ? `${hoje.resumo_automacoes.sem_ia} das ${hoje.resumo_automacoes.total} automações rodam sem gastar IA`
             : "a maioria das automações roda sem gastar IA"}
@@ -197,7 +198,9 @@ export default function PalestraPage() {
         </p>
       </section>
 
-      <section className="max-w-4xl mx-auto text-center">
+      </div>
+
+      <section className="max-w-5xl mx-auto text-center">
         <h2 className="text-lg font-semibold mb-1" style={{ color: "#6B7A7A" }}>
           A equipe (cada um com sua especialidade)
         </h2>

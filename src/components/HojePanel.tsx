@@ -203,7 +203,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
               A altura acompanha o miolo (termina na linha do "O que a equipe
               fez"); se a lista for maior, rola por dentro. */}
           {lateral && (
-            <div className="w-full lg:w-[270px] lg:shrink-0 order-3 lg:order-none lg:self-stretch lg:relative">
+            <div className="w-full lg:w-[320px] lg:shrink-0 order-3 lg:order-none lg:self-stretch lg:relative">
               <div className="lg:absolute lg:inset-0 lg:overflow-y-auto lg:pr-1">
                 {lateral}
               </div>
@@ -317,7 +317,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
 
 // Esqueleto do "Hoje": mesma estrutura e mesmas alturas do conteúdo real, em
 // cinza. Existe pra reservar o espaço, não pra enfeitar — por isso as medidas
-// acompanham as do layout de verdade (lateral 270px, coluna da caixa 350px).
+// acompanham as do layout de verdade (lateral 320px, coluna da caixa 350px).
 function Barra({ w = "100%", h = 14 }: { w?: string; h?: number }) {
   return (
     <span
@@ -352,7 +352,7 @@ function EsqueletoHoje({ lateral }: { lateral?: React.ReactNode }) {
 
         <div className="flex flex-col lg:flex-row gap-5 items-start">
           {lateral && (
-            <div className="w-full lg:w-[270px] lg:shrink-0 order-3 lg:order-none">{lateral}</div>
+            <div className="w-full lg:w-[320px] lg:shrink-0 order-3 lg:order-none">{lateral}</div>
           )}
 
           <div className="flex-1 min-w-0 space-y-5 order-2 lg:order-none">

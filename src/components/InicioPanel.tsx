@@ -9,6 +9,11 @@ import { squadUrlComToken } from "@/lib/squadFetch";
 
 export default function InicioPanel() {
   const [openOfficeFullscreen, setOpenOfficeFullscreen] = useState(false);
+  // 25/07 (tarde): a rodinha do mouse não subia a página quando o ponteiro
+  // estava sobre o escritório — o quadro capturava a rolagem. Agora ele nasce
+  // "só pra ver": a rolagem passa direto. Um clique em "interagir" devolve o
+  // controle pra quem quiser mexer nos bonequinhos.
+  const [interagindo, setInteragindo] = useState(false);
   // 25/07/2026: o escritório deixou de ser aberto na internet — /office e
   // /api/snapshot agora exigem login. Como iframe não manda cabeçalho, o token
   // da sessão vai na própria URL (a squad-api aceita ?token=).
@@ -24,15 +29,25 @@ export default function InicioPanel() {
       <section className="rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
           <span className="text-sm font-semibold text-[var(--text-primary)]">🏢 Escritório</span>
-          <button onClick={() => setOpenOfficeFullscreen(true)}
-            className="text-[11px] px-2 py-1 rounded bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-125 cursor-pointer transition-all">
-            Ver em tela cheia ↗
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setInteragindo(!interagindo)}
+              title={interagindo ? "Voltar a rolar a página com a rodinha" : "Deixar o escritório receber cliques e rolagem"}
+              className={`text-[11px] px-2 py-1 rounded cursor-pointer transition-all ${
+                interagindo ? "text-white" : "bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-125"
+              }`}
+              style={interagindo ? { background: "var(--accent, #2D6B6B)" } : undefined}>
+              {interagindo ? "🖱️ interagindo — clique pra soltar" : "🖱️ interagir"}
+            </button>
+            <button onClick={() => setOpenOfficeFullscreen(true)}
+              className="text-[11px] px-2 py-1 rounded bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-125 cursor-pointer transition-all">
+              Ver em tela cheia ↗
+            </button>
+          </div>
         </div>
         {officeUrl ? (
           <iframe
             src={officeUrl}
-            className="w-full border-0 h-[60vh] md:h-[70vh]"
+            className={`w-full border-0 h-[52vh] md:h-[58vh] ${interagindo ? "" : "pointer-events-none"}`}
             title="Escritório virtual"
             loading="lazy"
           />

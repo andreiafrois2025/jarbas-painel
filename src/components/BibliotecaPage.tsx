@@ -224,7 +224,7 @@ export default function BibliotecaPage() {
                     + Nova criação
                   </button>
                 </div>
-                <div className="grid gap-x-5 gap-y-4 lg:grid-cols-2 2xl:grid-cols-3 items-start">
+                <div className="grid gap-x-6 gap-y-5 xl:grid-cols-2 items-start">
                 {[...gruposCriacoes.entries()].map(([grupo, itens]) => (
                   <section key={grupo}>
                     <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">

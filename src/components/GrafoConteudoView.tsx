@@ -128,7 +128,7 @@ export default function GrafoConteudoView() {
   const raio = (n: No) => (n.tipo === "topico" ? 12 : n.tipo === "nota" ? 10 : 7);
 
   return (
-    <div className="p-4 md:p-6 w-full space-y-3">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
           {([["tudo", "Tudo"], ["topico", "🟣 Temas"], ["nota", "🟤 Notas"], ["tag", "🟢 Tags"]] as [typeof filtro, string][]).map(([k, l]) => (

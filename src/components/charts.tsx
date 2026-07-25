@@ -75,7 +75,7 @@ export function GraficoLinha({
     <div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
+        className="w-full" style={{ maxHeight: 260 }}
         role="img"
         aria-label={`Gráfico de linha, último valor ${ultimo.valor}${unidade}`}
         onMouseLeave={() => setHover(null)}
@@ -147,7 +147,7 @@ export function GraficoBarras({
     <div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
+        className="w-full" style={{ maxHeight: 260 }}
         role="img"
         aria-label="Gráfico de barras"
         onMouseLeave={() => setHover(null)}

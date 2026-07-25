@@ -670,7 +670,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="grid gap-3 xl:grid-cols-2 items-start">
                   {filteredCollaborators.map(collab => {
                     const collabAsgs = getCollabAssignments(collab.id);
                     const ctxs = getCollabContexts(collab.id);

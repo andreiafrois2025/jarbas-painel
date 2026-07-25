@@ -324,19 +324,22 @@ function AbaGeral({ data, hoje, taxaSemanal, area }: {
       {/* A tese dela: IA constrói, Python roda (12/07) — vale pras duas áreas */}
       <SecaoIAConstroi />
 
-      {mostraConteudo ? (
-        <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
-          sub="% das pautas propostas pela IA que eu aprovo, semana a semana">
-          <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
-        </CartaoGrafico>
-      ) : (
-        <CartaoGrafico titulo="Aprovação de pautas 📈"
-          sub="medição chega com o hub IGAM">
-          <p className="text-sm text-[var(--text-secondary)] py-6 text-center">—</p>
-        </CartaoGrafico>
-      )}
-
-      <EquipeGrid />
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr] items-start">
+        <div className="min-w-0">
+          {mostraConteudo ? (
+            <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
+              sub="% das pautas propostas pela IA que eu aprovo, semana a semana">
+              <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
+            </CartaoGrafico>
+          ) : (
+            <CartaoGrafico titulo="Aprovação de pautas 📈"
+              sub="medição chega com o hub IGAM">
+              <p className="text-sm text-[var(--text-secondary)] py-6 text-center">—</p>
+            </CartaoGrafico>
+          )}
+        </div>
+        <EquipeGrid />
+      </div>
 
       <div className="flex justify-center text-sm">
         <a href="/metricas/palestra" target="_blank"
@@ -361,7 +364,7 @@ function AbaProducao({ data, hoje, taxaSemanal, area }: {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {mostraConteudo ? (
           <Tile icone="📤" titulo="Posts no grupo IA" valor={hoje.enviados_total ?? "—"}
             sub={`${hoje.fila?.enviados_7d ?? 0} nos últimos 7 dias`} />

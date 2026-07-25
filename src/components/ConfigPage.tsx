@@ -93,7 +93,7 @@ function ContaTab() {
   const botao = "px-4 py-2 rounded-lg bg-[var(--af-teal,#2D6B6B)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50";
 
   return (
-    <div className="p-4 md:p-8 w-full space-y-8">
+    <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-8">
       {msg && (
         <div className={`px-4 py-2 rounded-lg text-sm ${msg.ok ? "bg-green-100 text-green-900" : "bg-red-100 text-red-900"}`}>
           {msg.texto}

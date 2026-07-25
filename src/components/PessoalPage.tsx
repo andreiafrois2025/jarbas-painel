@@ -1,6 +1,6 @@
 "use client";
 
-// 💛 Hub Pessoal — tudo que não é trabalho: escola do Luiz, finanças
+// 🤎 Hub Pessoal — tudo que não é trabalho: escola do Luiz, finanças
 // pessoais e espaço pra crescer (saúde, casa, família).
 
 import { useState } from "react";
@@ -63,7 +63,7 @@ export default function PessoalPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0 overflow-x-auto">
-        <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">💛 Pessoal</h1>
+        <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">🤎 Pessoal</h1>
         {botao("luiz", "🎒 Luiz — escola")}
         {botao("financas", "💰 Finanças")}
       </div>
@@ -73,21 +73,52 @@ export default function PessoalPage() {
           {aba === "luiz" ? (
             <>
               {escola.length > 0 && (
-                <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
-                  <h2 className="font-semibold text-[var(--text-primary)] mb-3">📚 Próximas entregas do Luiz</h2>
-                  <ul className="space-y-2">
-                    {escola.map((e, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
-                        <span className="text-[var(--text-muted)] whitespace-nowrap">
-                          {new Date(e.data + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                        </span>
-                        <span>{EMOJI_TIPO[e.tipo] || "📌"}</span>
-                        <span><strong>{e.disciplina}</strong>{e.nome ? ` — ${e.nome}` : ""}{e.pontos ? ` (${e.pontos})` : ""}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <div className="grid gap-4 md:grid-cols-3 items-start">
+                  {([
+                    ["prova", "🔴 Provas"],
+                    ["paracasa", "🟢 Para casa"],
+                    ["avaliativa", "🟡 Atividades avaliativas"],
+                  ] as const).map(([tipo, titulo]) => {
+                    const doTipo = escola.filter((e) => e.tipo === tipo);
+                    return (
+                      <div key={tipo} className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
+                        <h2 className="font-semibold text-[var(--text-primary)] mb-3">{titulo}</h2>
+                        {doTipo.length === 0 ? (
+                          <p className="text-sm text-[var(--text-muted)]">nada por enquanto</p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {doTipo.map((e, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
+                                <span className="text-[var(--text-muted)] whitespace-nowrap">
+                                  {new Date(e.data + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                                </span>
+                                <span><strong>{e.disciplina}</strong>{e.nome ? ` — ${e.nome}` : ""}{e.pontos ? ` (${e.pontos})` : ""}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {escola.some((e) => !["prova", "paracasa", "avaliativa"].includes(e.tipo)) && (
+                    <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)] md:col-span-3">
+                      <h2 className="font-semibold text-[var(--text-primary)] mb-3">➡️ Outros avisos</h2>
+                      <ul className="space-y-2">
+                        {escola.filter((e) => !["prova", "paracasa", "avaliativa"].includes(e.tipo)).map((e, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
+                            <span className="text-[var(--text-muted)] whitespace-nowrap">
+                              {new Date(e.data + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                            </span>
+                            <span>{EMOJI_TIPO[e.tipo] || "📌"}</span>
+                            <span><strong>{e.disciplina}</strong>{e.nome ? ` — ${e.nome}` : ""}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
+              <div className="grid gap-4 lg:grid-cols-[2fr_1fr] items-start">
               <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
                 <h2 className="font-semibold text-[var(--text-primary)] mb-2">📚 Como funciona a agenda escolar</h2>
                 <p className="text-sm text-[var(--text-secondary)]">
@@ -119,6 +150,7 @@ export default function PessoalPage() {
                   </a>
                 </div>
               </div>
+              </div>
             </>
           ) : (
             <>
@@ -132,13 +164,13 @@ export default function PessoalPage() {
                 <p className="text-sm text-[var(--text-muted)]">Carregando resumo do mês…</p>
               )}
               {financas && (
-                <>
+                <div className="grid gap-4 lg:grid-cols-2 items-start">
                   {cardResumo("Pessoal", financas.pessoal)}
                   {cardResumo("Empresa (Meraki)", financas.empresa)}
-                  <p className="text-[11px] text-[var(--text-muted)]">
+                  <p className="text-[11px] text-[var(--text-muted)] lg:col-span-2">
                     Soma das transações lançadas no mês (despesas já contam como saída). Lido ao vivo do seu Notion, sem expor nada em página pública.
                   </p>
-                </>
+                </div>
               )}
               <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
                 <h2 className="font-semibold text-[var(--text-primary)] mb-2">💰 Suas finanças no Notion</h2>
