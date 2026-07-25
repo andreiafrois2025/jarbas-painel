@@ -1,51 +1,20 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import { useStatus, NIVEL_UI } from "@/lib/status";
 
-// Semáforo de saúde do ecossistema. Lê o status.json que a VPS publica no
-// Supabase Storage a cada 5 min (gerado por /root/status-saude.py).
-const STATUS_URL =
-  "https://pmmyqljiuslstwbmiron.supabase.co/storage/v1/object/public/status/status.json";
-
-interface StatusSaude {
-  gerado_em: string;
-  nivel: "verde" | "amarelo" | "vermelho";
-  problemas: string[];
-  disco_pct: number;
-}
-
-const NIVEL_UI = {
-  verde: { dot: "🟢", label: "Tudo funcionando" },
-  amarelo: { dot: "🟡", label: "Atenção" },
-  vermelho: { dot: "🔴", label: "Algo caiu" },
-} as const;
+// Semáforo de saúde do ecossistema — o resumo que fica no topo da home.
+// É o que a Andréia olha primeiro ("é um lugar que eu visualizo mais rápido"),
+// então ele não muda de lugar nem de forma.
+//
+// 25/07/2026: deixou de ter fetch próprio (agora usa a leitura compartilhada,
+// ver lib/status.ts) e ganhou saída pro detalhe — antes abria este balãozinho
+// e morria ali, sem caminho pra investigar.
 
 export default function StatusSemaforo() {
-  const [status, setStatus] = useState<StatusSaude | null>(null);
-  const [stale, setStale] = useState(false);
+  const router = useRouter();
+  const { status, mudo: stale } = useStatus();
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const res = await fetch(`${STATUS_URL}?t=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(String(res.status));
-        const data: StatusSaude = await res.json();
-        if (!alive) return;
-        setStatus(data);
-        // Se a VPS parou de publicar há mais de 20 min, o próprio silêncio é alerta
-        const ageMin = (Date.now() - new Date(data.gerado_em).getTime()) / 60000;
-        setStale(ageMin > 20);
-      } catch {
-        if (alive) setStale(true);
-      }
-    };
-    load();
-    const id = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
 
   if (!status && !stale) return null;
 
@@ -86,6 +55,13 @@ export default function StatusSemaforo() {
               ))}
             </ul>
           )}
+          <button
+            onClick={() => { setOpen(false); router.push("/saude"); }}
+            className="mt-3 w-full text-xs px-3 py-2 rounded-lg font-medium text-white hover:opacity-90 cursor-pointer"
+            style={{ background: "var(--accent, #2D6B6B)" }}
+          >
+            🩺 Ver o detalhe
+          </button>
           {status && (
             <p className="text-[11px] text-[var(--text-muted)] mt-3">
               Atualizado {new Date(status.gerado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · disco {status.disco_pct}%

@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
-import { getFlowDocs } from "@/lib/storage";
-import type { FlowDoc } from "@/lib/types";
+import { getFlowDocs, addFlowDoc } from "@/lib/storage";
+import type { FlowDoc, FlowCategory } from "@/lib/types";
 import dynamic from "next/dynamic";
 import { interpretaCron, formataProxima, type CronInfo } from "@/lib/cron";
 
@@ -85,6 +85,9 @@ interface ItemUnificado {
   cronInfo: CronInfo | null;
   fluxo: FlowDoc | null;
   saude: Saude;
+  /** O relógio mudou depois da última vez que o desenho foi mexido. Não prova
+   *  que o desenho está errado — só que pode ter ficado pra trás. */
+  desenhoAtrasado: boolean;
 }
 
 function normaliza(t: string) {
@@ -99,6 +102,13 @@ export default function AutomacoesPage() {
   const [aberto, setAberto] = useState<ItemUnificado | null>(null);
   const [busca, setBusca] = useState("");
   const [legenda, setLegenda] = useState(false);
+  // 25/07/2026 (F3.1): duas formas de olhar a mesma lista. Por CATEGORIA é o
+  // padrão porque é como a Andréia procura ("como tá o fluxo de reels?"); por
+  // GATILHO serve pra saber o que está no ar. A escolha fica na URL, então
+  // sobrevive ao F5 e pode ser guardada nos favoritos.
+  const [visao, setVisao] = useState<"categoria" | "gatilho">("categoria");
+  const [relogioMudouEm, setRelogioMudouEm] = useState<string | null>(null);
+  const [criando, setCriando] = useState(false);
   const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
@@ -107,12 +117,25 @@ export default function AutomacoesPage() {
       ([cat, fs]) => {
         if (!vivo) return;
         setCrons(cat?.automacoes || []);
+        setRelogioMudouEm(cat?.crontab_modificado_em ?? null);
         setFluxos(fs);
         setCarregando(false);
       },
     );
     return () => { vivo = false; };
   }, []);
+
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("visao");
+    if (v === "gatilho" || v === "categoria") setVisao(v);
+  }, []);
+
+  const trocaVisao = (v: "categoria" | "gatilho") => {
+    setVisao(v);
+    const params = new URLSearchParams(window.location.search);
+    params.set("visao", v);
+    window.history.replaceState(null, "", `${window.location.pathname}?${params}`);
+  };
 
   const itens = useMemo<ItemUnificado[]>(() => {
     const usados = new Set<string>();
@@ -135,6 +158,8 @@ export default function AutomacoesPage() {
         cronInfo: info,
         fluxo,
         saude: avaliaSaude(c.ultima_execucao, info.frequenciaMin),
+        desenhoAtrasado: !!(fluxo && relogioMudouEm && fluxo.updated_at &&
+          new Date(relogioMudouEm) > new Date(fluxo.updated_at)),
       });
     }
 
@@ -153,10 +178,11 @@ export default function AutomacoesPage() {
         cronInfo: null,
         fluxo: f,
         saude: "desconhecida",
+        desenhoAtrasado: false,
       });
     }
     return lista;
-  }, [crons, fluxos]);
+  }, [crons, fluxos, relogioMudouEm]);
 
   const filtrados = useMemo(() => {
     const q = normaliza(busca);
@@ -169,6 +195,32 @@ export default function AutomacoesPage() {
   const problemas = itens.filter((i) => i.saude === "atrasada" || i.saude === "muda").length;
   const semDesenho = itens.filter((i) => !i.fluxo).length;
 
+  // Agrupamento que serve às duas visões. Por categoria: os mesmos rótulos que
+  // a squad-api já usa (Conteúdo & Notícias, Vídeo & Reels, Sistema & Saúde…).
+  // Por gatilho: o que dispara cada uma.
+  const grupos = useMemo(() => {
+    if (visao === "gatilho") {
+      return GATILHOS.map((g) => ({
+        chave: g.key,
+        titulo: `${g.icone} ${g.titulo}`,
+        explica: g.explica,
+        itens: filtrados
+          .filter((i) => i.gatilho === g.key)
+          .sort((a, b) =>
+            (a.cronInfo?.frequenciaMin ?? Number.MAX_SAFE_INTEGER) -
+            (b.cronInfo?.frequenciaMin ?? Number.MAX_SAFE_INTEGER)),
+      })).filter((g) => g.itens.length);
+    }
+    const m = new Map<string, ItemUnificado[]>();
+    for (const i of filtrados) m.set(i.categoria, [...(m.get(i.categoria) || []), i]);
+    return [...m.keys()].sort().map((cat) => ({
+      chave: cat,
+      titulo: cat,
+      explica: "",
+      itens: m.get(cat)!.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+    }));
+  }, [filtrados, visao]);
+
   async function copiar(texto: string) {
     try {
       await navigator.clipboard.writeText(texto);
@@ -179,7 +231,7 @@ export default function AutomacoesPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
+      <div className="p-4 md:p-6 space-y-5">
         {/* Cabeçalho: o resumo honesto do maquinário */}
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -190,18 +242,45 @@ export default function AutomacoesPage() {
               Tudo que a fábrica faz — o que roda sozinho, o que você aciona e o que reage a um evento.
             </p>
           </div>
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="buscar automação…"
-            className="text-sm px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)] w-full sm:w-64"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
+              {([["categoria", "por categoria"], ["gatilho", "por gatilho"]] as const).map(([v, r]) => (
+                <button
+                  key={v}
+                  onClick={() => trocaVisao(v)}
+                  className={`px-3 py-2 font-medium cursor-pointer transition-colors ${
+                    visao === v
+                      ? "text-white"
+                      : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                  style={visao === v ? { background: "var(--accent, #2D6B6B)" } : undefined}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="buscar automação…"
+              className="text-sm px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)] w-full sm:w-56"
+            />
+            <button
+              onClick={() => setCriando(true)}
+              className="text-sm px-4 py-2 rounded-lg font-medium text-white hover:opacity-90 cursor-pointer whitespace-nowrap"
+              style={{ background: "var(--accent, #2D6B6B)" }}
+            >
+              ＋ Novo fluxo
+            </button>
+          </div>
         </div>
 
         {!carregando && (
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]">
-              {itens.length} automações
+              {itens.filter((i) => i.gatilho === "relogio").length} no relógio ·{" "}
+              {itens.filter((i) => i.gatilho === "pedido").length} sob demanda ·{" "}
+              {itens.filter((i) => i.gatilho === "evento").length} por evento
             </span>
             <span className={`px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] ${problemas ? "text-amber-600 dark:text-amber-400" : "text-[var(--text-secondary)]"}`}>
               {problemas ? `${problemas} pedindo atenção` : "nenhuma atrasada"}
@@ -209,6 +288,11 @@ export default function AutomacoesPage() {
             {semDesenho > 0 && (
               <span className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-muted)]">
                 {semDesenho} sem desenho
+              </span>
+            )}
+            {itens.some((i) => i.desenhoAtrasado) && (
+              <span className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-amber-600 dark:text-amber-400">
+                {itens.filter((i) => i.desenhoAtrasado).length} com desenho possivelmente atrasado
               </span>
             )}
             <button
@@ -244,62 +328,36 @@ export default function AutomacoesPage() {
         {carregando ? (
           <p className="text-sm text-[var(--text-muted)]">carregando…</p>
         ) : (
-          GATILHOS.map((g) => {
-            const doGrupo = filtrados.filter((i) => i.gatilho === g.key);
-            if (!doGrupo.length) return null;
-            // No relógio: da que roda mais vezes pra mais rara.
-            doGrupo.sort((a, b) =>
-              (a.cronInfo?.frequenciaMin ?? Number.MAX_SAFE_INTEGER) -
-              (b.cronInfo?.frequenciaMin ?? Number.MAX_SAFE_INTEGER),
-            );
-            return (
-              <section key={g.key}>
-                <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-0.5">
-                  {g.icone} {g.titulo}{" "}
-                  <span className="text-[var(--text-muted)] font-normal">({doGrupo.length})</span>
-                </h2>
-                <p className="text-xs text-[var(--text-muted)] mb-2">{g.explica}</p>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                  {doGrupo.map((i) => (
-                    <button
-                      key={i.chave}
-                      onClick={() => setAberto(i)}
-                      className="text-left bg-[var(--bg-secondary)] rounded-xl px-4 py-3 border border-[var(--border)] hover:border-[var(--accent,#2D6B6B)] transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="font-medium text-sm text-[var(--text-primary)]">{i.nome}</p>
-                        <span className={`shrink-0 text-[11px] whitespace-nowrap ${SELO[i.saude].cor}`}>
-                          {SELO[i.saude].bolinha} {SELO[i.saude].texto}
-                        </span>
-                      </div>
-                      {i.descricao && (
-                        <p className="text-xs text-[var(--text-secondary)] mt-1">{i.descricao}</p>
-                      )}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-[var(--text-muted)]">
-                        {i.cronInfo ? (
-                          <>
-                            <span>⏰ {i.cronInfo.descricao}</span>
-                            <span>▸ última: {tempoDesde(i.cron?.ultima_execucao)}</span>
-                          </>
-                        ) : (
-                          <span>{i.gatilho === "pedido" ? "👋 sob demanda" : "🔔 por evento"}</span>
-                        )}
-                        <span className={i.fluxo ? "text-[var(--accent,#2D6B6B)]" : "text-[var(--text-muted)]"}>
-                          {i.fluxo ? "🗺️ tem desenho" : "sem desenho"}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            );
-          })
+          grupos.map(({ chave, titulo, explica, itens: doGrupo }) => (
+            <section key={chave}>
+              <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-0.5">
+                {titulo}{" "}
+                <span className="text-[var(--text-muted)] font-normal">({doGrupo.length})</span>
+              </h2>
+              {explica && <p className="text-xs text-[var(--text-muted)] mb-2">{explica}</p>}
+              <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2">
+                {doGrupo.map((i) => (
+                  <Card key={i.chave} item={i} onAbrir={() => setAberto(i)} />
+                ))}
+              </div>
+            </section>
+          ))
         )}
 
         {!carregando && filtrados.length === 0 && (
           <p className="text-sm text-[var(--text-muted)]">Nada encontrado pra “{busca}”.</p>
         )}
       </div>
+
+      {criando && (
+        <NovoFluxo
+          onFechar={() => setCriando(false)}
+          onCriado={(id) => {
+            setCriando(false);
+            router.push(`/producao/fluxos?fluxo=${id}`);
+          }}
+        />
+      )}
 
       {aberto && (
         <div
@@ -412,6 +470,162 @@ export default function AutomacoesPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Card de uma automação. Mesmo card nas duas visões — o que muda é só como a
+// lista está agrupada acima dele.
+function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }) {
+  return (
+    <button
+      onClick={onAbrir}
+      className="text-left bg-[var(--bg-secondary)] rounded-xl px-4 py-3 border border-[var(--border)] hover:border-[var(--accent,#2D6B6B)] transition-colors cursor-pointer"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-medium text-sm text-[var(--text-primary)]">{i.nome}</p>
+        <span className={`shrink-0 text-[11px] whitespace-nowrap ${SELO[i.saude].cor}`}>
+          {SELO[i.saude].bolinha} {SELO[i.saude].texto}
+        </span>
+      </div>
+      {i.descricao && <p className="text-xs text-[var(--text-secondary)] mt-1">{i.descricao}</p>}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-[var(--text-muted)]">
+        {i.cronInfo ? (
+          <>
+            <span>⏰ {i.cronInfo.descricao}</span>
+            <span>▸ última: {tempoDesde(i.cron?.ultima_execucao)}</span>
+          </>
+        ) : (
+          <span>{i.gatilho === "pedido" ? "👋 sob demanda" : "🔔 por evento"}</span>
+        )}
+        <span className={i.fluxo ? "text-[var(--accent,#2D6B6B)]" : "text-[var(--text-muted)]"}>
+          {i.fluxo ? "🗺️ tem desenho" : "sem desenho"}
+        </span>
+        {i.desenhoAtrasado && (
+          <span
+            className="text-amber-600 dark:text-amber-400"
+            title="O relógio da VPS mudou depois da última vez que este desenho foi mexido"
+          >
+            ⚠ desenho pode estar atrasado
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+// ＋ Novo fluxo — o lugar onde ela cria um fluxo manual. Antes isso só existia
+// dentro do kanban, aposentado em 25/07/2026 por ser a tela que ela abria e
+// nunca usava. Criar aqui é mais direto: nasce e já abre pra desenhar.
+function NovoFluxo({ onFechar, onCriado }: { onFechar: () => void; onCriado: (id: string) => void }) {
+  const [titulo, setTitulo] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [categoria, setCategoria] = useState<FlowCategory>("manual");
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const TIPOS: { valor: FlowCategory; rotulo: string; explica: string }[] = [
+    { valor: "manual", rotulo: "✋ Rotina minha", explica: "algo que você faz, e quer deixar desenhado" },
+    { valor: "automation", rotulo: "⚙️ Automação", explica: "algo que o sistema faz sozinho" },
+    { valor: "squad", rotulo: "🤖 Squad", explica: "um time de agentes trabalhando em etapas" },
+  ];
+
+  async function salvar() {
+    if (!titulo.trim()) { setErro("Dá um nome pro fluxo."); return; }
+    setSalvando(true); setErro(null);
+    try {
+      const f = await addFlowDoc({
+        title: titulo.trim(),
+        category: categoria,
+        description: descricao.trim() || undefined,
+        nodes: [{ id: "1", type: "start", position: { x: 100, y: 100 }, data: { label: "Início", icon: "▶️" } }],
+        edges: [],
+      });
+      onCriado(f.id);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Não consegui criar o fluxo.");
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onFechar}>
+      <div
+        className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border)] max-w-lg w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 p-4 border-b border-[var(--border)]">
+          <div>
+            <p className="font-semibold text-[var(--text-primary)]">Novo fluxo</p>
+            <p className="text-xs text-[var(--text-muted)]">Ele nasce vazio e abre pra você desenhar.</p>
+          </div>
+          <button
+            onClick={onFechar}
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none cursor-pointer"
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          <label className="block">
+            <span className="text-xs font-medium text-[var(--text-secondary)]">Nome</span>
+            <input
+              autoFocus
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") salvar(); }}
+              placeholder="ex.: Minha rotina de gravação"
+              className="mt-1 w-full text-sm px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)]"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-[var(--text-secondary)]">O que é (opcional)</span>
+            <input
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+              placeholder="uma linha explicando"
+              className="mt-1 w-full text-sm px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)]"
+            />
+          </label>
+          <div>
+            <span className="text-xs font-medium text-[var(--text-secondary)]">Tipo</span>
+            <div className="grid gap-1.5 mt-1">
+              {TIPOS.map((t) => (
+                <button
+                  key={t.valor}
+                  onClick={() => setCategoria(t.valor)}
+                  className={`text-left px-3 py-2 rounded-lg border text-sm cursor-pointer transition-colors ${
+                    categoria === t.valor
+                      ? "border-[var(--accent,#2D6B6B)] bg-[var(--accent-soft)]"
+                      : "border-[var(--border)] bg-[var(--bg-secondary)]"
+                  }`}
+                >
+                  <span className="font-medium text-[var(--text-primary)]">{t.rotulo}</span>
+                  <span className="block text-xs text-[var(--text-secondary)]">{t.explica}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {erro && <p className="text-xs text-red-600 dark:text-red-400">{erro}</p>}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={salvar}
+              disabled={salvando}
+              className="text-sm px-4 py-2 rounded-lg font-medium text-white hover:opacity-90 cursor-pointer disabled:opacity-50"
+              style={{ background: "var(--accent, #2D6B6B)" }}
+            >
+              {salvando ? "criando…" : "Criar e desenhar"}
+            </button>
+            <button
+              onClick={onFechar}
+              className="text-sm px-4 py-2 rounded-lg border border-[var(--border)] text-[var(--text-secondary)] cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

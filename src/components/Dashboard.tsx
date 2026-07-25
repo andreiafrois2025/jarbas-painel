@@ -24,8 +24,9 @@ interface DashboardProps {
 const NAV_ITEMS: { path: string; icon: string; title: string; match: string }[] = [
   { path: "/inicio", icon: "🏠", title: "Início", match: "/inicio" },
   { path: "/equipe", icon: "👥", title: "Equipe", match: "/equipe" },
-  { path: "/producao/squads", icon: "🚀", title: "Produção (Squads + Fluxos)", match: "/producao" },
-  { path: "/pessoal", icon: "💛", title: "Pessoal (Luiz + Finanças)", match: "/pessoal" },
+  { path: "/producao/automacoes", icon: "🚀", title: "Produção (Squads, Automações, Fluxos)", match: "/producao" },
+  { path: "/saude", icon: "🩺", title: "Saúde (do sistema + integrações)", match: "/saude" },
+  { path: "/pessoal", icon: "🤎", title: "Pessoal (Luiz + Finanças)", match: "/pessoal" },
   { path: "/metricas", icon: "📊", title: "Métricas", match: "/metricas" },
   { path: "/biblioteca", icon: "📚", title: "Biblioteca (Criações + Skills)", match: "/biblioteca" },
   { path: "/config", icon: "⚙️", title: "Config (Conta + Integrações)", match: "/config" },

@@ -94,7 +94,7 @@ function EquipeGrid() {
   );
 }
 
-const NOME_AUTOMACAO: Record<string, string> = {
+export const NOME_AUTOMACAO: Record<string, string> = {
   style_learner: "Aprendiz de estilo (Mike)",
   radar_to_ig: "Ponte Radar → Instagram",
   reels_pipeline: "Pipeline de reels",
@@ -109,7 +109,7 @@ const EQUIPE: [string, string][] = [
   ["💰", "Louis"], ["🥗", "Lara"], ["🧠", "Dra. Nara"], ["📚", "Sofia"],
 ];
 
-function Tile({ titulo, valor, sub, icone }: {
+export function Tile({ titulo, valor, sub, icone }: {
   titulo: string; valor: string | number; sub?: string; icone?: string;
 }) {
   return (
@@ -133,7 +133,7 @@ function CartaoGrafico({ titulo, sub, children }: {
   );
 }
 
-type Aba = "geral" | "producao" | "saude" | "diario";
+type Aba = "geral" | "producao" | "diario";
 // Filtro de área — chip no topo, afeta as abas "Painel Geral" e "Produtividade IA".
 // "tudo" = comportamento de sempre (soma/mostra tudo). "conteudo" = só o que já
 // existe hoje (fila/radar/envios/dicas/reels/horas_conteudo). "servidora" = só
@@ -208,7 +208,6 @@ export default function MetricasPage() {
         <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">📊 Métricas</h1>
         {botaoAba("geral", "🎤 Painel Geral")}
         {botaoAba("producao", "🤖 Produtividade IA")}
-        {botaoAba("saude", "❤️ Saúde do sistema")}
         {botaoAba("diario", "📖 Diário de bordo")}
       </div>
 
@@ -227,7 +226,6 @@ export default function MetricasPage() {
 
           {aba === "geral" && <AbaGeral data={data} hoje={hoje} taxaSemanal={taxaSemanal} area={area} />}
           {aba === "producao" && <AbaProducao data={data} hoje={hoje} taxaSemanal={taxaSemanal} area={area} />}
-          {aba === "saude" && <AbaSaude hoje={hoje} />}
           {aba === "diario" && <AbaDiario data={data} />}
         </div>
       </div>
@@ -486,83 +484,5 @@ function AbaDiario({ data }: { data: any }) {
   );
 }
 
-// Mesma fonte AO VIVO do semáforo da barra do topo (18/07: a aba mostrava o
-// snapshot noturno e dizia "verde" enquanto o semáforo estava vermelho)
-const STATUS_VIVO_URL =
-  "https://pmmyqljiuslstwbmiron.supabase.co/storage/v1/object/public/status/status.json";
-
-function AbaSaude({ hoje }: { hoje: any }) {
-  const [vivo, setVivo] = useState<any>(null);
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await fetch(`${STATUS_VIVO_URL}?t=${Date.now()}`, { cache: "no-store" });
-        if (r.ok && alive) setVivo(await r.json());
-      } catch { /* mantém o snapshot */ }
-    };
-    load();
-    const id = setInterval(load, 60000);
-    return () => { alive = false; clearInterval(id); };
-  }, []);
-
-  const nivel = vivo?.nivel ?? hoje.saude?.nivel;
-  const problemas: string[] = vivo?.problemas ?? hoje.saude?.problemas ?? [];
-  const nivelUi = { verde: "🟢 Tudo funcionando", amarelo: "🟡 Atenção", vermelho: "🔴 Algo caiu" }[
-    nivel as "verde" | "amarelo" | "vermelho"
-  ] ?? `⚪ ${nivel ?? "?"}`;
-  const sinais = Object.entries(
-    (vivo?.sinais_vitais ?? hoje.saude?.sinais ?? {}) as Record<string, boolean>);
-
-  // Fila e automações: preferir o status ao vivo (5 em 5 min) e cair pro
-  // snapshot noturno só se o fetch do vivo falhar
-  const fila = vivo?.fila_kanban ?? hoje.fila;
-  const automacoes = vivo?.automacoes ?? hoje.automacoes;
-  const filaAoVivo = !!vivo?.fila_kanban;
-  const automacoesAoVivo = !!vivo?.automacoes;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Tile titulo="Estado geral" valor={nivelUi}
-          sub={problemas.length ? problemas.join(" · ") : "nenhum problema aberto"} />
-        <Tile icone="⏰" titulo="Rotinas automáticas" valor={`${hoje.saude?.crons_ok ?? "?"}/${hoje.saude?.crons_total ?? "?"}`}
-          sub="rodando no horário" />
-        <Tile icone="💾" titulo="Disco da VPS" valor={`${vivo?.disco_pct ?? hoje.saude?.disco_pct ?? "?"}%`} sub="usado" />
-        <Tile icone="📬" titulo="Fila do grupo IA"
-          valor={fila?.pausado ? "⏸ pausada" : `${fila?.aprovados ?? 0} na fila`}
-          sub={`${fila?.pendentes ?? 0} aguardando sua avaliação${filaAoVivo ? " · ao vivo (5 em 5 min)" : ""}`} />
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-3">
-        <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[#E5DED4]">
-          <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">Sinais vitais</h3>
-          <ul className="space-y-1 text-sm text-[var(--text-primary)]">
-            {sinais.map(([nome, ok]) => (
-              <li key={nome} className="flex justify-between">
-                <span className="capitalize">{nome}</span>
-                <span>{ok ? "✅ no ar" : "❌ fora"}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[#E5DED4]">
-          <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">
-            Última execução das automações
-            {automacoesAoVivo && (
-              <span className="ml-2 text-xs font-normal text-[var(--text-secondary)]">ao vivo (5 em 5 min)</span>
-            )}
-          </h3>
-          <ul className="space-y-1 text-sm text-[var(--text-primary)]">
-            {Object.entries((automacoes ?? {}) as Record<string, string | null>).map(([k, iso]) => (
-              <li key={k} className="flex justify-between gap-2">
-                <span>{NOME_AUTOMACAO[k] ?? k}</span>
-                <span className="text-[var(--text-secondary)] whitespace-nowrap">{tempoRelativo(iso)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-}
+// 25/07/2026: a aba "Saúde do sistema" saiu daqui e virou a seção 🩺 Saúde.
+// Métricas voltou a ser só métrica.

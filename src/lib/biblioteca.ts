@@ -57,6 +57,9 @@ export interface Catalogo {
   automacoes: AutomacaoApiItem[];
   squads: string[];
   criacoes: CriacaoApiItem[];
+  /** Quando o relógio da VPS foi alterado pela última vez. Serve pra marcar
+   *  desenhos que podem ter ficado desatualizados desde então. */
+  crontab_modificado_em?: string | null;
 }
 
 // Busca o catálogo ao vivo. Retorna null em qualquer falha (API fora,
@@ -78,6 +81,7 @@ export async function fetchCatalogo(): Promise<Catalogo | null> {
       automacoes: Array.isArray(data.automacoes) ? data.automacoes : [],
       squads: Array.isArray(data.squads) ? data.squads : [],
       criacoes: Array.isArray(data.criacoes) ? data.criacoes : [],
+      crontab_modificado_em: data.crontab_modificado_em ?? null,
     };
   } catch {
     return null;
