@@ -187,7 +187,9 @@ export default function GrafoView() {
       </div>
 
       <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] overflow-hidden">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minHeight: 320 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full mx-auto block"
+          preserveAspectRatio="xMidYMid meet"
+          style={{ minHeight: 320, maxHeight: "calc(100vh - 15rem)" }}>
           {pronto && arestasVis.map(([a, b], i) => {
             const A = pos[a], B = pos[b];
             if (!A || !B) return null;

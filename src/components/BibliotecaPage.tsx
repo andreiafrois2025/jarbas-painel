@@ -224,6 +224,7 @@ export default function BibliotecaPage() {
                     + Nova criação
                   </button>
                 </div>
+                <div className="grid gap-x-5 gap-y-4 lg:grid-cols-2 2xl:grid-cols-3 items-start">
                 {[...gruposCriacoes.entries()].map(([grupo, itens]) => (
                   <section key={grupo}>
                     <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
@@ -292,6 +293,7 @@ export default function BibliotecaPage() {
                     </div>
                   </section>
                 ))}
+                </div>
                 <p className="text-xs text-[var(--text-muted)] pb-4">
                   Pra adicionar itens feitos na VPS, é só me pedir no chat. Pra coisas criadas fora (GPT, outra IA), use o botão “+ Nova criação”.
                 </p>

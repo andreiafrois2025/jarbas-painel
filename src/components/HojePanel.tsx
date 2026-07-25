@@ -185,7 +185,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
 
   return (
     <div>
-      <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-5">
+      <div className="p-4 md:p-6 w-full space-y-5">
         <div className="flex items-baseline justify-between flex-wrap gap-2">
           <h1 className="text-2xl font-bold text-[var(--text-primary)] capitalize">🏠 {hoje}</h1>
           <span className="text-xs text-[var(--text-secondary)]">
@@ -344,7 +344,7 @@ function EsqueletoHoje({ lateral }: { lateral?: React.ReactNode }) {
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
   return (
     <div>
-      <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-5">
+      <div className="p-4 md:p-6 w-full space-y-5">
         <div className="flex items-baseline justify-between flex-wrap gap-2">
           <h1 className="text-2xl font-bold text-[var(--text-primary)] capitalize">🏠 {hoje}</h1>
           <span className="text-xs text-[var(--text-secondary)]">carregando seu dia…</span>

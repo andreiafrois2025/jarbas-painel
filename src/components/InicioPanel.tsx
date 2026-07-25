@@ -20,7 +20,7 @@ export default function InicioPanel() {
   }, []);
 
   return (
-    <div className="p-4 md:p-6 pt-0 max-w-[1500px] mx-auto">
+    <div className="p-4 md:p-6 pt-0 w-full">
       <section className="rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
           <span className="text-sm font-semibold text-[var(--text-primary)]">🏢 Escritório</span>
