@@ -4,12 +4,20 @@
 // "Assistentes por área" virou coluna lateral do Hoje (AssistentesPorArea.tsx),
 // então aqui sobrou o que importa: os bonequinhos com a largura toda.
 
-import { useState } from "react";
-import { SQUAD_API_BASE } from "@/lib/config";
+import { useEffect, useState } from "react";
+import { squadUrlComToken } from "@/lib/squadFetch";
 
 export default function InicioPanel() {
   const [openOfficeFullscreen, setOpenOfficeFullscreen] = useState(false);
-  const officeUrl = `${SQUAD_API_BASE}/office/`;
+  // 25/07/2026: o escritório deixou de ser aberto na internet — /office e
+  // /api/snapshot agora exigem login. Como iframe não manda cabeçalho, o token
+  // da sessão vai na própria URL (a squad-api aceita ?token=).
+  const [officeUrl, setOfficeUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    squadUrlComToken("/office/").then((u) => { if (vivo) setOfficeUrl(u); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
 
   return (
     <div className="p-4 md:p-6 pt-0 max-w-[1500px] mx-auto">
@@ -21,12 +29,18 @@ export default function InicioPanel() {
             Ver em tela cheia ↗
           </button>
         </div>
-        <iframe
-          src={officeUrl}
-          className="w-full border-0 h-[60vh] md:h-[70vh]"
-          title="Escritório virtual"
-          loading="lazy"
-        />
+        {officeUrl ? (
+          <iframe
+            src={officeUrl}
+            className="w-full border-0 h-[60vh] md:h-[70vh]"
+            title="Escritório virtual"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-[60vh] md:h-[70vh] flex items-center justify-center text-sm text-[var(--text-secondary)]">
+            abrindo o escritório…
+          </div>
+        )}
       </section>
 
       {/* Modal de escritório em tela cheia */}
@@ -42,7 +56,9 @@ export default function InicioPanel() {
                 ✕
               </button>
             </div>
-            <iframe src={officeUrl} className="flex-1 w-full border-0" title="Escritório virtual (fullscreen)" />
+            {officeUrl && (
+              <iframe src={officeUrl} className="flex-1 w-full border-0" title="Escritório virtual (fullscreen)" />
+            )}
           </div>
         </div>
       )}

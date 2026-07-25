@@ -3,7 +3,8 @@
 // Helper de fetch autenticado para a squad-api.
 // Mesmo padrão do `comToken` em src/lib/hoje.ts: pega o access_token da sessão
 // Supabase e manda no header Authorization. Use em qualquer chamada à
-// SQUAD_API_BASE que não seja /api/snapshot ou /office (essas continuam públicas).
+// SQUAD_API_BASE. Desde 25/07/2026 /api/snapshot e /office também exigem login
+// (o iframe do escritório usa squadUrlComToken).
 
 import { supabase } from "./supabase";
 import { SQUAD_API_BASE } from "./config";
