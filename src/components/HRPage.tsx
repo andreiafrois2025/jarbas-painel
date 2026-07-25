@@ -878,7 +878,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                             onKeyDown={e => { if (e.key === "Enter") handleRenameSector(); }}
                             className="bg-white/20 text-white placeholder:text-white/50 rounded px-2 py-1 text-xs flex-1 outline-none"
                             autoFocus />
-                          <button onClick={handleRenameSector} className="text-xs bg-white/20 px-2 py-1 rounded cursor-pointer hover:bg-white/30">✓</button>
+                          <button aria-label="Confirmar" onClick={handleRenameSector} className="text-xs bg-white/20 px-2 py-1 rounded cursor-pointer hover:bg-white/30">✓</button>
                           <button onClick={() => setEditingSector(null)} className="text-xs bg-white/20 px-2 py-1 rounded cursor-pointer hover:bg-white/30">✕</button>
                         </div>
                       ) : (

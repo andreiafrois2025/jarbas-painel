@@ -223,7 +223,7 @@ interface Explicacao {
 }
 
 const QUEM: Record<QuemResolve, { rotulo: string; cor: string }> = {
-  voce: { rotulo: "👤 Você resolve", cor: "text-emerald-700 dark:text-emerald-400" },
+  voce: { rotulo: "👤 Você resolve", cor: "text-emerald-700" },
   claude: { rotulo: "🤖 Me peça", cor: "text-[var(--accent)]" },
   sozinho: { rotulo: "⏳ Se resolve sozinho", cor: "text-[var(--text-muted)]" },
 };

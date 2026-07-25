@@ -143,7 +143,7 @@ export default function StartSquadModal({ squad, open, onClose }: StartSquadModa
             <span>{squad.icon || "▶️"}</span>
             <span>Iniciar {squad.name}</span>
           </h2>
-          <button
+          <button aria-label="Fechar"
             onClick={onClose}
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none cursor-pointer"
           >×</button>

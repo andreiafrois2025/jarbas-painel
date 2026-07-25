@@ -153,7 +153,7 @@ export default function BibliotecaPage() {
           <p className="text-xs text-[var(--text-secondary)] mt-1.5 line-clamp-3">
             {(s.descricao_simples || s.descricao).split("\n")[0]}
           </p>
-          <p className={`text-[10px] mt-2 font-medium ${s.instalado ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-muted)]"}`}>
+          <p className={`text-[10px] mt-2 font-medium ${s.instalado ? "text-emerald-600" : "text-[var(--text-muted)]"}`}>
             {s.instalado ? "🟢 Instalado no ecossistema" : "⚪ Não instalado"}
           </p>
           <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
@@ -405,7 +405,7 @@ export default function BibliotecaPage() {
               >
                 {copiado ? "copiado!" : "📋 Copiar"}
               </button>
-              <p className={`text-xs font-medium ${skillAberta.instalado ? "text-emerald-600 dark:text-emerald-400" : "text-[var(--text-muted)]"}`}>
+              <p className={`text-xs font-medium ${skillAberta.instalado ? "text-emerald-600" : "text-[var(--text-muted)]"}`}>
                 {skillAberta.instalado ? "🟢 Instalado no ecossistema" : "⚪ Não instalado — só referência"}
               </p>
               <div className="text-xs text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)] flex items-center gap-1.5">
@@ -510,7 +510,7 @@ function FormNovaCriacao({
       >
         <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
           <p className="font-semibold text-[var(--text-primary)]">{editando ? "✏️ Editar criação" : "+ Nova criação"}</p>
-          <button onClick={onFechar} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none">
+          <button aria-label="Fechar" onClick={onFechar} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none">
             ✕
           </button>
         </div>

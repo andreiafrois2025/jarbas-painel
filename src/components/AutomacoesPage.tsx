@@ -116,9 +116,9 @@ function avaliaSaude(ultima: string | null | undefined, frequenciaMin: number): 
 }
 
 const SELO: Record<Saude, { bolinha: string; texto: string; cor: string }> = {
-  ok: { bolinha: "🟢", texto: "no ar", cor: "text-emerald-600 dark:text-emerald-400" },
-  atrasada: { bolinha: "🟡", texto: "atrasada", cor: "text-amber-600 dark:text-amber-400" },
-  muda: { bolinha: "🔴", texto: "sem sinal há muito tempo", cor: "text-red-600 dark:text-red-400" },
+  ok: { bolinha: "🟢", texto: "no ar", cor: "text-emerald-600" },
+  atrasada: { bolinha: "🟡", texto: "atrasada", cor: "text-amber-600" },
+  muda: { bolinha: "🔴", texto: "sem sinal há muito tempo", cor: "text-red-600" },
   desconhecida: { bolinha: "⚪", texto: "não dá pra saber", cor: "text-[var(--text-muted)]" },
 };
 
@@ -441,7 +441,7 @@ export default function AutomacoesPage() {
               {itens.filter((i) => i.gatilho === "pedido").length} sob demanda ·{" "}
               {itens.filter((i) => i.gatilho === "evento").length} por evento
             </span>
-            <span className={`px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] ${problemas ? "text-amber-600 dark:text-amber-400" : "text-[var(--text-secondary)]"}`}>
+            <span className={`px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] ${problemas ? "text-amber-600" : "text-[var(--text-secondary)]"}`}>
               {problemas ? `${problemas} pedindo atenção` : "nenhuma atrasada"}
             </span>
             {semDesenho > 0 && (
@@ -450,7 +450,7 @@ export default function AutomacoesPage() {
               </span>
             )}
             {itens.some((i) => i.desenhoAtrasado) && (
-              <span className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-amber-600 dark:text-amber-400">
+              <span className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-amber-600">
                 {itens.filter((i) => i.desenhoAtrasado).length} com fluxo possivelmente atrasado
               </span>
             )}
@@ -659,8 +659,8 @@ function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }
         <span
           className={`text-[10px] px-2 py-0.5 rounded-full border ${
             i.usaIA
-              ? "border-[var(--terra,#A0583C)] text-[#A0583C] dark:text-amber-400"
-              : "border-emerald-600/40 text-emerald-700 dark:text-emerald-400"
+              ? "border-[var(--terra,#A0583C)] text-[#A0583C]"
+              : "border-emerald-600/40 text-emerald-700"
           }`}
           title={i.custo}
         >
@@ -682,7 +682,7 @@ function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }
         </span>
         {i.desenhoAtrasado && (
           <span
-            className="text-amber-600 dark:text-amber-400"
+            className="text-amber-600"
             title="O relógio da VPS mudou depois da última vez que este desenho foi mexido"
           >
             ⚠ fluxo pode estar atrasado
@@ -805,7 +805,7 @@ function NovoFluxo({ categorias, onFechar, onCriado }: {
               ))}
             </div>
           </div>
-          {erro && <p className="text-xs text-red-600 dark:text-red-400">{erro}</p>}
+          {erro && <p className="text-xs text-red-600">{erro}</p>}
           <div className="flex gap-2 pt-1">
             <button
               onClick={salvar}
@@ -904,13 +904,13 @@ function CartaoPercurso({ percurso, itens, onIr }: {
                     </span>
                   )}
                   {vivo && (
-                    <span className={vivo.usaIA ? "text-[#A0583C] dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}>
+                    <span className={vivo.usaIA ? "text-[#A0583C]" : "text-emerald-700"}>
                       {vivo.usaIA ? "🤖 usa IA" : "🐍 sem IA"}
                     </span>
                   )}
                   {/* O passo aponta pra uma automação que não existe mais */}
                   {passo.automacao && !vivo && (
-                    <span className="text-amber-600 dark:text-amber-400">
+                    <span className="text-amber-600">
                       ⚠ não achei essa automação no relógio
                     </span>
                   )}

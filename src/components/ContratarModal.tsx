@@ -185,7 +185,7 @@ export default function ContratarModal({
           <h2 className="text-lg font-semibold">
             {editingAssignment ? "Editar Atribuição" : step === "select" ? "Selecionar Colaborador" : step === "create" ? "Novo Colaborador" : "Definir Função"}
           </h2>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl cursor-pointer w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-tertiary)]">×</button>
+          <button aria-label="Fechar" onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl cursor-pointer w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[var(--bg-tertiary)]">×</button>
         </div>
 
         <div className="p-5 max-h-[70vh] overflow-y-auto">
