@@ -6,12 +6,10 @@ import { Collaborator, Assignment, QuickLink } from "@/lib/types";
 import {
   getCategories,
   signOut,
-  seedDefaultData,
   getCollaborators,
   getAssignments,
   getQuickLinks,
   addQuickLink,
-  migrateFromAgents,
 } from "@/lib/storage";
 import type { Category as CategoryType } from "@/lib/types";
 import JobsMonitor from "./JobsMonitor";
@@ -47,10 +45,10 @@ export default function Dashboard({ session, children }: DashboardProps) {
 
   const loadData = useCallback(async () => {
     try {
-      if (session.user?.id) {
-        await seedDefaultData(session.user.id);
-        await migrateFromAgents(session.user.id);
-      }
+      // 25/07/2026 (F7): saíram daqui duas chamadas que rodavam a CADA abertura
+      // do painel — seedDefaultData e migrateFromAgents. Eram a migração de maio
+      // (quando "agents" virou "collaborators"), que já terminou: as duas
+      // perguntavam ao banco "já migrou?" e ouviam "já", desde então.
       const [categoriesData, collabData, assignData, qlData] = await Promise.all([
         getCategories(),
         getCollaborators(),

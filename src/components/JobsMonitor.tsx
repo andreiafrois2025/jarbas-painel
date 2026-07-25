@@ -78,6 +78,10 @@ export default function JobsMonitor() {
   const [resumeModal, setResumeModal] = useState<{ jobId: string; squad: string; suggestedStepId: number | string | null } | null>(null);
   const [resumeStepId, setResumeStepId] = useState<string>("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // 25/07/2026 (F7): antes, se a VPS não respondesse, a barra simplesmente
+  // desaparecia — indistinguível de "não há nada rodando". Se uma squad caísse
+  // no meio, a Andréia concluiria que tinha terminado. Agora o silêncio aparece.
+  const [semResposta, setSemResposta] = useState(false);
   const [dismissed, setDismissed] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
     try {
@@ -91,7 +95,11 @@ export default function JobsMonitor() {
   const fetchData = useCallback(async () => {
     try {
       const jobsRes = await squadFetch(`/api/jobs`);
-      if (!jobsRes.ok) return;
+      if (!jobsRes.ok) {
+        setSemResposta(true);
+        return;
+      }
+      setSemResposta(false);
       const jobs: Job[] = await jobsRes.json();
       // Job com userStatus (marcação manual da Andréia) sai das listas ativas e vai pra arquivados
       const running = jobs.filter((j) => j.status === "running" && !j.userStatus);
@@ -116,10 +124,13 @@ export default function JobsMonitor() {
               pendingMap[j.jobId] = data.pendings;
             }
           }
-        } catch {}
+        } catch (e) { console.warn("JobsMonitor: falha pontual ignorada", e); }
       }));
       setPendings(pendingMap);
-    } catch {}
+    } catch (e) {
+      console.warn("JobsMonitor: a squad-api não respondeu", e);
+      setSemResposta(true);
+    }
   }, [dismissed]);
 
   useEffect(() => {
@@ -131,7 +142,20 @@ export default function JobsMonitor() {
   const pendingCount = Object.values(pendings).reduce((acc, arr) => acc + arr.length, 0);
   const hasAnything = runningJobs.length > 0 || pendingCount > 0 || troubledJobs.length > 0 || archivedJobs.length > 0;
 
-  if (!hasAnything) return null;
+  if (!hasAnything && !semResposta) return null;
+
+  // Só o aviso de silêncio: nada rodando que eu consiga ver, e a VPS calada.
+  if (!hasAnything && semResposta) {
+    return (
+      <div className="shrink-0 px-3 md:px-5 py-2 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex items-center gap-2 text-xs">
+        <span>🟡</span>
+        <span className="text-[var(--text-secondary)]">
+          Não consegui falar com a VPS agora, então <b>não sei dizer</b> se há squad rodando.
+          Se você iniciou alguma, ela pode estar trabalhando sem aparecer aqui.
+        </span>
+      </div>
+    );
+  }
 
   async function loadPipelineSteps(squad: string) {
     if (pipelineSteps[squad]) return;
@@ -140,7 +164,7 @@ export default function JobsMonitor() {
       if (!r.ok) return;
       const data = await r.json();
       setPipelineSteps((prev) => ({ ...prev, [squad]: data.steps || [] }));
-    } catch {}
+    } catch (e) { console.warn("JobsMonitor: falha pontual ignorada", e); }
   }
 
   async function openResumeModal(job: Job) {
@@ -176,7 +200,7 @@ export default function JobsMonitor() {
       const next = new Set(prev).add(jobId);
       try {
         window.localStorage.setItem("jobsMonitor.dismissed", JSON.stringify([...next]));
-      } catch {}
+      } catch (e) { console.warn("JobsMonitor: falha pontual ignorada", e); }
       return next;
     });
   }
@@ -297,7 +321,7 @@ export default function JobsMonitor() {
         if (!r.ok) return;
         const data = await r.json();
         setInlineFiles((prev) => ({ ...prev, [jobId]: data.files || [] }));
-      } catch {}
+      } catch (e) { console.warn("JobsMonitor: falha pontual ignorada", e); }
     }
   }
 

@@ -1,10 +1,18 @@
+// Camada de acesso ao Supabase.
+//
+// 25/07/2026 (F7): removidas as funções do modelo antigo — agents, o primeiro
+// modelo de flows, executions e products. Nada disso era chamado por nenhuma
+// tela; era resquício da versão anterior do painel, de antes de "agents" virar
+// "collaborators + assignments" em maio. As TABELAS continuam no banco (o
+// histórico de executions tem 121 linhas e não se joga fora) — só o código que
+// ninguém usava saiu daqui.
 // =============================================
 // Storage — Funções de acesso ao Supabase
 // Centraliza todas as operações de CRUD
 // =============================================
 
 import { supabase } from "./supabase";
-import { Agent, Category, Flow, Execution, DEFAULT_AGENTS, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Product, Squad, FlowDoc, FlowCategory, FlowColumn } from "./types";
+import { Category, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Squad, FlowDoc, FlowCategory, FlowColumn } from "./types";
 
 // ---- AUTH ----
 
@@ -56,81 +64,26 @@ export async function getUser() {
   return data.user;
 }
 
-// ---- SEED (dados iniciais para novos usuários) ----
-
-/** Popula dados padrão na primeira vez que o usuário loga */
+// ---- SEED de cadastro novo ----
+// Só roda quando alguém cria conta (LoginScreen), nunca na abertura do painel.
+// 25/07/2026: antes isso também populava a tabela legada "agents", que nenhuma
+// tela lê mais desde maio. Ficou apenas o que ainda é usado: as categorias.
 export async function seedDefaultData(userId: string) {
-  // Verificar se já tem agentes
   const { data: existing } = await supabase
-    .from("agents")
+    .from("categories")
     .select("id")
     .eq("user_id", userId)
     .limit(1);
+  if (existing && existing.length > 0) return; // já tem categorias
 
-  if (existing && existing.length > 0) return; // já tem dados
-
-  // Inserir categorias padrão com contexto
-  const categories = DEFAULT_CATEGORIES.map((cat) => ({
-    name: cat.name,
-    context: cat.context,
-    order: cat.order,
-    user_id: userId,
-  }));
-  await supabase.from("categories").insert(categories);
-
-  // Inserir agentes padrão
-  const agents = DEFAULT_AGENTS.map((agent) => ({
-    ...agent,
-    user_id: userId,
-  }));
-  await supabase.from("agents").insert(agents);
-}
-
-// ---- AGENTS ----
-
-/** Buscar todos os agentes do usuário */
-export async function getAgents(): Promise<Agent[]> {
-  const { data, error } = await supabase
-    .from("agents")
-    .select("*")
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-  return data || [];
-}
-
-/** Criar novo agente */
-export async function addAgent(
-  agent: Omit<Agent, "id" | "user_id" | "created_at">
-): Promise<Agent> {
-  const user = await getUser();
-  const { data, error } = await supabase
-    .from("agents")
-    .insert({ ...agent, user_id: user?.id })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-/** Atualizar agente */
-export async function updateAgent(
-  id: string,
-  updates: Partial<Agent>
-): Promise<void> {
-  const { error } = await supabase
-    .from("agents")
-    .update(updates)
-    .eq("id", id);
-
-  if (error) throw error;
-}
-
-/** Excluir agente */
-export async function deleteAgent(id: string): Promise<void> {
-  const { error } = await supabase.from("agents").delete().eq("id", id);
-  if (error) throw error;
+  await supabase.from("categories").insert(
+    DEFAULT_CATEGORIES.map((cat) => ({
+      name: cat.name,
+      context: cat.context,
+      order: cat.order,
+      user_id: userId,
+    })),
+  );
 }
 
 // ---- CATEGORIES ----
@@ -173,105 +126,6 @@ export async function updateCategory(id: string, updates: string | { name?: stri
 export async function deleteCategory(id: string): Promise<void> {
   const { error } = await supabase.from("categories").delete().eq("id", id);
   if (error) throw error;
-}
-
-// ---- FLOWS ----
-
-/** Buscar fluxos do usuário */
-export async function getFlows(): Promise<Flow[]> {
-  const { data, error } = await supabase
-    .from("flows")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return data || [];
-}
-
-/** Criar fluxo */
-export async function addFlow(flow: { name: string; steps: Flow["steps"] }): Promise<Flow> {
-  const user = await getUser();
-  const { data, error } = await supabase
-    .from("flows")
-    .insert({ name: flow.name, steps: flow.steps, user_id: user?.id })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-/** Atualizar fluxo */
-export async function updateFlow(id: string, updates: { name?: string; steps?: Flow["steps"] }): Promise<void> {
-  const { error } = await supabase
-    .from("flows")
-    .update(updates)
-    .eq("id", id);
-
-  if (error) throw error;
-}
-
-/** Excluir fluxo */
-export async function deleteFlow(id: string): Promise<void> {
-  const { error } = await supabase.from("flows").delete().eq("id", id);
-  if (error) throw error;
-}
-
-/** Executar fluxo (registra execução e abre agentes em sequência) */
-export async function executeFlow(flow: Flow): Promise<void> {
-  const user = await getUser();
-  // Registrar execução do fluxo
-  await supabase.from("executions").insert({
-    flow_id: flow.id,
-    status: "completed",
-    user_id: user?.id,
-  });
-  // Registrar execução de cada agente do fluxo
-  for (const step of flow.steps) {
-    await supabase.from("executions").insert({
-      agent_id: step.agentId,
-      flow_id: flow.id,
-      status: "completed",
-      user_id: user?.id,
-    });
-  }
-}
-
-// ---- EXECUTIONS ----
-
-/** Registrar execução de agente (clique em "Abrir") */
-export async function recordExecution(agentId: string): Promise<void> {
-  const user = await getUser();
-  await supabase.from("executions").insert({
-    agent_id: agentId,
-    status: "completed",
-    user_id: user?.id,
-  });
-}
-
-/** Buscar execuções do usuário */
-export async function getExecutions(): Promise<Execution[]> {
-  const { data, error } = await supabase
-    .from("executions")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return data || [];
-}
-
-/** Contar execuções de hoje */
-export async function getTodayExecutionCount(): Promise<number> {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const { count, error } = await supabase
-    .from("executions")
-    .select("*", { count: "exact", head: true })
-    .gte("created_at", today.toISOString());
-
-  if (error) return 0;
-  return count || 0;
 }
 
 // =============================================
@@ -429,57 +283,6 @@ export async function deleteQuickLink(id: string): Promise<void> {
 }
 
 // =============================================
-// PRODUCTS (Produtos/entregas por área)
-// =============================================
-
-/** Buscar todos os produtos */
-export async function getProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-/** Buscar produtos de uma categoria/sala */
-export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("category_id", categoryId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-/** Criar produto */
-export async function addProduct(
-  product: Omit<Product, "id" | "user_id" | "created_at">
-): Promise<Product> {
-  const user = await getUser();
-  const { data, error } = await supabase
-    .from("products")
-    .insert({ ...product, user_id: user?.id })
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-/** Atualizar produto */
-export async function updateProduct(id: string, updates: Partial<Product>): Promise<void> {
-  const { error } = await supabase.from("products").update(updates).eq("id", id);
-  if (error) throw error;
-}
-
-/** Excluir produto */
-export async function deleteProduct(id: string): Promise<void> {
-  const { error } = await supabase.from("products").delete().eq("id", id);
-  if (error) throw error;
-}
-
-// =============================================
 // SQUADS (pipelines multi-agente)
 // =============================================
 
@@ -526,67 +329,6 @@ export async function deleteSquad(id: string): Promise<void> {
 // =============================================
 // MIGRAÇÃO: agents → collaborators + assignments
 // =============================================
-
-/** Migrar dados do modelo antigo (agents) para o novo (collaborators + assignments) */
-export async function migrateFromAgents(userId: string): Promise<void> {
-  // Verificar se já migrou
-  const { data: existing } = await supabase
-    .from("collaborators")
-    .select("id")
-    .eq("user_id", userId)
-    .limit(1);
-  if (existing && existing.length > 0) return;
-
-  // Buscar agentes e categorias atuais
-  const { data: agents } = await supabase.from("agents").select("*").eq("user_id", userId);
-  const { data: cats } = await supabase.from("categories").select("*").eq("user_id", userId);
-  if (!agents || agents.length === 0 || !cats) return;
-
-  // Agrupar por agent_name para criar 1 colaborador por nome
-  const collabMap = new Map<string, Collaborator>();
-  for (const ag of agents) {
-    const name = ag.agent_name || ag.name;
-    if (!collabMap.has(name)) {
-      const { data } = await supabase
-        .from("collaborators")
-        .insert({
-          name,
-          gender: ag.gender || "male",
-          skin_tone: ag.skin_tone ?? 0,
-          hair_color: ag.hair_color ?? 0,
-          shirt_color: ag.shirt_color ?? 0,
-          has_glasses: ag.has_glasses ?? false,
-          icon: ag.icon || "⚡",
-          user_id: userId,
-        })
-        .select()
-        .single();
-      if (data) collabMap.set(name, data);
-    }
-  }
-
-  // Criar assignments
-  for (const ag of agents) {
-    const name = ag.agent_name || ag.name;
-    const collab = collabMap.get(name);
-    if (!collab) continue;
-
-    // Encontrar a categoria pelo nome
-    const cat = cats.find(c => c.name === ag.category);
-    if (!cat) continue;
-
-    await supabase.from("assignments").insert({
-      collaborator_id: collab.id,
-      category_id: cat.id,
-      tool_name: ag.name,
-      link: ag.link,
-      description: ag.description || "",
-      type: ag.type || "manual",
-      sub_links: ag.sub_links || [],
-      user_id: userId,
-    }).select().single();
-  }
-}
 
 // ---- FLOWS DOC (editor visual n8n-like) ----
 

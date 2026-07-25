@@ -5,8 +5,19 @@ import { useRouter } from "next/navigation";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { getFlowDocs } from "@/lib/storage";
 import type { FlowDoc } from "@/lib/types";
+import dynamic from "next/dynamic";
 import { interpretaCron, formataProxima, type CronInfo } from "@/lib/cron";
-import FlowCanvas from "./flow/FlowCanvas";
+
+// O desenho aparece só quando você abre o detalhe de um card — então o editor
+// (~75 KB) não precisa vir junto com a lista (F7, 25/07/2026).
+const FlowCanvas = dynamic(() => import("./flow/FlowCanvas"), {
+  loading: () => (
+    <div className="h-full flex items-center justify-center text-xs text-[var(--text-muted)]">
+      desenhando…
+    </div>
+  ),
+  ssr: false,
+});
 
 // =============================================================
 // ⚡ Automações — a tela única do maquinário que roda sozinho.

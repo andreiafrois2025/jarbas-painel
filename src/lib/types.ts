@@ -10,39 +10,6 @@ export interface SubLink {
 }
 
 /** Agente de IA — representa um funcionário do escritório */
-export interface Agent {
-  id: string;
-  /** Nome personalizado do agente (aparece acima da cabeça) ex: "Jarvis", "Ana" */
-  agent_name?: string;
-  /** Nome da IA/ferramenta (aparece na plaquinha da mesa) ex: "Claude", "ChatGPT" */
-  name: string;
-  /** Link para abrir a ferramenta */
-  link: string;
-  /** Categoria/workspace (aba) ex: "Trabalho", "Pessoal" */
-  category: string;
-  /** Tipo de execução */
-  type: "manual" | "automatic";
-  /** Ícone emoji */
-  icon?: string;
-  /** Função/descrição curta (aparece na mesa, linha 2) ex: "Chat", "Imagem" */
-  description?: string;
-  /** Gênero do bonequinho */
-  gender?: "male" | "female";
-  /** Tom de pele (índice 0-5) */
-  skin_tone?: number;
-  /** Cor do cabelo (índice 0-9) */
-  hair_color?: number;
-  /** Cor da camisa (índice 0-9) */
-  shirt_color?: number;
-  /** Usa óculos */
-  has_glasses?: boolean;
-  /** Links adicionais — cada botão abre um GPT/ferramenta diferente */
-  sub_links?: SubLink[];
-  /** Quantos contextos diferentes esse colaborador atua (badge de presença) */
-  context_count?: number;
-  user_id?: string;
-  created_at?: string;
-}
 
 /** Categoria/Sala — ambiente dentro de um contexto */
 export interface Category {
@@ -58,20 +25,8 @@ export const CONTEXTS = ["IGAM", "AndréIA", "Pessoal", "Família"] as const;
 export type ContextType = typeof CONTEXTS[number];
 
 /** Fluxo — sequência de ações entre agentes */
-export interface Flow {
-  id: string;
-  name: string;
-  steps: FlowStep[];
-  user_id?: string;
-  created_at?: string;
-}
 
 /** Etapa de um fluxo */
-export interface FlowStep {
-  agentId: string;
-  action: string;
-  order: number;
-}
 
 // =============================================
 // Fluxos-desenho (n8n-like, só documentação, não executa)
@@ -142,15 +97,6 @@ export interface FlowColumn {
 }
 
 /** Registro de execução */
-export interface Execution {
-  id: string;
-  flow_id?: string;
-  agent_id?: string;
-  result?: string;
-  status: "running" | "completed" | "failed";
-  created_at?: string;
-  user_id?: string;
-}
 
 // =============================================
 // Novo modelo: Colaborador + Atribuição
@@ -245,18 +191,6 @@ export interface QuickLink {
 }
 
 /** Produto/entrega de uma área/setor */
-export interface Product {
-  id: string;
-  category_id: string;
-  title: string;
-  description?: string;
-  /** Link do projeto de criação (ex: Canva, Figma) */
-  creation_link?: string;
-  /** Link do produto final publicado (ex: dashboard, site) */
-  final_link?: string;
-  user_id?: string;
-  created_at?: string;
-}
 
 /** Ocupante da mesa — combina colaborador + atribuição para renderização */
 export interface DeskOccupant {
@@ -264,25 +198,6 @@ export interface DeskOccupant {
   collaborator: Collaborator;
 }
 
-/** Converter DeskOccupant para Agent (adapter para OfficeScene) */
-export function occupantToAgent(occ: DeskOccupant): Agent {
-  return {
-    id: occ.assignment.id,
-    agent_name: occ.collaborator.name,
-    name: occ.assignment.tool_name,
-    link: occ.assignment.link,
-    category: occ.assignment.category?.name || "",
-    type: occ.assignment.type,
-    icon: occ.collaborator.icon,
-    description: occ.assignment.description,
-    gender: occ.collaborator.gender,
-    skin_tone: occ.collaborator.skin_tone,
-    hair_color: occ.collaborator.hair_color,
-    shirt_color: occ.collaborator.shirt_color,
-    has_glasses: occ.collaborator.has_glasses,
-    sub_links: occ.assignment.sub_links,
-  };
-}
 
 /** Categorias/Salas padrão para novos usuários */
 export const DEFAULT_CATEGORIES: { name: string; context: string; order: number }[] = [
@@ -310,55 +225,3 @@ export const DEFAULT_CATEGORIES: { name: string; context: string; order: number 
 ];
 
 /** Agentes padrão para novos usuários */
-export const DEFAULT_AGENTS: Omit<Agent, "id" | "user_id" | "created_at">[] = [
-  {
-    agent_name: "Atlas",
-    name: "ChatGPT",
-    link: "https://chat.openai.com",
-    category: "Dados & Análise",
-    type: "manual",
-    icon: "🤖",
-    description: "Chat",
-    gender: "male",
-  },
-  {
-    agent_name: "Sofia",
-    name: "Claude",
-    link: "https://claude.ai",
-    category: "Produção",
-    type: "manual",
-    icon: "🧠",
-    description: "Chat",
-    gender: "female",
-  },
-  {
-    agent_name: "Neo",
-    name: "Gemini",
-    link: "https://gemini.google.com",
-    category: "Dados & Análise",
-    type: "manual",
-    icon: "💎",
-    description: "Chat",
-    gender: "male",
-  },
-  {
-    agent_name: "Luna",
-    name: "Midjourney",
-    link: "https://www.midjourney.com",
-    category: "Produção",
-    type: "manual",
-    icon: "🎨",
-    description: "Imagem",
-    gender: "female",
-  },
-  {
-    agent_name: "Max",
-    name: "Perplexity",
-    link: "https://www.perplexity.ai",
-    category: "Geotecnologias",
-    type: "manual",
-    icon: "🔍",
-    description: "Pesquisa",
-    gender: "male",
-  },
-];

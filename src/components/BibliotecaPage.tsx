@@ -13,7 +13,13 @@ import {
   type LinkItem,
   type NovaCriacaoPayload,
 } from "@/lib/biblioteca";
-import GrafoView from "./GrafoView";
+import dynamic from "next/dynamic";
+
+// O grafo é uma aba entre seis; não precisa ser baixado por quem abre Criações.
+const GrafoView = dynamic(() => import("./GrafoView"), {
+  loading: () => <p className="text-xs text-[var(--text-muted)]">montando o grafo…</p>,
+  ssr: false,
+});
 
 // Biblioteca: acesso rápido a tudo que existe (links diretos) e o catálogo
 // de skills/capacidades do ecossistema, com como acionar cada uma.

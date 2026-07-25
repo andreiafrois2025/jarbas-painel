@@ -168,8 +168,13 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
       Não consegui carregar o resumo de hoje. (A tela Hoje precisa da squad-api ativa na VPS.)
     </div>;
   }
+  // 25/07/2026 (F7): antes aqui havia UMA LINHA de texto ("Carregando seu dia…")
+  // no lugar onde depois apareceria a página inteira. Quando os dados chegavam,
+  // o conteúdo crescia de repente e empurrava o escritório pra baixo — era esse
+  // o "pula" ao abrir o painel. Agora o espaço já nasce reservado, no mesmo
+  // formato do conteúdo final: nada se move quando os dados chegam.
   if (!dados) {
-    return <div className="p-6 text-sm text-[var(--text-secondary)] animate-pulse">Carregando seu dia…</div>;
+    return <EsqueletoHoje lateral={lateral} />;
   }
 
   // Só notícias, UAU primeiro
@@ -305,6 +310,81 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
           </section>
         </div>
 
+      </div>
+    </div>
+  );
+}
+
+// Esqueleto do "Hoje": mesma estrutura e mesmas alturas do conteúdo real, em
+// cinza. Existe pra reservar o espaço, não pra enfeitar — por isso as medidas
+// acompanham as do layout de verdade (lateral 270px, coluna da caixa 350px).
+function Barra({ w = "100%", h = 14 }: { w?: string; h?: number }) {
+  return (
+    <span
+      className="block rounded animate-pulse"
+      style={{ width: w, height: h, background: "var(--bg-tertiary, #EDE8E1)" }}
+    />
+  );
+}
+
+function CaixaEsqueleto({ titulo, linhas = 3 }: { titulo: string; linhas?: number }) {
+  return (
+    <section className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
+      <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">{titulo}</h2>
+      <div className="space-y-2">
+        {Array.from({ length: linhas }).map((_, i) => (
+          <Barra key={i} w={i === linhas - 1 ? "60%" : "100%"} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function EsqueletoHoje({ lateral }: { lateral?: React.ReactNode }) {
+  const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <div>
+      <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-5">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] capitalize">🏠 {hoje}</h1>
+          <span className="text-xs text-[var(--text-secondary)]">carregando seu dia…</span>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-5 items-start">
+          {lateral && (
+            <div className="w-full lg:w-[270px] lg:shrink-0 order-3 lg:order-none">{lateral}</div>
+          )}
+
+          <div className="flex-1 min-w-0 space-y-5 order-2 lg:order-none">
+            <div className="grid md:grid-cols-2 gap-4">
+              <CaixaEsqueleto titulo="📅 Agenda de hoje" linhas={3} />
+              <CaixaEsqueleto titulo="✅ Tarefas" linhas={3} />
+            </div>
+            <section>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
+                ⚡ O que a equipe fez
+              </h2>
+              <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => <Barra key={i} w={`${92 - i * 9}%`} />)}
+              </div>
+            </section>
+          </div>
+
+          <section className="w-full lg:w-[350px] lg:shrink-0 order-1 lg:order-none">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
+              📥 Caixa de aprovação
+            </h2>
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)] space-y-2">
+                  <Barra w="30%" h={12} />
+                  <Barra w="100%" />
+                  <Barra w="70%" />
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

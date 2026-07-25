@@ -1,11 +1,21 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import SquadsPage from "./SquadsPage";
 import AutomacoesPage from "./AutomacoesPage";
-import FlowsPageV2 from "./flow/FlowsPageV2";
-import EstudioPage from "./EstudioPage";
 import { pageToPath } from "@/lib/painel-context";
+
+// 25/07/2026 (F7): o editor de desenho (@xyflow + roughjs) e o estúdio de reels
+// pesam ~75 KB e eram baixados em TODA aba de Produção, mesmo sem você abri-los.
+// Agora só chegam quando a aba correspondente é aberta.
+const carregando = () => (
+  <div className="flex-1 flex items-center justify-center text-sm text-[var(--text-secondary)]">
+    abrindo…
+  </div>
+);
+const FlowsPageV2 = dynamic(() => import("./flow/FlowsPageV2"), { loading: carregando, ssr: false });
+const EstudioPage = dynamic(() => import("./EstudioPage"), { loading: carregando, ssr: false });
 
 type SubPage = "squads" | "automacoes" | "fluxos" | "estudio";
 
