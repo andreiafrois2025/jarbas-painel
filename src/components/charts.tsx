@@ -205,3 +205,55 @@ function TooltipSvg({ x, y, W, linhas }: { x: number; y: number; W: number; linh
     </g>
   );
 }
+
+// ── Pizza ───────────────────────────────────────────────────────────────
+// Criado em 25/07/2026 a pedido dela, pra mostrar proporção: automações por
+// categoria e quantas gastam IA. Pizza serve pra "quanto de cada" — não para
+// evolução no tempo, que continua sendo linha ou barra.
+const CORES_PIZZA = ["#2D6B6B", "#A0583C", "#5A8F8F", "#C08457", "#7FA8A8", "#8C6B4F", "#456B74", "#B08968"];
+
+export function GraficoPizza({ fatias, altura = 200 }: {
+  fatias: { rotulo: string; valor: number }[];
+  altura?: number;
+}) {
+  const total = fatias.reduce((a, f) => a + f.valor, 0);
+  if (!total) {
+    return <p className="text-sm text-[var(--text-muted)] py-6 text-center">sem dados ainda</p>;
+  }
+  const R = 80, CX = 100, CY = 100;
+  let angulo = -Math.PI / 2; // começa no topo
+  const setores = fatias.map((f, i) => {
+    const fatia = (f.valor / total) * Math.PI * 2;
+    const x1 = CX + R * Math.cos(angulo), y1 = CY + R * Math.sin(angulo);
+    angulo += fatia;
+    const x2 = CX + R * Math.cos(angulo), y2 = CY + R * Math.sin(angulo);
+    const grande = fatia > Math.PI ? 1 : 0;
+    // uma fatia de 100% não fecha com arco: vira círculo inteiro
+    const d = fatias.length === 1
+      ? `M ${CX} ${CY - R} A ${R} ${R} 0 1 1 ${CX - 0.01} ${CY - R} Z`
+      : `M ${CX} ${CY} L ${x1} ${y1} A ${R} ${R} 0 ${grande} 1 ${x2} ${y2} Z`;
+    return { d, cor: CORES_PIZZA[i % CORES_PIZZA.length], ...f };
+  });
+
+  return (
+    <div className="flex flex-wrap items-center gap-4 justify-center">
+      <svg viewBox="0 0 200 200" style={{ height: altura, maxWidth: "100%" }} role="img"
+        aria-label={fatias.map((f) => `${f.rotulo}: ${f.valor}`).join(", ")}>
+        {setores.map((s) => (
+          <path key={s.rotulo} d={s.d} fill={s.cor} stroke="var(--bg-secondary)" strokeWidth="1.5" />
+        ))}
+      </svg>
+      <ul className="text-sm space-y-1 min-w-[140px]">
+        {setores.map((s) => (
+          <li key={s.rotulo} className="flex items-center gap-2">
+            <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: s.cor }} />
+            <span className="text-[var(--text-primary)] flex-1">{s.rotulo}</span>
+            <span className="text-[var(--text-secondary)] tabular-nums">
+              {s.valor} <span className="text-[var(--text-muted)]">({Math.round((s.valor / total) * 100)}%)</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

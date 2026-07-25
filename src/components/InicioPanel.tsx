@@ -26,17 +26,17 @@ export default function InicioPanel() {
 
   return (
     <div className="p-4 md:p-6 pt-0 w-full">
-      <section className="rounded-xl border border-[var(--border)] overflow-hidden max-w-[900px] mx-auto">
+      <section className="rounded-xl border border-[var(--border)] overflow-hidden max-w-[1150px] mx-auto">
         <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
           <span className="text-sm font-semibold text-[var(--text-primary)]">🏢 Escritório</span>
           <div className="flex items-center gap-1.5">
             <button onClick={() => setInteragindo(!interagindo)}
-              title={interagindo ? "Voltar a rolar a página com a rodinha" : "Deixar o escritório receber cliques e rolagem"}
+              title={interagindo ? "Enquanto está ligado, a rodinha do mouse mexe no escritório e não na página" : "Ligue pra clicar nos botões e no menu das squads aqui dentro"}
               className={`text-[11px] px-2 py-1 rounded cursor-pointer transition-all ${
                 interagindo ? "text-white" : "bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-125"
               }`}
               style={interagindo ? { background: "var(--accent, #2D6B6B)" } : undefined}>
-              {interagindo ? "🖱️ interagindo — clique pra soltar" : "🖱️ interagir"}
+              {interagindo ? "🖱️ clicando dentro — solte pra rolar a página" : "🖱️ clicar dentro do escritório"}
             </button>
             <button onClick={() => setOpenOfficeFullscreen(true)}
               className="text-[11px] px-2 py-1 rounded bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-125 cursor-pointer transition-all">
@@ -47,7 +47,7 @@ export default function InicioPanel() {
         {officeUrl ? (
           <iframe
             src={officeUrl}
-            className={`w-full border-0 h-[70vh] md:h-[78vh] ${interagindo ? "" : "pointer-events-none"}`}
+            className={`w-full border-0 h-[78vh] md:h-[86vh] ${interagindo ? "" : "pointer-events-none"}`}
             title="Escritório virtual"
             loading="lazy"
           />

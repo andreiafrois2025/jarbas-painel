@@ -5,7 +5,8 @@
 // Fonte: metrics-history.json publicado toda noite pelo metrics-snapshot.py.
 
 import { useState, useEffect } from "react";
-import { GraficoLinha, GraficoBarras } from "./charts";
+import { GraficoLinha, GraficoBarras, GraficoPizza } from "./charts";
+import { usePainel } from "@/lib/painel-context";
 import {
   useMetricsHistory, semanasOrdenadas, tempoRelativo,
 } from "@/lib/metrics";
@@ -283,67 +284,108 @@ function SecaoIAConstroi() {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function AbaGeral({ data, hoje, taxaSemanal, area }: {
+function AbaGeral({ data, hoje, taxaSemanal }: {
   data: any; hoje: any; taxaSemanal: { label: string; valor: number }[]; area: Area;
 }) {
-  const mostraConteudo = area !== "servidora";
+  const { collaborators, assignments } = usePainel();
 
-  // Tiles honestos: só mostra número onde a métrica existe pra área escolhida.
-  const tiles: [string | number, string][] = [[EQUIPE.length, "agentes na equipe"]];
-  if (mostraConteudo) {
-    tiles.push([hoje.fila?.cards_gerados_total ?? "—", "notícias e dicas curadas"]);
-    tiles.push([hoje.enviados_total ?? "—", "posts publicados"]);
-  }
-  if (area === "conteudo") {
-    tiles.push([`${Math.round(hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0)}h`, "economizadas em conteúdo"]);
-  } else if (area === "servidora") {
-    tiles.push(hoje.horas_trabalho != null
-      ? [`${Math.round(hoje.horas_trabalho)}h`, "economizadas no serviço público"]
-      : ["—", "economizadas no serviço público (medição chega com o hub IGAM)"]);
-  } else {
-    tiles.push([`${Math.round(hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0)}h`, "economizadas em conteúdo"]);
-    tiles.push(hoje.horas_trabalho != null
-      ? [`${Math.round(hoje.horas_trabalho)}h`, "economizadas no serviço público"]
-      : ["—", "economizadas no serviço público (medição chega com o hub IGAM)"]);
-  }
+  // 25/07 (tarde) — o Painel Geral passou a ser sobre o ECOSSISTEMA, não sobre
+  // conteúdo. Pedido dela: "coisas gerais assim, do ecossistema".
+  // Regra que ela deu e vale pra tudo aqui: sempre TOTAL DA VIDA + ÚLTIMOS 30
+  // DIAS, pra mostrar o que já foi feito e a evolução.
+  const dias: any[] = data?.days ?? [];
+  const ultimos = (n: number) => dias.slice(-n);
+
+  const somaAgentes = (janela: any[]) => {
+    const acc: Record<string, number> = {};
+    for (const d of janela) {
+      for (const [quem, qtd] of Object.entries((d.atividades_por_agente ?? {}) as Record<string, number>)) {
+        acc[quem] = (acc[quem] ?? 0) + qtd;
+      }
+    }
+    return acc;
+  };
+
+  const hojePorAgente = (hoje?.atividades_por_agente ?? {}) as Record<string, number>;
+  const mesPorAgente = somaAgentes(ultimos(30));
+  const totalHoje = Object.values(hojePorAgente).reduce((a, b) => a + b, 0);
+  const totalMes = Object.values(mesPorAgente).reduce((a, b) => a + b, 0);
+
+  // Horas: o snapshot guarda o acumulado do dia, então o total é o último valor
+  // e a evolução é a diferença pro começo da janela.
+  const horasHoje = hoje?.horas_economizadas ?? 0;
+  const horas30 = (() => {
+    const janela = ultimos(30);
+    if (janela.length < 2) return null;
+    return Math.max(0, (janela[janela.length - 1]?.horas_economizadas ?? 0) - (janela[0]?.horas_economizadas ?? 0));
+  })();
+
+  const r = hoje?.resumo_automacoes;
+  const porCategoria = (() => {
+    if (!r?.itens) return [];
+    const m = new Map<string, number>();
+    for (const i of r.itens) m.set(i.categoria || "outros", (m.get(i.categoria || "outros") ?? 0) + 1);
+    return [...m.entries()].map(([rotulo, valor]) => ({ rotulo, valor })).sort((a, b) => b.valor - a.valor);
+  })();
+
+  const emBarras = (obj: Record<string, number>) =>
+    Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([label, valor]) => ({ label, valor }));
+
+  const cards: [string | number, string, string?][] = [
+    [`${Math.round(horasHoje)}h`, "horas economizadas no total", "desde que começamos a medir"],
+    [horas30 == null ? "—" : `${Math.round(horas30)}h`, "nos últimos 30 dias", horas30 == null ? "precisa de mais dias de histórico" : undefined],
+    [collaborators.length, "agentes na equipe"],
+    [assignments.length, "assistentes em uso"],
+    [totalMes || "—", "atividades nos últimos 30 dias", "feitas pelos agentes, sozinhos"],
+    [totalHoje || "—", "atividades hoje"],
+  ];
 
   return (
     <div className="space-y-5">
-      {/* 25/07 (tarde) — recomposta com ela. O problema não era o tamanho da
-          página, era a ORDEM e o peso: um número gigante, um gráfico gigante e
-          a equipe lá embaixo, tudo exigindo rolagem.
-
-          Agora: a faixa de números (o resumo) fica no topo, e abaixo dela a
-          página se divide em duas colunas — à esquerda o que se OLHA (gráfico),
-          à direita o que se CONSULTA (a tese do custo e o time). Cabe numa
-          tela, que era o pedido original. */}
       <section>
         <p className="text-xs uppercase tracking-[0.3em] mb-4" style={{ color: "#A0583C" }}>
-          Minha fábrica com IA
+          Meu ecossistema
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {tiles.map(([v, r]) => (
-            <div key={String(r)} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
-              <div className="text-3xl md:text-4xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{v}</div>
-              <div className="mt-1.5 text-xs text-[var(--text-secondary)]">{r}</div>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          {cards.map(([v, r1, sub]) => (
+            <div key={String(r1)} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
+              <div className="text-3xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{v}</div>
+              <div className="mt-1.5 text-xs text-[var(--text-secondary)]">{r1}</div>
+              {sub && <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">{sub}</div>}
             </div>
           ))}
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr] items-start">
-        <div className="min-w-0">
-          {mostraConteudo ? (
-            <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
-              sub="% das pautas propostas pela IA que eu aprovo, semana a semana">
-              <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
-            </CartaoGrafico>
-          ) : (
-            <CartaoGrafico titulo="Aprovação de pautas 📈" sub="medição chega com o hub IGAM">
-              <p className="text-sm text-[var(--text-secondary)] py-6 text-center">—</p>
-            </CartaoGrafico>
-          )}
-        </div>
+      <div className="grid gap-4 lg:grid-cols-2 items-start">
+        <CartaoGrafico titulo="Atividades por agente — hoje" sub="quem trabalhou desde a meia-noite">
+          {totalHoje ? <GraficoBarras pontos={emBarras(hojePorAgente)} />
+            : <p className="text-sm text-[var(--text-muted)] py-6 text-center">nenhuma atividade registrada hoje ainda</p>}
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="Atividades por agente — últimos 30 dias"
+          sub={`somando os ${Math.min(dias.length, 30)} dias que já temos guardados`}>
+          {totalMes ? <GraficoBarras pontos={emBarras(mesPorAgente)} />
+            : <p className="text-sm text-[var(--text-muted)] py-6 text-center">ainda sem histórico suficiente</p>}
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="Automações por categoria" sub={`${r?.total ?? 0} no relógio da VPS`}>
+          <GraficoPizza fatias={porCategoria} />
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="Quanto do que roda gasta IA"
+          sub="todas foram construídas com IA — poucas precisam dela pra rodar">
+          <GraficoPizza fatias={r ? [
+            { rotulo: "Roda sem IA", valor: r.sem_ia },
+            { rotulo: "Consome IA", valor: r.com_ia },
+          ] : []} />
+        </CartaoGrafico>
+
+        <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
+          sub="% do que a IA propõe que eu aprovo, semana a semana"
+          >
+          <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
+        </CartaoGrafico>
 
         <div className="space-y-4">
           <SecaoIAConstroi />
@@ -358,106 +400,77 @@ function AbaGeral({ data, hoje, taxaSemanal, area }: {
 function AbaProducao({ data, hoje, taxaSemanal, area }: {
   data: any; hoje: any; taxaSemanal: { label: string; valor: number; detalhe?: string }[]; area: Area;
 }) {
+  // 25/07 (tarde) — reescrita com a regra dela: "pensar sempre em total que já
+  // foi feito na vida e total dos últimos 30 e 7 dias, pra demonstrar tudo que
+  // já foi feito e a evolução".
+  //
+  // Esta aba é sobre CONTEÚDO. O que é do ecossistema mudou pro Painel Geral, e
+  // o que é do trabalho de servidora tem cards próprios no fim.
+  const dias: any[] = data?.days ?? [];
   const mostraConteudo = area !== "servidora";
+
   const enviosSemana = semanasOrdenadas(data.envios_semanas).map((s) => ({
     label: s.label, valor: s.valor as number,
   }));
-  const porAgente = Object.entries((hoje.atividades_por_agente ?? {}) as Record<string, number>)
-    .sort((a, b) => b[1] - a[1]);
-  const icones: Record<string, string> = Object.fromEntries(EQUIPE.map(([i, n]) => [n, i]));
+
+  // Diferença entre o começo e o fim da janela = o que aconteceu nela.
+  const noPeriodo = (n: number, campo: (d: any) => number) => {
+    const janela = dias.slice(-n);
+    if (janela.length < 2) return null;
+    return Math.max(0, campo(janela[janela.length - 1]) - campo(janela[0]));
+  };
+  const enviados = (d: any) => d?.enviados_total ?? 0;
+  const enviados7 = noPeriodo(7, enviados);
+  const enviados30 = noPeriodo(30, enviados);
+
+  const cards: [string, string | number, string?][] = [
+    ["📤 Posts no grupo — total", hoje.enviados_total ?? "—", "desde o começo"],
+    ["📤 Nos últimos 30 dias", enviados30 ?? "—", enviados30 == null ? "precisa de mais histórico" : undefined],
+    ["📤 Nos últimos 7 dias", hoje.fila?.enviados_7d ?? enviados7 ?? "—"],
+    ["💡 Dicas no banco", hoje.dicas?.total ?? "—", `${hoje.dicas?.nunca_usadas ?? 0} nunca usadas`],
+    ["💡 Vezes que uma dica foi ao grupo", hoje.dicas?.envios_total ?? "—", "a mesma dica pode voltar"],
+    ["📰 Notícias e dicas curadas", hoje.fila?.cards_gerados_total ?? "—", "tudo que já passou pelo Radar"],
+    ["📥 Esperando sua avaliação", hoje.fila?.pendentes ?? "—"],
+    ["⏱️ Horas economizadas em conteúdo", `${Math.round(hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0)}h`],
+  ];
+
+  const cardsServidora: [string, string | number, string?][] = [
+    ["🤖 Squads executadas", hoje.jobs?.total ?? "—", `${hoje.jobs?.concluidos ?? 0} concluídas`],
+    ["🤖 Squads nos últimos 30 dias", hoje.jobs?.ultimos_30d ?? "—"],
+    ["⏱️ Horas no serviço público", hoje.horas_trabalho != null ? `${Math.round(hoje.horas_trabalho)}h` : "—",
+      hoje.horas_trabalho == null ? "medição chega com o hub IGAM" : undefined],
+  ];
+
+  const Bloco = ({ titulo, itens }: { titulo: string; itens: [string, string | number, string?][] }) => (
+    <section>
+      <p className="text-xs uppercase tracking-[0.3em] mb-3" style={{ color: "#A0583C" }}>{titulo}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {itens.map(([rotulo, valor, sub]) => (
+          <div key={rotulo} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-3.5">
+            <div className="text-2xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{valor}</div>
+            <div className="mt-1.5 text-xs text-[var(--text-secondary)]">{rotulo}</div>
+            {sub && <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">{sub}</div>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-2.5">
-        {mostraConteudo ? (
-          <Tile icone="📤" titulo="Posts no grupo IA" valor={hoje.enviados_total ?? "—"}
-            sub={`${hoje.fila?.enviados_7d ?? 0} nos últimos 7 dias`} />
-        ) : (
-          <Tile icone="📤" titulo="Posts no grupo IA" valor="—" sub="métrica de conteúdo" />
-        )}
-        {area === "servidora" ? (
-          <Tile icone="⏱️" titulo="Horas economizadas (serviço público)"
-            valor={hoje.horas_trabalho != null ? `${hoje.horas_trabalho}h` : "—"}
-            sub="medição chega com o hub IGAM" />
-        ) : (
-          <Tile icone="⏱️" titulo="Horas economizadas (conteúdo)" valor={`${hoje.horas_conteudo ?? hoje.horas_economizadas ?? 0}h`}
-            sub={area === "tudo" && hoje.horas_trabalho != null
-              ? `+ ${hoje.horas_trabalho}h no serviço público`
-              : area === "tudo" ? "serviço público: medição chega com o hub IGAM" : undefined} />
-        )}
-        {mostraConteudo ? (
-          <Tile icone="💡" titulo="Dicas do banco" valor={`${hoje.dicas?.usadas ?? 0}/${hoje.dicas?.total ?? 0}`}
-            sub="já usadas em posts" />
-        ) : (
-          <Tile icone="💡" titulo="Dicas do banco" valor="—" sub="métrica de conteúdo" />
-        )}
-        <Tile icone="🤖" titulo="Squads (jobs)" valor={hoje.jobs?.concluidos ?? 0}
-          sub={`concluídos · ${hoje.jobs?.ultimos_30d ?? 0} nos últimos 30 dias`} />
-      </div>
+    <div className="space-y-5">
+      {mostraConteudo && <Bloco titulo="Conteúdo — o que já saiu" itens={cards} />}
+      {area !== "conteudo" && <Bloco titulo="Trabalho de servidora" itens={cardsServidora} />}
 
-      <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[#E5DED4]">
-        <h3 className="font-semibold text-[var(--text-primary)]">Atividades de hoje por agente</h3>
-        <p className="text-xs text-[var(--text-secondary)] mb-3">
-          Execuções registradas no feed do escritório (envios, curadorias, rondas)
-        </p>
-        {porAgente.length === 0 ? (
-          <p className="text-sm text-[var(--text-secondary)]">Nenhuma atividade registrada hoje ainda.</p>
-        ) : (
-          <ul className="space-y-2">
-            {porAgente.map(([quem, n]) => (
-              <li key={quem} className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                <span className="w-28 shrink-0">{icones[quem] ?? "🤖"} {quem}</span>
-                <span className="h-3 rounded-full" style={{
-                  background: "#2D6B6B",
-                  width: `${Math.min(100, (n / Math.max(...porAgente.map(([, v]) => v))) * 100)}%`,
-                  minWidth: 12,
-                }} />
-                <span className="font-semibold">{n}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {mostraConteudo ? (
-        <div className="grid lg:grid-cols-2 gap-3">
-          <CartaoGrafico titulo="Aprendizado geral 📈"
-            sub="Taxa de aprovação dos cards do Radar por semana de criação">
-            <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
-          </CartaoGrafico>
-          <CartaoGrafico titulo="Posts enviados ao grupo por semana"
-            sub="Curadoria aprovada por você que chegou na comunidade">
+      {mostraConteudo && (
+        <div className="grid gap-4 lg:grid-cols-2 items-start">
+          <CartaoGrafico titulo="Posts enviados ao grupo, por semana"
+            sub="cada barra é uma semana, do domingo ao sábado">
             <GraficoBarras pontos={enviosSemana} />
           </CartaoGrafico>
-        </div>
-      ) : (
-        <CartaoGrafico titulo="Gráficos de conteúdo" sub="medição chega com o hub IGAM">
-          <p className="text-sm text-[var(--text-secondary)] py-6 text-center">—</p>
-        </CartaoGrafico>
-      )}
-
-      {/* Evolução individual por agente (pedido dela 12/07) — só faz sentido em conteúdo */}
-      {mostraConteudo && (
-        <div className="grid lg:grid-cols-3 gap-3">
-          {([
-            ["mike", "🔍 Mike — notícias", "aprovação das notícias propostas"],
-            ["izzy", "✍️ Izzy — dicas", "aprovação das dicas propostas"],
-            ["reels", "🎬 Reels — pautas", "aprovação das pautas de reel"],
-          ] as const).map(([chave, titulo, sub]) => {
-            const serie = semanasOrdenadas<{ aprovados: number; descartados: number; taxa: number | null }>(
-              data.radar_semanas_por_agente?.[chave])
-              .filter((s) => s.valor?.taxa !== null && s.valor?.taxa !== undefined)
-              .map((s) => ({
-                label: s.label,
-                valor: Math.round((s.valor.taxa as number) * 100),
-                detalhe: `${s.valor.aprovados} aprov. / ${s.valor.descartados} desc.`,
-              }));
-            return (
-              <CartaoGrafico key={chave} titulo={titulo} sub={sub}>
-                <GraficoLinha pontos={serie} unidade="%" maxY={100} altura={170} />
-              </CartaoGrafico>
-            );
-          })}
+          <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
+            sub="% dos cards propostos que eu aprovo, por semana">
+            <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
+          </CartaoGrafico>
         </div>
       )}
     </div>

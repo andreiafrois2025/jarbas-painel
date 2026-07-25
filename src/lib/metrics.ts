@@ -82,10 +82,35 @@ export function useMetricsHistory(refreshMs = 0) {
 // Ordena chaves "2026-W27" cronologicamente e devolve rótulo curto "S27".
 // Tolera mapa ausente: o JSON publicado pode ser de uma versão mais antiga
 // do coletor (foi exatamente isso que derrubou a página em 12/07).
+/** Data do domingo da semana ISO (ex.: "2026-W30" → 19/07). */
+function domingoDaSemana(chave: string): Date | null {
+  const [ano, sem] = chave.split("-W");
+  if (!ano || !sem) return null;
+  // 4 de janeiro cai sempre na semana 1 do padrão ISO
+  const quatro = new Date(Date.UTC(Number(ano), 0, 4));
+  const segundaDaUm = new Date(quatro);
+  segundaDaUm.setUTCDate(quatro.getUTCDate() - ((quatro.getUTCDay() + 6) % 7));
+  const segunda = new Date(segundaDaUm);
+  segunda.setUTCDate(segundaDaUm.getUTCDate() + (Number(sem) - 1) * 7);
+  return segunda;
+}
+
 export function semanasOrdenadas<T>(mapa: Record<string, T> | undefined | null): { key: string; label: string; valor: T }[] {
+  // 25/07/2026: o rótulo era "S30" — número de semana ISO, que ninguém lê de
+  // cabeça. Ela pediu data: "queria usar mês dia, dia tal a dia tal".
+  const dd = (d: Date) => `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
   return Object.keys(mapa ?? {})
     .sort()
-    .map((k) => ({ key: k, label: `S${k.split("-W")[1]}`, valor: (mapa as Record<string, T>)[k] }));
+    .map((k) => {
+      const ini = domingoDaSemana(k);
+      let label = `S${k.split("-W")[1]}`;
+      if (ini) {
+        const fim = new Date(ini);
+        fim.setUTCDate(ini.getUTCDate() + 6);
+        label = `${dd(ini)}–${dd(fim)}`;
+      }
+      return { key: k, label, valor: (mapa as Record<string, T>)[k] };
+    });
 }
 
 export function tempoRelativo(iso: string | null): string {
