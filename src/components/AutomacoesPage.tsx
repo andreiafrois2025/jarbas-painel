@@ -42,7 +42,7 @@ type Gatilho = "relogio" | "pedido" | "evento";
 // assunto, mas Squad é QUEM EXECUTA e Reage a evento é QUANDO DISPARA. A
 // Andréia pegou: "existe o squad de criar carrossel que é criação de conteúdo".
 //
-//   CATEGORIA  = sobre o que é           (Conteúdo, Vídeo, Escola, Licitação…)
+//   CATEGORIA  = sobre o que é           (Conteúdo, Vídeo, Escola, Trabalho…)
 //   TIPO       = quem faz o trabalho     (squad, você, o sistema)
 //   GATILHO    = o que dispara           (relógio, você pede, um evento)
 //
@@ -57,6 +57,11 @@ const TIPOS: Record<Tipo, { icone: string; rotulo: string; explica: string }> = 
 
 // Categoria dos fluxos que não têm horário no relógio (os que têm vêm com a
 // categoria pronta da squad-api). Casado pelo título, sem acento e sem caixa.
+// 25/07 (tarde): "⚖️ Licitação" virou "🏛️ Trabalho técnico". Licitação era um
+// fluxo só e não ia crescer; o guarda-chuva certo é o ofício técnico dela como
+// servidora — licitação, geoprocessamento, gestão da informação. Fora de
+// propósito: "IGAM" não serve como nome, porque coisa do Igam também aparece em
+// Agenda & Rotina; e gestão de pessoas, quando vier, merece categoria própria.
 const CATEGORIA_POR_FLUXO: Record<string, string> = {
   "briefing matinal telegram (donna)": "🗓️ Agenda & Rotina",
   "briefing matinal whatsapp (donna)": "🗓️ Agenda & Rotina",
@@ -68,7 +73,7 @@ const CATEGORIA_POR_FLUXO: Record<string, string> = {
   "squad: instagram carrossel": "📰 Conteúdo & Notícias",
   "reels-studio: edicao automatica (\"meu capcut\")": "🎬 Vídeo & Reels",
   "financas whatsapp → louis → notion": "💰 Finanças",
-  "squad: licitacao igam": "⚖️ Licitação",
+  "squad: licitacao igam": "🏛️ Trabalho técnico",
   "squad: criar agente": "🧰 Agentes & Ferramentas",
 };
 const CATEGORIA_PADRAO = "🩺 Sistema & Saúde";
