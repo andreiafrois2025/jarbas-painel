@@ -39,6 +39,8 @@ export interface AutomacaoApiItem {
   log?: string | null; // arquivo de log de onde sai o sinal de vida
   log_compartilhado?: boolean; // outro cron escreve no mesmo log → sinal indireto
   ultima_execucao?: string | null; // ISO do mtime do log; null = não dá pra saber
+  usa_ia?: boolean; // consome IA na EXECUÇÃO (todas foram construídas com IA)
+  custo_execucao?: string; // descrição honesta do custo de rodar
 }
 
 export interface CriacaoApiItem {

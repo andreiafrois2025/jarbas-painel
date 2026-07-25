@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FlowDoc } from "@/lib/types";
 import { getFlowDocs, duplicateFlowDoc, updateFlowDoc } from "@/lib/storage";
+import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
+import { interpretaCron, formataProxima } from "@/lib/cron";
 import FlowCanvas from "./FlowCanvas";
 import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 
@@ -21,6 +23,12 @@ export default function FlowsPageV2() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  // 25/07 (tarde): a janelinha que abria por cima do card virou ESTA página.
+  // Ela pediu: "essa janela poderia ser a página do fluxo, ocupando a tela toda,
+  // e no campo como funciona por dentro aparecer o fluxo direto". Então o
+  // cabeçalho ganhou o que estava lá (quando roda, próxima, última, comando) e
+  // o desenho ocupa o resto — já editável, sem precisar de outro botão.
+  const [automacoes, setAutomacoes] = useState<AutomacaoApiItem[]>([]);
 
   const load = async (): Promise<FlowDoc[]> => {
     setLoading(true);
@@ -35,6 +43,10 @@ export default function FlowsPageV2() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchCatalogo().then((c) => setAutomacoes(c?.automacoes || []));
+  }, []);
 
   useEffect(() => {
     // Deep-link: /producao/fluxos?fluxo=<id>&cat=<categoria> sobrevive ao F5
@@ -65,6 +77,11 @@ export default function FlowsPageV2() {
   // card de Automações, então o Voltar desfaz exatamente esse passo.
 
   const selected = flows.find((f) => f.id === selectedId) || null;
+  const semAcento = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const automacao = selected
+    ? automacoes.find((a) => a.flow && semAcento(a.flow) === semAcento(selected.title)) || null
+    : null;
+  const cron = automacao ? interpretaCron(automacao.agenda) : null;
 
   const handleDuplicate = async (id: string) => {
     const f = await duplicateFlowDoc(id);
@@ -144,10 +161,35 @@ export default function FlowsPageV2() {
         </div>
         {selected.description && (
           <div className="bg-[var(--bg-tertiary)] px-4 py-2 text-xs text-[var(--text-secondary)] shrink-0 border-b border-[var(--border)]">
-            {selected.description}
+            {selected.description.replace(/^\[[^\]]+\]\s*/, "")}
           </div>
         )}
-        <div style={{ height: "75vh", minHeight: 500, position: "relative" }}>
+
+        {automacao && cron && (
+          <div className="shrink-0 border-b border-[var(--border)] bg-[var(--bg-primary)] px-4 py-3">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <Dado rotulo="Quando roda" valor={cron.descricao} extra={`${automacao.agenda} (UTC)`} />
+              <Dado rotulo="Próxima" valor={formataProxima(cron.proxima)} />
+              <Dado rotulo="Última execução" valor={quandoFoi(automacao.ultima_execucao)}
+                extra={!automacao.log ? "não deixa registro" : automacao.log_compartilhado ? "sinal indireto" : undefined} />
+              <Dado
+                rotulo="Custo por execução"
+                valor={automacao.usa_ia ? "🤖 usa IA" : "🐍 sem IA"}
+                extra={automacao.custo_execucao}
+              />
+            </div>
+            <details className="mt-2">
+              <summary className="text-[11px] text-[var(--text-muted)] cursor-pointer select-none">
+                comando que roda na VPS
+              </summary>
+              <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded p-2 border border-[var(--border)]">
+                {automacao.comando}
+              </pre>
+            </details>
+          </div>
+        )}
+
+        <div className="flex-1 min-h-[420px] relative">
           <FlowCanvas flow={selected} onChange={handleCanvasChange} />
         </div>
       </div>
@@ -186,4 +228,25 @@ export default function FlowsPageV2() {
       )}
     </div>
   );
+}
+
+function Dado({ rotulo, valor, extra }: { rotulo: string; valor: string; extra?: string }) {
+  return (
+    <div className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)]">
+      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{rotulo}</p>
+      <p className="text-sm text-[var(--text-primary)]">{valor}</p>
+      {extra && <p className="text-[10px] text-[var(--text-muted)] mt-0.5 break-words">{extra}</p>}
+    </div>
+  );
+}
+
+function quandoFoi(iso: string | null | undefined): string {
+  if (!iso) return "não sei dizer";
+  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return "agora mesmo";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  return `há ${d} dia${d > 1 ? "s" : ""}`;
 }

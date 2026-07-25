@@ -5,19 +5,8 @@ import { useRouter } from "next/navigation";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { getFlowDocs, addFlowDoc } from "@/lib/storage";
 import type { FlowDoc, FlowCategory } from "@/lib/types";
-import dynamic from "next/dynamic";
 import { interpretaCron, formataProxima, type CronInfo } from "@/lib/cron";
 
-// O desenho aparece só quando você abre o detalhe de um card — então o editor
-// (~75 KB) não precisa vir junto com a lista (F7, 25/07/2026).
-const FlowCanvas = dynamic(() => import("./flow/FlowCanvas"), {
-  loading: () => (
-    <div className="h-full flex items-center justify-center text-xs text-[var(--text-muted)]">
-      desenhando…
-    </div>
-  ),
-  ssr: false,
-});
 
 // =============================================================
 // ⚡ Automações — a tela única do maquinário que roda sozinho.
@@ -78,6 +67,25 @@ const CATEGORIA_POR_FLUXO: Record<string, string> = {
 };
 const CATEGORIA_PADRAO = "🩺 Sistema & Saúde";
 
+// Custo de execução dos fluxos que não têm horário no relógio (os que têm vêm
+// com o custo pronto da squad-api). A tese dela: "uso IA pra CONSTRUIR
+// automações que depois rodam SEM IA" — então o que importa aqui é se a
+// automação gasta token TODA VEZ QUE RODA, não se foi feita com IA.
+const CUSTO_POR_FLUXO: Record<string, { usaIA: boolean; custo: string }> = {
+  "briefing matinal telegram (donna)": { usaIA: false, custo: "zero — template fixo com agenda e tarefas" },
+  "briefing matinal whatsapp (donna)": { usaIA: false, custo: "zero — template fixo" },
+  "alerta de compromisso proximo (donna)": { usaIA: false, custo: "zero — lê o calendário" },
+  "resumo diario de pendentes ia (12h utc)": { usaIA: false, custo: "zero — conta cards" },
+  "noticias uau (fluxo prioritario)": { usaIA: true, custo: "escrita via Claude (assinatura)" },
+  "donna captura ideias de conteudo (whatsapp)": { usaIA: true, custo: "Gemini, centavos por captura" },
+  "minha semana de conteudo (rotina)": { usaIA: false, custo: "zero — é a sua rotina, não um programa" },
+  "squad: instagram carrossel": { usaIA: true, custo: "assinatura Claude, sob demanda" },
+  "squad: licitacao igam": { usaIA: true, custo: "assinatura Claude, sob demanda" },
+  "squad: criar agente": { usaIA: true, custo: "assinatura Claude, sob demanda" },
+  "reels-studio: edicao automatica (\"meu capcut\")": { usaIA: false, custo: "zero — ffmpeg + Whisper na própria VPS" },
+  "financas whatsapp → louis → notion": { usaIA: true, custo: "Gemini por registro" },
+};
+
 const GATILHOS: { key: Gatilho; icone: string; titulo: string; explica: string }[] = [
   { key: "relogio", icone: "⏰", titulo: "No relógio", explica: "dispara sozinho em horário fixo (crontab da VPS)" },
   { key: "pedido", icone: "👋", titulo: "Quando você pede", explica: "você aciona e ele roda — squads e rotinas manuais" },
@@ -123,6 +131,8 @@ interface ItemUnificado {
   gatilho: Gatilho;
   categoria: string;
   tipo: Tipo;
+  usaIA: boolean;
+  custo: string;
   cron: AutomacaoApiItem | null;
   cronInfo: CronInfo | null;
   fluxo: FlowDoc | null;
@@ -148,7 +158,7 @@ export default function AutomacoesPage() {
   // padrão porque é como a Andréia procura ("como tá o fluxo de reels?"); por
   // GATILHO serve pra saber o que está no ar. A escolha fica na URL, então
   // sobrevive ao F5 e pode ser guardada nos favoritos.
-  const [visao, setVisao] = useState<"categoria" | "tipo" | "gatilho">("categoria");
+  const [visao, setVisao] = useState<"categoria" | "tipo" | "custo" | "gatilho">("categoria");
   const [relogioMudouEm, setRelogioMudouEm] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -169,7 +179,7 @@ export default function AutomacoesPage() {
 
   useEffect(() => {
     const v = new URLSearchParams(window.location.search).get("visao");
-    if (v === "gatilho" || v === "categoria" || v === "tipo") setVisao(v);
+    if (v === "gatilho" || v === "categoria" || v === "tipo" || v === "custo") setVisao(v);
   }, []);
 
   // 25/07/2026 — o "Voltar" do navegador precisa fechar a janela do card.
@@ -184,9 +194,19 @@ export default function AutomacoesPage() {
   // empilha uma entrada, Voltar desfaz essa entrada e fecha a janela. Só depois
   // disso o Voltar sai da página, como antes.
   const marcouHistorico = useRef(false);
-  const navPendente = useRef<string | null>(null);
 
+  // 25/07 (tarde): clicar num card agora NAVEGA pra página do fluxo, que passou
+  // a mostrar tudo que a janelinha mostrava — e em tela cheia, com o desenho já
+  // editável. Ela pediu isso depois de gravar a tela no celular pra conseguir
+  // ler a janela que passava rápido demais.
+  //
+  // A janela só sobrevive como plano B: pras poucas automações que ainda não
+  // têm fluxo desenhado, e que portanto não têm página pra onde ir.
   const abrirCard = (i: ItemUnificado) => {
+    if (i.fluxo) {
+      router.push(`/producao/fluxos?fluxo=${i.fluxo.id}`);
+      return;
+    }
     setAberto(i);
     window.history.pushState({ janelaJarbas: true }, "");
     marcouHistorico.current = true;
@@ -201,28 +221,8 @@ export default function AutomacoesPage() {
     }
   };
 
-  // Ir pro editor: consome a entrada da janela ANTES de navegar, senão o Voltar
-  // lá de dentro exigiria dois cliques pra sair de Automações.
-  const abrirEditor = (idFluxo: string) => {
-    const destino = `/producao/fluxos?fluxo=${idFluxo}`;
-    setAberto(null);
-    if (marcouHistorico.current) {
-      marcouHistorico.current = false;
-      navPendente.current = destino;
-      window.history.back();
-    } else {
-      router.push(destino);
-    }
-  };
-
   useEffect(() => {
     const aoVoltar = () => {
-      if (navPendente.current) {
-        const destino = navPendente.current;
-        navPendente.current = null;
-        router.push(destino);
-        return;
-      }
       // Voltou com a janela aberta: fecha a janela e fica na página.
       marcouHistorico.current = false;
       setAberto(null);
@@ -232,7 +232,7 @@ export default function AutomacoesPage() {
     return () => window.removeEventListener("popstate", aoVoltar);
   }, [router]);
 
-  const trocaVisao = (v: "categoria" | "tipo" | "gatilho") => {
+  const trocaVisao = (v: "categoria" | "tipo" | "custo" | "gatilho") => {
     setVisao(v);
     const params = new URLSearchParams(window.location.search);
     params.set("visao", v);
@@ -256,6 +256,8 @@ export default function AutomacoesPage() {
         descricao: c.descricao || "",
         gatilho: "relogio",
         tipo: "automatico",
+        usaIA: !!c.usa_ia,
+        custo: c.custo_execucao || (c.usa_ia ? "consome IA" : "zero"),
         categoria: c.categoria || CATEGORIA_PADRAO,
         cron: c,
         cronInfo: info,
@@ -280,6 +282,8 @@ export default function AutomacoesPage() {
         descricao: (f.description || "").replace(/^\[[^\]]+\]\s*/, ""),
         gatilho,
         tipo,
+        usaIA: CUSTO_POR_FLUXO[normaliza(f.title)]?.usaIA ?? false,
+        custo: CUSTO_POR_FLUXO[normaliza(f.title)]?.custo ?? "não sei dizer",
         categoria: marcada?.[1] || CATEGORIA_POR_FLUXO[normaliza(f.title)] || CATEGORIA_PADRAO,
         cron: null,
         cronInfo: null,
@@ -316,6 +320,16 @@ export default function AutomacoesPage() {
           .sort((a, b) =>
             (a.cronInfo?.frequenciaMin ?? Number.MAX_SAFE_INTEGER) -
             (b.cronInfo?.frequenciaMin ?? Number.MAX_SAFE_INTEGER)),
+      })).filter((g) => g.itens.length);
+    }
+    if (visao === "custo") {
+      const grupos = [
+        { chave: "sem", titulo: "🐍 Roda sem gastar IA", explica: "custo zero por execução — foi construída com IA, mas roda com Python", filtro: (i: ItemUnificado) => !i.usaIA },
+        { chave: "com", titulo: "🤖 Consome IA quando roda", explica: "gasta token ou crédito a cada execução", filtro: (i: ItemUnificado) => i.usaIA },
+      ];
+      return grupos.map((g) => ({
+        chave: g.chave, titulo: g.titulo, explica: g.explica,
+        itens: filtrados.filter(g.filtro).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
       })).filter((g) => g.itens.length);
     }
     if (visao === "tipo") {
@@ -360,7 +374,7 @@ export default function AutomacoesPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
-              {([["categoria", "por categoria"], ["tipo", "por tipo"], ["gatilho", "por gatilho"]] as const).map(([v, r]) => (
+              {([["categoria", "por categoria"], ["tipo", "por tipo"], ["custo", "por custo"], ["gatilho", "por gatilho"]] as const).map(([v, r]) => (
                 <button
                   key={v}
                   onClick={() => trocaVisao(v)}
@@ -415,6 +429,9 @@ export default function AutomacoesPage() {
                 {itens.filter((i) => i.desenhoAtrasado).length} com fluxo possivelmente atrasado
               </span>
             )}
+            <span className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]">
+              🐍 {itens.filter((i) => !i.usaIA).length} rodam sem gastar IA
+            </span>
             <button
               onClick={() => setLegenda(!legenda)}
               className="px-3 py-1.5 rounded-full underline decoration-dotted text-[var(--text-secondary)] cursor-pointer"
@@ -523,6 +540,11 @@ export default function AutomacoesPage() {
                       </p>
                     </div>
                     <div className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)]">
+                      <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Custo por execução</p>
+                      <p className="text-sm text-[var(--text-primary)]">{aberto.usaIA ? "🤖 usa IA" : "🐍 sem IA"}</p>
+                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">{aberto.custo}</p>
+                    </div>
+                    <div className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)]">
                       <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">Próxima</p>
                       <p className="text-sm text-[var(--text-primary)]">
                         {formataProxima(aberto.cronInfo.proxima)}
@@ -563,29 +585,16 @@ export default function AutomacoesPage() {
                 </>
               )}
 
-              {/* O desenho aparece aqui mesmo — é o "ver por dentro" do card */}
+              {/* Esta janela só abre pra automação SEM fluxo — quem tem fluxo
+                  vai direto pra página dele, que mostra tudo isto em tela cheia. */}
               <div>
                 <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)] mb-1">
                   Como funciona por dentro
                 </p>
-                {aberto.fluxo ? (
-                  <>
-                    <div className="h-[380px] rounded-lg border border-[var(--border)] overflow-hidden bg-[var(--bg-secondary)]">
-                      <FlowCanvas flow={aberto.fluxo} />
-                    </div>
-                    <button
-                      onClick={() => abrirEditor(aberto.fluxo!.id)}
-                      className="mt-2 text-xs px-3 py-1.5 rounded-full border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                    >
-                      ✏️ Abrir no editor de fluxos
-                    </button>
-                  </>
-                ) : (
-                  <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-lg p-3 border border-[var(--border)]">
-                    Essa automação ainda não tem desenho. Peça pro Claude criar — ou desenhe
-                    você mesma em Produção › Fluxos.
-                  </p>
-                )}
+                <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-lg p-3 border border-[var(--border)]">
+                  Essa automação ainda não tem fluxo desenhado, então não há o que mostrar aqui.
+                  Peça pro Claude desenhar — ou desenhe você mesma pelo botão ＋ Novo fluxo.
+                </p>
               </div>
             </div>
           </div>
@@ -609,12 +618,24 @@ function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }
           {SELO[i.saude].bolinha} {SELO[i.saude].texto}
         </span>
       </div>
-      <span
-        className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-secondary)]"
-        title={TIPOS[i.tipo].explica}
-      >
-        {TIPOS[i.tipo].icone} {TIPOS[i.tipo].rotulo}
-      </span>
+      <div className="flex flex-wrap gap-1 mt-1">
+        <span
+          className="text-[10px] px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-secondary)]"
+          title={TIPOS[i.tipo].explica}
+        >
+          {TIPOS[i.tipo].icone} {TIPOS[i.tipo].rotulo}
+        </span>
+        <span
+          className={`text-[10px] px-2 py-0.5 rounded-full border ${
+            i.usaIA
+              ? "border-[var(--terra,#A0583C)] text-[#A0583C] dark:text-amber-400"
+              : "border-emerald-600/40 text-emerald-700 dark:text-emerald-400"
+          }`}
+          title={i.custo}
+        >
+          {i.usaIA ? "🤖 usa IA" : "🐍 sem IA"}
+        </span>
+      </div>
       {i.descricao && <p className="text-xs text-[var(--text-secondary)] mt-1">{i.descricao}</p>}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-[var(--text-muted)]">
         {i.cronInfo ? (
