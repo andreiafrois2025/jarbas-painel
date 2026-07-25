@@ -208,7 +208,7 @@ export const PERCURSOS: Percurso[] = [
     titulo: "Captura da Donna",
     pergunta: "Mandei um áudio ou print pra Donna — onde isso foi parar?",
     resumo:
-      "Você fala com a Donna no WhatsApp e a coisa aparece organizada no Notion, sem você abrir o Notion.",
+      "Você fala com a Donna no WhatsApp e a coisa aparece organizada no Notion, sem você abrir o Notion. Sete destinos possíveis, e ela escolhe.",
     passos: [
       {
         icone: "📱",
@@ -224,12 +224,20 @@ export const PERCURSOS: Percurso[] = [
         detalhe: "Usa Gemini pra classificar. Centavos por captura.",
       },
       {
+        icone: "🖼️",
+        titulo: "A imagem sobe junto",
+        tipo: "automacao",
+        fluxo: "Donna guarda filme, livro e compra",
+        detalhe:
+          "O print vai anexado no card, não só o texto lido dele. Se o upload falhar, o item é salvo assim mesmo — melhor sem foto do que sem registro.",
+      },
+      {
         icone: "🗂️",
         titulo: "Vai pro banco certo do Notion",
         tipo: "guardado",
         onde: "Notion",
         detalhe:
-          "Tarefas, banco de Conteúdos (como ideia), Despejo ou demanda do Igam — cada um no seu lugar.",
+          "Tarefas · Conteúdos (como ideia) · Despejo · demanda do Igam · Filmes & Séries · Livros · Minha Lista de Desejos.",
       },
       {
         icone: "✅",

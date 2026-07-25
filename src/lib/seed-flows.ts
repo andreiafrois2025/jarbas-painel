@@ -697,6 +697,39 @@ const envioImediato: SeedFlow = {
   ],
 };
 
+
+const donnaGuardaPessoal: SeedFlow = {
+  title: "Donna guarda filme, livro e compra",
+  category: "automation",
+  description:
+    "Você manda um print ou áudio pra Donna no WhatsApp e a coisa aparece no banco certo do Notion, COM a imagem anexada. Nasceu em 25/07/2026 do pedido dela: ver um produto num story, printar, e não precisar abrir o Notion pra guardar.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Você manda print ou áudio", icon: "📱", details: "Pelo WhatsApp. Pode dizer o que é (\"filme\", \"série\", \"livro\", \"compras\") ou mandar só a imagem.", executor: "Andréia", tags: ["WhatsApp"] } },
+    { id: "2", type: "condition", position: col(1), data: { label: "Ela disse o que era?", icon: "❓", details: "Se disse, vale a palavra dela — sem adivinhação.\nSe não disse, a Donna OLHA a imagem e decide.", executor: "Donna" } },
+    { id: "3", type: "action", position: col(2, 100), data: { label: "Donna lê a imagem", icon: "👁️", details: "Capa de livro → livro.\nPôster ou trailer → filme.\nProduto com preço, story de loja → compra.\nNa dúvida entre dois, pergunta em UMA linha.", executor: "Donna (Gemini)", tags: ["Gemini"] } },
+    { id: "4", type: "action", position: col(3), data: { label: "Extrai o que dá pra ler", icon: "🔎", details: "Nome, autor, preço, onde assistir, link.\nO que não der pra ler fica em branco — não inventa.", executor: "Donna" } },
+    { id: "5", type: "action", position: col(4), data: { label: "Sobe a imagem pro Notion", icon: "🖼️", details: "A foto vai pro próprio Notion (API de upload), não como link externo. Se o upload falhar, o item é salvo assim mesmo — melhor sem foto do que sem registro.", executor: "captura_pessoal.py", tags: ["Notion"] } },
+    { id: "6", type: "end", position: col(5, 100), data: { label: "🎬 Filmes & Séries", icon: "🎬", details: "Status \"Quero assistir\". Campos: Tipo, Onde está, Sinopse, Capa.", executor: "Notion", tags: ["Notion"] } },
+    { id: "7", type: "end", position: col(5, 250), data: { label: "📚 Livros", icon: "📚", details: "Status \"Quero ler\". Campos: Autor, Descrição, Link para compra, Capa.", executor: "Notion", tags: ["Notion"] } },
+    { id: "8", type: "end", position: col(5, 400), data: { label: "🛍️ Minha Lista de Desejos", icon: "🛍️", details: "Status \"Desejo\", Prioridade \"Quero\". Campos: Preço, Link, Categoria, Imagem.", executor: "Notion", tags: ["Notion"] } },
+    { id: "9", type: "end", position: col(6), data: { label: "Confirma em 1 linha", icon: "✅", details: "Com o link do card, pra você conferir sem procurar.", executor: "Donna", tags: ["WhatsApp"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3", data: { label: "não disse" } },
+    { id: "e2-4", source: "2", target: "4", data: { label: "disse" } },
+    { id: "e3-4", source: "3", target: "4" },
+    { id: "e4-5", source: "4", target: "5" },
+    { id: "e5-6", source: "5", target: "6" },
+    { id: "e5-7", source: "5", target: "7" },
+    { id: "e5-8", source: "5", target: "8" },
+    { id: "e6-9", source: "6", target: "9" },
+    { id: "e7-9", source: "7", target: "9" },
+    { id: "e8-9", source: "8", target: "9" },
+  ],
+};
+
 export const SEED_FLOWS: SeedFlow[] = [
   // Automações
   briefingTelegram,
@@ -712,6 +745,7 @@ export const SEED_FLOWS: SeedFlow[] = [
   reelsStudio,
   radarParaInstagram,
   donnaCapturaIdeias,
+  donnaGuardaPessoal,
   aprendizEstilo,
   snapshotMetricas,
   alertaFalhasDonna,
