@@ -51,12 +51,19 @@ export default function FlowsPageV2() {
     });
   }, []);
 
+  // 25/07/2026: o "voltar" do navegador não voltava pra tela anterior — esta
+  // página reescrevia a entrada do histórico (replaceState) em vez de criar uma
+  // nova, então o navegador perdia a referência de onde a Andréia veio.
+  // Agora a URL só é sincronizada quando o fluxo muda POR DENTRO da tela, e o
+  // botão "Voltar" leva explicitamente pra Automações, que é a porta de entrada.
   useEffect(() => {
-    if (loading) return;
-    const params = new URLSearchParams();
-    if (selectedId) params.set("fluxo", selectedId);
-    window.history.replaceState(null, "", `${window.location.pathname}${params.toString() ? `?${params}` : ""}`);
-  }, [selectedId, loading]);
+    const aoVoltar = () => {
+      const f = new URLSearchParams(window.location.search).get("fluxo");
+      setSelectedId(f);
+    };
+    window.addEventListener("popstate", aoVoltar);
+    return () => window.removeEventListener("popstate", aoVoltar);
+  }, []);
 
   const selected = flows.find((f) => f.id === selectedId) || null;
 
@@ -81,10 +88,10 @@ export default function FlowsPageV2() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-4 py-2 flex items-center gap-3 shrink-0">
           <button
-            onClick={() => setSelectedId(null)}
-            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            onClick={() => router.push("/producao/automacoes")}
+            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
           >
-            ← Voltar
+            ← Voltar pras Automações
           </button>
           <h2 className="text-base font-semibold truncate flex-1">{selected.title}</h2>
           {selected.is_seed && (

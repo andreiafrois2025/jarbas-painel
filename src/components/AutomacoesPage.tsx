@@ -37,6 +37,42 @@ const FlowCanvas = dynamic(() => import("./flow/FlowCanvas"), {
 
 type Gatilho = "relogio" | "pedido" | "evento";
 
+// 25/07/2026 — TRÊS EIXOS, não um só. Antes eu tinha misturado tudo em
+// "categoria": "🤖 Squads" e "🔔 Reage a evento" apareciam ali como se fossem
+// assunto, mas Squad é QUEM EXECUTA e Reage a evento é QUANDO DISPARA. A
+// Andréia pegou: "existe o squad de criar carrossel que é criação de conteúdo".
+//
+//   CATEGORIA  = sobre o que é           (Conteúdo, Vídeo, Escola, Licitação…)
+//   TIPO       = quem faz o trabalho     (squad, você, o sistema)
+//   GATILHO    = o que dispara           (relógio, você pede, um evento)
+//
+// A squad do carrossel agora é: categoria Conteúdo · tipo Squad · gatilho Você pede.
+type Tipo = "squad" | "manual" | "automatico";
+
+const TIPOS: Record<Tipo, { icone: string; rotulo: string; explica: string }> = {
+  squad: { icone: "🤖", rotulo: "Squad", explica: "um time de agentes trabalhando em etapas" },
+  manual: { icone: "✋", rotulo: "Você faz", explica: "rotina sua, desenhada pra não se perder" },
+  automatico: { icone: "⚙️", rotulo: "O sistema faz", explica: "roda sozinho, sem ninguém tocar" },
+};
+
+// Categoria dos fluxos que não têm horário no relógio (os que têm vêm com a
+// categoria pronta da squad-api). Casado pelo título, sem acento e sem caixa.
+const CATEGORIA_POR_FLUXO: Record<string, string> = {
+  "briefing matinal telegram (donna)": "🗓️ Agenda & Rotina",
+  "briefing matinal whatsapp (donna)": "🗓️ Agenda & Rotina",
+  "alerta de compromisso proximo (donna)": "🗓️ Agenda & Rotina",
+  "resumo diario de pendentes ia (12h utc)": "🗓️ Agenda & Rotina",
+  "noticias uau (fluxo prioritario)": "📰 Conteúdo & Notícias",
+  "donna captura ideias de conteudo (whatsapp)": "📰 Conteúdo & Notícias",
+  "minha semana de conteudo (rotina)": "📰 Conteúdo & Notícias",
+  "squad: instagram carrossel": "📰 Conteúdo & Notícias",
+  "reels-studio: edicao automatica (\"meu capcut\")": "🎬 Vídeo & Reels",
+  "financas whatsapp → louis → notion": "💰 Finanças",
+  "squad: licitacao igam": "⚖️ Licitação",
+  "squad: criar agente": "🧰 Agentes & Ferramentas",
+};
+const CATEGORIA_PADRAO = "🩺 Sistema & Saúde";
+
 const GATILHOS: { key: Gatilho; icone: string; titulo: string; explica: string }[] = [
   { key: "relogio", icone: "⏰", titulo: "No relógio", explica: "dispara sozinho em horário fixo (crontab da VPS)" },
   { key: "pedido", icone: "👋", titulo: "Quando você pede", explica: "você aciona e ele roda — squads e rotinas manuais" },
@@ -81,6 +117,7 @@ interface ItemUnificado {
   descricao: string;
   gatilho: Gatilho;
   categoria: string;
+  tipo: Tipo;
   cron: AutomacaoApiItem | null;
   cronInfo: CronInfo | null;
   fluxo: FlowDoc | null;
@@ -106,7 +143,7 @@ export default function AutomacoesPage() {
   // padrão porque é como a Andréia procura ("como tá o fluxo de reels?"); por
   // GATILHO serve pra saber o que está no ar. A escolha fica na URL, então
   // sobrevive ao F5 e pode ser guardada nos favoritos.
-  const [visao, setVisao] = useState<"categoria" | "gatilho">("categoria");
+  const [visao, setVisao] = useState<"categoria" | "tipo" | "gatilho">("categoria");
   const [relogioMudouEm, setRelogioMudouEm] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -127,10 +164,10 @@ export default function AutomacoesPage() {
 
   useEffect(() => {
     const v = new URLSearchParams(window.location.search).get("visao");
-    if (v === "gatilho" || v === "categoria") setVisao(v);
+    if (v === "gatilho" || v === "categoria" || v === "tipo") setVisao(v);
   }, []);
 
-  const trocaVisao = (v: "categoria" | "gatilho") => {
+  const trocaVisao = (v: "categoria" | "tipo" | "gatilho") => {
     setVisao(v);
     const params = new URLSearchParams(window.location.search);
     params.set("visao", v);
@@ -153,7 +190,8 @@ export default function AutomacoesPage() {
         nome: c.nome,
         descricao: c.descricao || "",
         gatilho: "relogio",
-        categoria: c.categoria || "🩺 Sistema & Saúde",
+        tipo: "automatico",
+        categoria: c.categoria || CATEGORIA_PADRAO,
         cron: c,
         cronInfo: info,
         fluxo,
@@ -168,12 +206,16 @@ export default function AutomacoesPage() {
     for (const f of fluxos) {
       if (usados.has(f.id)) continue;
       const gatilho: Gatilho = f.category === "squad" || f.category === "manual" ? "pedido" : "evento";
+      const tipo: Tipo = f.category === "squad" ? "squad" : f.category === "manual" ? "manual" : "automatico";
+      // Fluxo criado por ela guarda a categoria como "[📰 Conteúdo] descrição".
+      const marcada = (f.description || "").match(/^\[([^\]]+)\]\s*/);
       lista.push({
         chave: `flow:${f.id}`,
         nome: f.title,
-        descricao: f.description || "",
+        descricao: (f.description || "").replace(/^\[[^\]]+\]\s*/, ""),
         gatilho,
-        categoria: f.category === "squad" ? "🤖 Squads" : "🔔 Reage a evento",
+        tipo,
+        categoria: marcada?.[1] || CATEGORIA_POR_FLUXO[normaliza(f.title)] || CATEGORIA_PADRAO,
         cron: null,
         cronInfo: null,
         fluxo: f,
@@ -211,6 +253,15 @@ export default function AutomacoesPage() {
             (b.cronInfo?.frequenciaMin ?? Number.MAX_SAFE_INTEGER)),
       })).filter((g) => g.itens.length);
     }
+    if (visao === "tipo") {
+      return (Object.keys(TIPOS) as Tipo[]).map((t) => ({
+        chave: t,
+        titulo: `${TIPOS[t].icone} ${TIPOS[t].rotulo}`,
+        explica: TIPOS[t].explica,
+        itens: filtrados.filter((i) => i.tipo === t)
+          .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+      })).filter((g) => g.itens.length);
+    }
     const m = new Map<string, ItemUnificado[]>();
     for (const i of filtrados) m.set(i.categoria, [...(m.get(i.categoria) || []), i]);
     return [...m.keys()].sort().map((cat) => ({
@@ -244,7 +295,7 @@ export default function AutomacoesPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
-              {([["categoria", "por categoria"], ["gatilho", "por gatilho"]] as const).map(([v, r]) => (
+              {([["categoria", "por categoria"], ["tipo", "por tipo"], ["gatilho", "por gatilho"]] as const).map(([v, r]) => (
                 <button
                   key={v}
                   onClick={() => trocaVisao(v)}
@@ -287,12 +338,12 @@ export default function AutomacoesPage() {
             </span>
             {semDesenho > 0 && (
               <span className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-muted)]">
-                {semDesenho} sem desenho
+                {semDesenho} sem fluxo
               </span>
             )}
             {itens.some((i) => i.desenhoAtrasado) && (
               <span className="px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-amber-600 dark:text-amber-400">
-                {itens.filter((i) => i.desenhoAtrasado).length} com desenho possivelmente atrasado
+                {itens.filter((i) => i.desenhoAtrasado).length} com fluxo possivelmente atrasado
               </span>
             )}
             <button
@@ -351,6 +402,7 @@ export default function AutomacoesPage() {
 
       {criando && (
         <NovoFluxo
+          categorias={[...new Set([...itens.map((i) => i.categoria), CATEGORIA_PADRAO])].sort()}
           onFechar={() => setCriando(false)}
           onCriado={(id) => {
             setCriando(false);
@@ -488,6 +540,12 @@ function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }
           {SELO[i.saude].bolinha} {SELO[i.saude].texto}
         </span>
       </div>
+      <span
+        className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full border border-[var(--border)] text-[var(--text-secondary)]"
+        title={TIPOS[i.tipo].explica}
+      >
+        {TIPOS[i.tipo].icone} {TIPOS[i.tipo].rotulo}
+      </span>
       {i.descricao && <p className="text-xs text-[var(--text-secondary)] mt-1">{i.descricao}</p>}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-[var(--text-muted)]">
         {i.cronInfo ? (
@@ -499,14 +557,14 @@ function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }
           <span>{i.gatilho === "pedido" ? "👋 sob demanda" : "🔔 por evento"}</span>
         )}
         <span className={i.fluxo ? "text-[var(--accent,#2D6B6B)]" : "text-[var(--text-muted)]"}>
-          {i.fluxo ? "🗺️ tem desenho" : "sem desenho"}
+          {i.fluxo ? "🗺️ tem fluxo" : "sem fluxo"}
         </span>
         {i.desenhoAtrasado && (
           <span
             className="text-amber-600 dark:text-amber-400"
             title="O relógio da VPS mudou depois da última vez que este desenho foi mexido"
           >
-            ⚠ desenho pode estar atrasado
+            ⚠ fluxo pode estar atrasado
           </span>
         )}
       </div>
@@ -517,16 +575,23 @@ function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }
 // ＋ Novo fluxo — o lugar onde ela cria um fluxo manual. Antes isso só existia
 // dentro do kanban, aposentado em 25/07/2026 por ser a tela que ela abria e
 // nunca usava. Criar aqui é mais direto: nasce e já abre pra desenhar.
-function NovoFluxo({ onFechar, onCriado }: { onFechar: () => void; onCriado: (id: string) => void }) {
+function NovoFluxo({ categorias, onFechar, onCriado }: {
+  categorias: string[];
+  onFechar: () => void;
+  onCriado: (id: string) => void;
+}) {
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
-  const [categoria, setCategoria] = useState<FlowCategory>("manual");
+  const [tipo, setTipo] = useState<FlowCategory>("manual");
+  // 25/07: faltava escolher a CATEGORIA — o formulário só perguntava o tipo, e
+  // ela ficou sem saber onde o fluxo ia parar na lista.
+  const [categoria, setCategoria] = useState<string>(categorias[0] || CATEGORIA_PADRAO);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const TIPOS: { valor: FlowCategory; rotulo: string; explica: string }[] = [
-    { valor: "manual", rotulo: "✋ Rotina minha", explica: "algo que você faz, e quer deixar desenhado" },
-    { valor: "automation", rotulo: "⚙️ Automação", explica: "algo que o sistema faz sozinho" },
+  const OPCOES_TIPO: { valor: FlowCategory; rotulo: string; explica: string }[] = [
+    { valor: "manual", rotulo: "✋ Você faz", explica: "rotina sua, desenhada pra não se perder" },
+    { valor: "automation", rotulo: "⚙️ O sistema faz", explica: "roda sozinho, sem ninguém tocar" },
     { valor: "squad", rotulo: "🤖 Squad", explica: "um time de agentes trabalhando em etapas" },
   ];
 
@@ -536,8 +601,10 @@ function NovoFluxo({ onFechar, onCriado }: { onFechar: () => void; onCriado: (id
     try {
       const f = await addFlowDoc({
         title: titulo.trim(),
-        category: categoria,
-        description: descricao.trim() || undefined,
+        category: tipo,
+        // A categoria fica gravada no começo da descrição, que é onde a lista
+        // consegue lê-la sem precisar de coluna nova no banco.
+        description: `[${categoria}] ${descricao.trim()}`.trim(),
         nodes: [{ id: "1", type: "start", position: { x: 100, y: 100 }, data: { label: "Início", icon: "▶️" } }],
         edges: [],
       });
@@ -588,15 +655,25 @@ function NovoFluxo({ onFechar, onCriado }: { onFechar: () => void; onCriado: (id
               className="mt-1 w-full text-sm px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)]"
             />
           </label>
+          <label className="block">
+            <span className="text-xs font-medium text-[var(--text-secondary)]">Categoria</span>
+            <select
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value)}
+              className="mt-1 w-full text-sm px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)]"
+            >
+              {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </label>
           <div>
-            <span className="text-xs font-medium text-[var(--text-secondary)]">Tipo</span>
+            <span className="text-xs font-medium text-[var(--text-secondary)]">Quem faz</span>
             <div className="grid gap-1.5 mt-1">
-              {TIPOS.map((t) => (
+              {OPCOES_TIPO.map((t) => (
                 <button
                   key={t.valor}
-                  onClick={() => setCategoria(t.valor)}
+                  onClick={() => setTipo(t.valor)}
                   className={`text-left px-3 py-2 rounded-lg border text-sm cursor-pointer transition-colors ${
-                    categoria === t.valor
+                    tipo === t.valor
                       ? "border-[var(--accent,#2D6B6B)] bg-[var(--accent-soft)]"
                       : "border-[var(--border)] bg-[var(--bg-secondary)]"
                   }`}

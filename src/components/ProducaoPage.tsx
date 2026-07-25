@@ -23,8 +23,11 @@ interface Props {
   sub: SubPage;
 }
 
-// Envolve Squads e Fluxos em abas internas; cada aba é uma rota
-// (/producao/squads e /producao/fluxos), então F5 mantém a aba.
+// Abas internas de Produção; cada aba é uma rota, então F5 mantém a aba.
+//
+// 25/07/2026: "Fluxos" saiu do menu. A rota continua existindo (é pra onde um
+// card de Automações leva pra desenhar), mas deixou de ser um destino que se
+// escolhe — não é mais lista, é a mesa de desenho de um fluxo específico.
 export default function ProducaoPage({ sub }: Props) {
   const router = useRouter();
 
@@ -53,16 +56,6 @@ export default function ProducaoPage({ sub }: Props) {
           ⚡ Automações
         </button>
         <button
-          onClick={() => router.push("/producao/fluxos")}
-          className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
-            sub === "fluxos"
-              ? "border-[var(--accent)] text-[var(--text-primary)]"
-              : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          🔄 Fluxos
-        </button>
-        <button
           onClick={() => router.push("/producao/estudio")}
           className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
             sub === "estudio"
@@ -80,7 +73,7 @@ export default function ProducaoPage({ sub }: Props) {
         )}
         {sub === "fluxos" && (
           <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
-            editor visual — desenho de automações e squads
+            mesa de desenho — chega-se aqui por um card de Automações
           </span>
         )}
         {sub === "estudio" && (

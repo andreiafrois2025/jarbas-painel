@@ -82,7 +82,7 @@ function AbaSaude() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Tile titulo="Estado geral" valor={ui ? `${ui.dot} ${ui.label}` : `⚪ ${nivel ?? "?"}`}
-          sub={problemas.length ? problemas.join(" · ") : "nenhum problema aberto"} />
+          sub={problemas.length ? `${problemas.length} ponto(s) de atenção abaixo` : "nenhum problema aberto"} />
         <Tile icone="⏰" titulo="Rotinas automáticas"
           valor={`${hoje?.saude?.crons_ok ?? "?"}/${hoje?.saude?.crons_total ?? "?"}`}
           sub="rodando no horário" />
@@ -92,6 +92,8 @@ function AbaSaude() {
           valor={fila?.pausado ? "⏸ pausada" : `${fila?.aprovados ?? 0} na fila`}
           sub={`${fila?.pendentes ?? 0} aguardando sua avaliação`} />
       </div>
+
+      <Atencao problemas={problemas} />
 
       <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-3">
         <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
@@ -208,10 +210,11 @@ function AbaIntegracoes() {
   ];
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-3">
+    <div className="space-y-3">
       <p className="text-xs text-[var(--text-secondary)]">
         Status ao vivo (semáforo {st ? tempoRelativo(st.gerado_em) : "…"}). Chaves e tokens ficam na VPS — nunca aqui.
       </p>
+      <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
       {itens.map((i) => (
         <div key={i.nome} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] flex gap-3 items-start">
           <span className="text-2xl">{i.icone}</span>
@@ -238,6 +241,153 @@ function AbaIntegracoes() {
           </div>
         </div>
       ))}
+      </div>
     </div>
+  );
+}
+
+// ── Tradutor de problemas ──────────────────────────────────────────────
+// A VPS descreve os problemas em linguagem de máquina ("sinal vital caído:
+// whatsapp"). Aqui cada um vira um tópico com: o que significa, o que fazer, e
+// principalmente QUEM resolve — ela ou eu. Pedido dela em 25/07: "tem que
+// falar em português leigo o que significa e como é a solução, se é eu fazendo
+// algo ou se tenho que pedir você".
+type QuemResolve = "voce" | "claude" | "sozinho";
+
+interface Explicacao {
+  titulo: string;
+  significa: string;
+  solucao: string;
+  quem: QuemResolve;
+}
+
+const QUEM: Record<QuemResolve, { rotulo: string; cor: string }> = {
+  voce: { rotulo: "👤 Você resolve", cor: "text-emerald-700 dark:text-emerald-400" },
+  claude: { rotulo: "🤖 Me peça", cor: "text-[var(--accent)]" },
+  sozinho: { rotulo: "⏳ Se resolve sozinho", cor: "text-[var(--text-muted)]" },
+};
+
+function explica(problema: string): Explicacao {
+  const p = problema.toLowerCase();
+
+  if (p.includes("sinal vital") && p.includes("whatsapp")) return {
+    titulo: "O WhatsApp da Donna caiu",
+    significa: "A conexão do WhatsApp com o servidor caiu. A Donna não recebe nem manda mensagem por lá enquanto isso — inclusive os avisos automáticos.",
+    solucao: "Costuma voltar sozinho em segundos. Se passar de uns 10 minutos, o celular pode ter desconectado a sessão do WhatsApp Web e é preciso parear de novo.",
+    quem: "claude",
+  };
+  if (p.includes("sinal vital") && p.includes("telegram")) return {
+    titulo: "O bot do Telegram caiu",
+    significa: "O canal do Telegram parou. Você continua com o WhatsApp funcionando, então não fica sem aviso nenhum.",
+    solucao: "Existe um vigia que reinicia sozinho a cada 30 minutos. Se persistir, me chame.",
+    quem: "sozinho",
+  };
+  if (p.includes("sinal vital") && p.includes("gateway")) return {
+    titulo: "O porteiro das mensagens caiu",
+    significa: "O programa que entrega as mensagens dos agentes parou. Nada sai nem entra até ele voltar.",
+    solucao: "Tem religamento automático. Se ficar vermelho por mais de 15 minutos, me peça pra olhar.",
+    quem: "claude",
+  };
+  if (p.includes("sinal vital") && p.includes("container")) return {
+    titulo: "O container da Donna parou",
+    significa: "É a caixa onde a Donna e o Louis moram. Parada, nenhum dos dois funciona.",
+    solucao: "Precisa ser religado no servidor — não dá pra fazer pelo painel.",
+    quem: "claude",
+  };
+  if (p.includes("fila do kanban alta")) {
+    const n = problema.match(/(\d+)/)?.[1] ?? "várias";
+    return {
+      titulo: `${n} notícias esperando sua avaliação`,
+      significa: "O Mike buscou e a Izzy escreveu, mas ninguém aprovou nem descartou. A fila só anda com a sua decisão.",
+      solucao: "Abrir o Radar no Notion e passar os cards: aprovar o que vale, descartar o resto. Uns minutos resolvem.",
+      quem: "voce",
+    };
+  }
+  if (p.includes("pausado")) return {
+    titulo: "O envio pro grupo está pausado",
+    significa: "Mesmo com notícias aprovadas, nada é enviado pro grupo enquanto estiver pausado. Normalmente alguém pausou de propósito.",
+    solucao: "Se foi sem querer, é só despausar. Se não souber quem pausou, me pergunte.",
+    quem: "voce",
+  };
+  if (p.includes("disco em")) {
+    const n = problema.match(/(\d+)/)?.[1] ?? "";
+    return {
+      titulo: `O disco da VPS está em ${n}%`,
+      significa: "O espaço do servidor está acabando. Cheio, as automações começam a falhar sem explicação clara.",
+      solucao: "Preciso entrar no servidor e limpar arquivos velhos (logs, backups antigos, vídeos já entregues).",
+      quem: "claude",
+    };
+  }
+  if (p.includes("cron atrasado") || p.includes("nao rodou") || p.includes("não rodou")) {
+    const nome = problema.split(":").pop()?.trim() ?? "uma rotina";
+    return {
+      titulo: `A rotina "${nome}" não rodou no horário`,
+      significa: "Alguma tarefa automática deveria ter rodado e não rodou, ou rodou e não deixou registro.",
+      solucao: "Preciso olhar o registro dela pra saber se falhou ou se só atrasou.",
+      quem: "claude",
+    };
+  }
+  if (p.includes("briefing") && (p.includes("nao saiu") || p.includes("não saiu") || p.includes("falhou") || p.includes("sem registro"))) return {
+    titulo: "O briefing da manhã não chegou",
+    significa: "O resumo do dia (agenda + tarefas) deveria ter chegado e não chegou. Normalmente é o WhatsApp que estava fora na hora.",
+    solucao: "Você pode pedir pra Donna: \"me manda o briefing\". Se falhar de novo amanhã, me chame.",
+    quem: "voce",
+  };
+  if (p.includes("heartbeat")) return {
+    titulo: "O motor central está com a configuração errada",
+    significa: "O ritmo do motor que dispara notícias e dicas está fora do valor combinado. Isso pode gastar créditos à toa.",
+    solucao: "É correção de configuração no servidor — me peça pra ajustar.",
+    quem: "claude",
+  };
+  if (p.startsWith("ronda diária")) return {
+    titulo: "A ronda da manhã achou algo",
+    significa: problema.replace(/^ronda diária:\s*/i, ""),
+    solucao: "Depende do que ela achou. Me mande esta linha que eu investigo.",
+    quem: "claude",
+  };
+  return {
+    titulo: problema,
+    significa: "Esse aviso ainda não tem tradução pra português comum aqui.",
+    solucao: "Me mande esta linha que eu explico e resolvo.",
+    quem: "claude",
+  };
+}
+
+function Atencao({ problemas }: { problemas: string[] }) {
+  if (!problemas.length) return null;
+  return (
+    <section>
+      <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">
+        ⚠️ Precisa de atenção{" "}
+        <span className="text-[var(--text-muted)] font-normal">({problemas.length})</span>
+      </h3>
+      <div className="grid gap-2 lg:grid-cols-2 2xl:grid-cols-3">
+        {problemas.map((p, i) => {
+          const e = explica(p);
+          return (
+            <div key={i} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] border-l-[3px] border-l-amber-500">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-medium text-sm text-[var(--text-primary)]">{e.titulo}</p>
+                <span className={`text-[11px] whitespace-nowrap font-medium ${QUEM[e.quem].cor}`}>
+                  {QUEM[e.quem].rotulo}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                <strong className="text-[var(--text-primary)]">O que é:</strong> {e.significa}
+              </p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                <strong className="text-[var(--text-primary)]">O que fazer:</strong> {e.solucao}
+              </p>
+              <details className="mt-2">
+                <summary className="text-[10px] text-[var(--text-muted)] cursor-pointer select-none">
+                  texto técnico original
+                </summary>
+                <p className="text-[11px] font-mono text-[var(--text-muted)] mt-1 break-words">{p}</p>
+              </details>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
