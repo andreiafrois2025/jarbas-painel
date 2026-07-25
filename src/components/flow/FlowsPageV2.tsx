@@ -22,6 +22,18 @@ export default function FlowsPageV2() {
   const [flows, setFlows] = useState<FlowDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 25/07 — o "pisca" que ela viu ao clicar num card.
+  //
+  // A sequência era: a tela nascia sem fluxo escolhido e sem a lista carregada,
+  // então o primeiro desenho da tela caía no estado "escolha um fluxo" — a tela
+  // vazia. Só depois o endereço era lido e a lista chegava, aí o fluxo aparecia.
+  // Ou seja: a tela vazia não era um erro, era o estado inicial legítimo sendo
+  // mostrado por uma fração de segundo antes da resposta chegar.
+  //
+  // Correção: enquanto a tela ainda não se situou (não leu o endereço nem
+  // recebeu a lista), ela mostra o ESQUELETO da página de fluxo, não a tela
+  // vazia. A tela vazia só aparece quando de fato não há fluxo pedido.
+  const [situada, setSituada] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   // 25/07 (tarde): a janelinha que abria por cima do card virou ESTA página.
   // Ela pediu: "essa janela poderia ser a página do fluxo, ocupando a tela toda,
@@ -57,9 +69,11 @@ export default function FlowsPageV2() {
     // Automações, que sabem o nome do fluxo mas não o id do banco.
     const titulo = params.get("titulo");
     load().then((lista) => {
-      if (!titulo || fluxo) return;
-      const alvo = lista.find((f) => f.title.toLowerCase() === titulo.toLowerCase());
-      if (alvo) setSelectedId(alvo.id);
+      if (titulo && !fluxo) {
+        const alvo = lista.find((f) => f.title.toLowerCase() === titulo.toLowerCase());
+        if (alvo) setSelectedId(alvo.id);
+      }
+      setSituada(true);
     });
   }, []);
 
@@ -97,6 +111,12 @@ export default function FlowsPageV2() {
     setSaveState("saved");
     setTimeout(() => setSaveState("idle"), 1200);
   };
+
+  // Ainda não dá pra saber o que mostrar: ou o endereço não foi lido, ou a
+  // lista não chegou, ou o fluxo pedido ainda não foi encontrado nela.
+  if (!situada || loading || (selectedId && !selected)) {
+    return <EsqueletoFluxo pedido={!!selectedId} />;
+  }
 
   // ─── Modo canvas (fluxo aberto) ───
   if (selected) {
@@ -249,4 +269,35 @@ function quandoFoi(iso: string | null | undefined): string {
   if (h < 24) return `há ${h}h`;
   const d = Math.floor(h / 24);
   return `há ${d} dia${d > 1 ? "s" : ""}`;
+}
+
+// Esqueleto da página de fluxo: mesma moldura do conteúdo real, em cinza.
+// Serve pra que nada apareça no lugar errado enquanto os dados vêm.
+function EsqueletoFluxo({ pedido }: { pedido: boolean }) {
+  const barra = (w: string, h = 12) => (
+    <span className="block rounded animate-pulse" style={{ width: w, height: h, background: "var(--bg-tertiary, #EDE8E1)" }} />
+  );
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-4 py-3 flex items-center gap-3 shrink-0">
+        <span className="text-sm text-[var(--text-muted)]">← Voltar pras Automações</span>
+        <div className="flex-1">{barra("40%", 16)}</div>
+      </div>
+      {pedido && (
+        <div className="shrink-0 border-b border-[var(--border)] px-4 py-3">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)] space-y-1.5">
+                {barra("55%", 9)}
+                {barra("80%", 14)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex-1 min-h-[420px] flex items-center justify-center">
+        <span className="text-sm text-[var(--text-muted)] animate-pulse">abrindo o fluxo…</span>
+      </div>
+    </div>
+  );
 }
