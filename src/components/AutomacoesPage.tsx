@@ -6,6 +6,7 @@ import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { getFlowDocs, addFlowDoc } from "@/lib/storage";
 import type { FlowDoc, FlowCategory } from "@/lib/types";
 import { interpretaCron, formataProxima, type CronInfo } from "@/lib/cron";
+import { PERCURSOS, ROTULO_TIPO, type Percurso, type PassoPercurso } from "@/lib/percursos";
 
 
 // =============================================================
@@ -25,6 +26,12 @@ import { interpretaCron, formataProxima, type CronInfo } from "@/lib/cron";
 // =============================================================
 
 type Gatilho = "relogio" | "pedido" | "evento";
+
+// 25/07 (fim do dia): PERCURSO é a primeira visão e a que abre por padrão, a
+// pedido dela — é a que responde "como funciona isso do começo ao fim", que é
+// a pergunta que ela mais precisa responder pros outros. As outras quatro
+// agrupam a mesma lista; percurso é a única que ENCADEIA.
+type Visao = "percurso" | "categoria" | "tipo" | "custo" | "gatilho";
 
 // 25/07/2026 — TRÊS EIXOS, não um só. Antes eu tinha misturado tudo em
 // "categoria": "🤖 Squads" e "🔔 Reage a evento" apareciam ali como se fossem
@@ -158,7 +165,7 @@ export default function AutomacoesPage() {
   // padrão porque é como a Andréia procura ("como tá o fluxo de reels?"); por
   // GATILHO serve pra saber o que está no ar. A escolha fica na URL, então
   // sobrevive ao F5 e pode ser guardada nos favoritos.
-  const [visao, setVisao] = useState<"categoria" | "tipo" | "custo" | "gatilho">("categoria");
+  const [visao, setVisao] = useState<Visao>("percurso");
   const [relogioMudouEm, setRelogioMudouEm] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
   const [copiado, setCopiado] = useState(false);
@@ -179,7 +186,7 @@ export default function AutomacoesPage() {
 
   useEffect(() => {
     const v = new URLSearchParams(window.location.search).get("visao");
-    if (v === "gatilho" || v === "categoria" || v === "tipo" || v === "custo") setVisao(v);
+    if (["percurso","gatilho","categoria","tipo","custo"].includes(v || "")) setVisao(v as Visao);
   }, []);
 
   // 25/07/2026 — o "Voltar" do navegador precisa fechar a janela do card.
@@ -232,7 +239,21 @@ export default function AutomacoesPage() {
     return () => window.removeEventListener("popstate", aoVoltar);
   }, [router]);
 
-  const trocaVisao = (v: "categoria" | "tipo" | "custo" | "gatilho") => {
+  // Um passo de percurso aponta pro nome da automação ou pro título do fluxo.
+  // Aqui isso vira navegação de verdade — ou aviso, se a peça não existir mais.
+  const abrirPorNome = (passo: PassoPercurso) => {
+    if (passo.fluxo) {
+      const f = fluxos.find((x) => normaliza(x.title) === normaliza(passo.fluxo!));
+      if (f) { router.push(`/producao/fluxos?fluxo=${f.id}`); return; }
+    }
+    if (passo.automacao) {
+      const alvo = itens.find((i) => normaliza(i.nome) === normaliza(passo.automacao!));
+      if (alvo?.fluxo) { router.push(`/producao/fluxos?fluxo=${alvo.fluxo.id}`); return; }
+      if (alvo) { setAberto(alvo); return; }
+    }
+  };
+
+  const trocaVisao = (v: Visao) => {
     setVisao(v);
     const params = new URLSearchParams(window.location.search);
     params.set("visao", v);
@@ -374,7 +395,7 @@ export default function AutomacoesPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-lg border border-[var(--border)] overflow-hidden text-xs">
-              {([["categoria", "por categoria"], ["tipo", "por tipo"], ["custo", "por custo"], ["gatilho", "por gatilho"]] as const).map(([v, r]) => (
+              {([["percurso", "percursos"], ["categoria", "por categoria"], ["tipo", "por tipo"], ["custo", "por custo"], ["gatilho", "por gatilho"]] as const).map(([v, r]) => (
                 <button
                   key={v}
                   onClick={() => trocaVisao(v)}
@@ -464,6 +485,12 @@ export default function AutomacoesPage() {
 
         {carregando ? (
           <p className="text-sm text-[var(--text-muted)]">carregando…</p>
+        ) : visao === "percurso" ? (
+          <div className="grid gap-4 2xl:grid-cols-2">
+            {PERCURSOS.map((p) => (
+              <CartaoPercurso key={p.id} percurso={p} itens={itens} onIr={abrirPorNome} />
+            ))}
+          </div>
         ) : (
           grupos.map(({ chave, titulo, explica, itens: doGrupo }) => (
             <section key={chave}>
@@ -794,5 +821,121 @@ function NovoFluxo({ categorias, onFechar, onCriado }: {
         </div>
       </div>
     </div>
+  );
+}
+
+// Um percurso desenhado como texto encadeado — foi a forma que ela pediu:
+// "talvez nem precisaria ser desenho, poderia ser escrito passo a passo e em
+// cada nó direciona para aquela automação ou desenho do fluxo".
+function CartaoPercurso({ percurso, itens, onIr }: {
+  percurso: Percurso;
+  itens: ItemUnificado[];
+  onIr: (p: PassoPercurso) => void;
+}) {
+  const [regraAberta, setRegraAberta] = useState<number | null>(null);
+  const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  // Dado ao vivo do passo: horário e sinal de vida vêm da automação real.
+  const dadoVivo = (passo: PassoPercurso) => {
+    if (!passo.automacao) return null;
+    return itens.find((i) => norm(i.nome) === norm(passo.automacao!)) || null;
+  };
+
+  const clicavel = (passo: PassoPercurso) => !!(passo.fluxo || passo.automacao);
+
+  return (
+    <section className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] p-5">
+      <header className="mb-3">
+        <h2 className="text-base font-semibold text-[var(--text-primary)]">
+          {percurso.icone} {percurso.titulo}
+        </h2>
+        <p className="text-sm text-[var(--text-secondary)] italic mt-0.5">“{percurso.pergunta}”</p>
+        <p className="text-xs text-[var(--text-muted)] mt-1.5">{percurso.resumo}</p>
+      </header>
+
+      <ol className="relative">
+        {percurso.passos.map((passo, i) => {
+          const vivo = dadoVivo(passo);
+          const meta = ROTULO_TIPO[passo.tipo];
+          const ultimo = i === percurso.passos.length - 1;
+          return (
+            <li key={i} className="relative pl-8 pb-3">
+              {/* a linha que liga um passo ao seguinte */}
+              {!ultimo && (
+                <span className="absolute left-[11px] top-6 bottom-0 w-px bg-[var(--border)]" aria-hidden />
+              )}
+              <span
+                className="absolute left-0 top-0.5 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-semibold"
+                style={{ background: "var(--bg-primary)", border: `1.5px solid ${meta.cor}`, color: meta.cor }}
+              >
+                {i + 1}
+              </span>
+
+              <div
+                className={clicavel(passo) ? "cursor-pointer group" : ""}
+                onClick={() => clicavel(passo) && onIr(passo)}
+                role={clicavel(passo) ? "button" : undefined}
+                tabIndex={clicavel(passo) ? 0 : undefined}
+                onKeyDown={(e) => { if (clicavel(passo) && (e.key === "Enter" || e.key === " ")) onIr(passo); }}
+              >
+                <p className="text-sm font-medium text-[var(--text-primary)] group-hover:underline decoration-dotted">
+                  {passo.icone} {passo.titulo}
+                  {clicavel(passo) && <span className="text-[var(--text-muted)] font-normal"> ↗</span>}
+                </p>
+                {passo.detalhe && (
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">{passo.detalhe}</p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 text-[10px]">
+                  <span style={{ color: meta.cor }} className="font-semibold uppercase tracking-wider">
+                    {meta.rotulo}
+                  </span>
+                  {passo.onde && <span className="text-[var(--text-muted)]">{passo.onde}</span>}
+                  {vivo?.cronInfo && (
+                    <span className="text-[var(--text-muted)]">⏰ {vivo.cronInfo.descricao}</span>
+                  )}
+                  {vivo && (
+                    <span className={SELO[vivo.saude].cor}>
+                      {SELO[vivo.saude].bolinha} {SELO[vivo.saude].texto}
+                    </span>
+                  )}
+                  {vivo && (
+                    <span className={vivo.usaIA ? "text-[#A0583C] dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}>
+                      {vivo.usaIA ? "🤖 usa IA" : "🐍 sem IA"}
+                    </span>
+                  )}
+                  {/* O passo aponta pra uma automação que não existe mais */}
+                  {passo.automacao && !vivo && (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      ⚠ não achei essa automação no relógio
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {passo.regras && (
+                <div className="mt-1.5">
+                  <button
+                    onClick={() => setRegraAberta(regraAberta === i ? null : i)}
+                    className="text-[11px] underline decoration-dotted text-[var(--text-secondary)] cursor-pointer"
+                  >
+                    {regraAberta === i ? "esconder" : `ver ${passo.regras.length} regras`}
+                  </button>
+                  {regraAberta === i && (
+                    <ol className="mt-1.5 space-y-1 border-l-2 border-[var(--border)] pl-3">
+                      {passo.regras.map((r, j) => (
+                        <li key={j} className="text-xs text-[var(--text-secondary)]">
+                          <span className="font-semibold text-[var(--text-primary)]">{j + 1}º</span> {r}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
