@@ -9,7 +9,6 @@ import { GraficoLinha, GraficoBarras } from "./charts";
 import {
   useMetricsHistory, semanasOrdenadas, tempoRelativo,
 } from "@/lib/metrics";
-import { AUTOMACOES, SEM_IA } from "@/lib/automacoes";
 import { fetchEquipePublica, fallbackPublico, type AgentePublico } from "@/lib/equipe";
 
 // Grid da equipe clicável: abre a bio do agente num popover. A descrição vinha
@@ -235,28 +234,44 @@ export default function MetricasPage() {
 
 function SecaoIAConstroi() {
   const [aberto, setAberto] = useState(false);
+  const { hoje } = useMetricsHistory();
+  const r = hoje?.resumo_automacoes;
+
+  // 25/07/2026 (F2): esse número vinha de uma lista digitada à mão que tinha
+  // parado em 17 enquanto o relógio da VPS já tinha 20 — e ele vai pro telão
+  // no modo palco. Agora sai da contagem real, feita no snapshot da VPS.
+  if (!r) {
+    return (
+      <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[#E5DED4] text-center">
+        <p className="text-sm text-[var(--text-secondary)]">
+          A contagem das automações chega no próximo resumo da madrugada.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[#E5DED4] text-center">
       <p className="text-lg md:text-xl font-semibold text-[var(--text-primary)]">
-        🧮 Das <span style={{ color: "#2D6B6B" }}>{AUTOMACOES.length} automações</span> no ar,{" "}
-        <span style={{ color: "#A0583C" }}>{SEM_IA} rodam sem gastar 1 token de IA</span>
+        🧮 Das <span style={{ color: "#2D6B6B" }}>{r.total} automações</span> no ar,{" "}
+        <span style={{ color: "#A0583C" }}>{r.sem_ia} rodam sem gastar 1 token de IA</span>
       </p>
       <p className="text-sm text-[var(--text-secondary)] mt-1">
         Todas foram <strong>construídas</strong> com IA — mas a maioria <strong>roda</strong> só com Python, de graça, pra sempre.
       </p>
-      <button onClick={() => setAberto(!aberto)} className="text-xs underline decoration-dotted mt-2 text-[var(--text-secondary)]">
+      <button onClick={() => setAberto(!aberto)} className="text-xs underline decoration-dotted mt-2 text-[var(--text-secondary)] cursor-pointer">
         {aberto ? "esconder a lista" : "ver quem é quem"}
       </button>
       {aberto && (
-        <div className="grid md:grid-cols-2 gap-1.5 mt-3 text-left">
-          {AUTOMACOES.map((a) => (
+        <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-1.5 mt-3 text-left">
+          {r.itens.map((a) => (
             <div key={a.nome} className="flex items-start gap-2 text-sm rounded-lg px-3 py-2"
               style={{ background: "var(--bg-primary)" }}>
-              <span>{a.icone}</span>
+              <span>{a.usa_ia ? "🤖" : "🐍"}</span>
               <span className="text-[var(--text-primary)]">
                 {a.nome}
                 <span className="block text-xs text-[var(--text-secondary)]">
-                  {a.usaIA ? `🤖 usa IA: ${a.custo}` : `🐍 sem IA na execução (${a.custo})`}
+                  {a.usa_ia ? `usa IA: ${a.custo}` : `sem IA na execução (${a.custo})`}
                 </span>
               </span>
             </div>

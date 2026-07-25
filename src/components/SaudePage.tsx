@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useStatus, NIVEL_UI } from "@/lib/status";
 import { useMetricsHistory, tempoRelativo } from "@/lib/metrics";
+import { useIntegracoes, COMO_MEDIMOS, type Integracao } from "@/lib/integracoes";
 import { Tile, NOME_AUTOMACAO } from "./MetricasPage";
 import type { StatusSaude } from "@/lib/status";
 
@@ -138,114 +139,74 @@ function AbaSaude() {
 }
 
 function AbaIntegracoes() {
-  const { status: st } = useStatus();
-  const { hoje } = useMetricsHistory();
+  const { status } = useStatus();
+  const { integracoes, erro } = useIntegracoes();
 
-  // A leitura do estado agora vem do useStatus compartilhado — este bloco tinha
-  // seu próprio fetch, que era o terceiro download do mesmo arquivo por minuto.
+  if (erro) return <p className="text-sm text-[var(--text-secondary)]">Não consegui falar com a VPS pra medir as integrações.</p>;
+  if (!integracoes) return <p className="text-sm text-[var(--text-muted)]">medindo cada integração…</p>;
 
-  const autom = hoje?.automacoes ?? {};
-  const rodouRecente = (iso: string | null | undefined, horas: number) =>
-    !!iso && Date.now() - new Date(iso).getTime() < horas * 3600 * 1000;
-
-  const itens: { nome: string; icone: string; ok: boolean | null; detalhe: string; onde: string;
-                 links?: { rotulo: string; url: string }[] }[] = [
-    {
-      nome: "WhatsApp (Donna)", icone: "📱",
-      ok: st ? !!st.sinais_vitais?.whatsapp : null,
-      detalhe: "Briefing matinal, grupo IA, alertas de falha e avisos de tarefas.",
-      onde: "Gateway OpenClaw na VPS (re-parear: openclaw channels)",
-      links: [{ rotulo: "WhatsApp Web", url: "https://web.whatsapp.com" }],
-    },
-    {
-      nome: "Telegram (bot)", icone: "💬",
-      ok: st ? !!st.sinais_vitais?.telegram : null,
-      detalhe: "Canal de fallback: checkpoints das squads, entrega de carrosséis.",
-      onde: "claude-telegram.service + OpenClaw",
-      links: [{ rotulo: "Abrir bot", url: "https://t.me/jarbas_af_bot" }],
-    },
-    {
-      nome: "Notion", icone: "🗂️",
-      ok: hoje ? rodouRecente(autom.status_saude, 2) : null,
-      detalhe: "Radar de Posts IA, banco Conteúdos, lista de tarefas, Segundo Cérebro.",
-      onde: "Token no container OpenClaw (workspace/notion_radar.py)",
-      links: [
-        { rotulo: "Radar", url: "https://app.notion.com/p/391b90b9061d81d993b7dc2de46eab87" },
-        { rotulo: "Tarefas", url: "https://app.notion.com/p/a73b90b9061d8299899f81c8938e9de6" },
-        { rotulo: "Produção de Conteúdo", url: "https://app.notion.com/p/2fbb90b9061d812f9afce74e767879eb" },
-      ],
-    },
-    {
-      nome: "Google Gemini", icone: "🤖",
-      ok: null,
-      detalhe: "Gerador de posts, roteiros de reels e aprendiz de estilo (conta do Jarbas).",
-      onde: "GEMINI_API_KEY no container — uso visível nos logs da VPS",
-      links: [{ rotulo: "Console (uso/quota)", url: "https://aistudio.google.com" }],
-    },
-    {
-      nome: "Google Calendar", icone: "📅",
-      ok: st ? !!st.sinais_vitais?.container : null,
-      detalhe: "Agenda do briefing matinal (conta assistentejarbas.ia@gmail.com).",
-      onde: "google_calendar_token.json no container",
-      links: [{ rotulo: "Abrir agenda", url: "https://calendar.google.com" }],
-    },
-    {
-      nome: "Google Drive (backups e reels)", icone: "☁️",
-      ok: st ? st.crons?.backup_diario?.ok ?? null : null,
-      detalhe: "Backup diário da VPS + acervo Instagram/Reels + Marca.",
-      onde: "rclone remote JarbasDrive2",
-      links: [{ rotulo: "Abrir Drive", url: "https://drive.google.com/drive/my-drive" }],
-    },
-    {
-      nome: "Supabase (painel)", icone: "⚡",
-      ok: st !== null,
-      detalhe: "Login, fluxos, equipe, status e métricas do painel.",
-      onde: ".env.local do painel + bucket público status",
-      links: [
-        { rotulo: "Projeto", url: "https://supabase.com/dashboard/project/pmmyqljiuslstwbmiron" },
-        { rotulo: "Deploys (Vercel)", url: "https://vercel.com/andreiafrois2025s-projects/jarbas-painel" },
-        { rotulo: "Repositório", url: "https://github.com/andreiafrois2025/jarbas-painel" },
-      ],
-    },
-  ];
+  // Cada item diz COMO é medido — e o que a medição respondeu.
+  const avalia = (i: Integracao): { bolinha: string; texto: string; como: string } => {
+    if (i.medicao === "ping") {
+      if (i.ok === true) return { bolinha: "🟢", texto: "funcionando", como: `perguntei agora — ${i.nota}` };
+      if (i.ok === false) return { bolinha: "🔴", texto: "com problema", como: `perguntei agora — ${i.nota}` };
+      return { bolinha: "⚪", texto: "não sei dizer", como: i.nota || COMO_MEDIMOS.ping };
+    }
+    if (i.medicao === "sinal") {
+      const v = (status?.sinais_vitais as Record<string, boolean> | undefined)?.[i.sinal || ""];
+      if (v === true) return { bolinha: "🟢", texto: "no ar", como: COMO_MEDIMOS.sinal };
+      if (v === false) return { bolinha: "🔴", texto: "fora do ar", como: COMO_MEDIMOS.sinal };
+      return { bolinha: "⚪", texto: "sem leitura agora", como: COMO_MEDIMOS.sinal };
+    }
+    if (i.medicao === "cron") {
+      const c = status?.crons?.[i.cron || ""];
+      if (c?.ok) return { bolinha: "🟢", texto: "rodou no horário", como: COMO_MEDIMOS.cron };
+      if (c) return { bolinha: "🟡", texto: "a rotina atrasou", como: COMO_MEDIMOS.cron };
+      return { bolinha: "⚪", texto: "sem leitura agora", como: COMO_MEDIMOS.cron };
+    }
+    return { bolinha: "⚪", texto: "não medimos", como: COMO_MEDIMOS.nenhum };
+  };
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-[var(--text-secondary)]">
-        Status ao vivo (semáforo {st ? tempoRelativo(st.gerado_em) : "…"}). Chaves e tokens ficam na VPS — nunca aqui.
+        Cada integração diz como é medida. Chaves e tokens ficam na VPS — nunca aqui.
       </p>
       <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-      {itens.map((i) => (
-        <div key={i.nome} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] flex gap-3 items-start">
-          <span className="text-2xl">{i.icone}</span>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-[var(--text-primary)]">{i.nome}</span>
-              <span className="text-xs">
-                {i.ok === null ? "⚪ sem medição direta" : i.ok ? "🟢 funcionando" : "🔴 com problema"}
-              </span>
-            </div>
-            <p className="text-sm text-[var(--text-secondary)] mt-0.5">{i.detalhe}</p>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Onde vive: {i.onde}</p>
-            {i.links && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {i.links.map((l) => (
-                  <a key={l.url} href={l.url} target="_blank" rel="noreferrer"
-                    className="text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80"
-                    style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
-                    {l.rotulo} ↗
-                  </a>
-                ))}
+        {integracoes.map((i) => {
+          const a = avalia(i);
+          return (
+            <div key={i.nome} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] flex gap-3 items-start">
+              <span className="text-2xl">{i.icone}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-[var(--text-primary)]">{i.nome}</span>
+                  <span className="text-xs">{a.bolinha} {a.texto}</span>
+                </div>
+                <p className="text-sm text-[var(--text-secondary)] mt-0.5">{i.detalhe}</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                  Como sei disso: {a.como}
+                </p>
+                <p className="text-[11px] text-[var(--text-muted)]">Onde vive: {i.onde}</p>
+                {i.links && i.links.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {i.links.map((l) => (
+                      <a key={l.url} href={l.url} target="_blank" rel="noreferrer"
+                        className="text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80"
+                        style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
+                        {l.rotulo} ↗
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
 }
-
 // ── Tradutor de problemas ──────────────────────────────────────────────
 // A VPS descreve os problemas em linguagem de máquina ("sinal vital caído:
 // whatsapp"). Aqui cada um vira um tópico com: o que significa, o que fazer, e

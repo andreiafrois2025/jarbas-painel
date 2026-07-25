@@ -30,6 +30,14 @@ export interface SnapshotDia {
   style: { approval_rate_news?: number; total_cards?: number };
   jobs: { total: number; concluidos: number; ultimos_30d: number };
   automacoes: Record<string, string | null>;
+  /** Contagem real das automações do relógio da VPS (F2, 25/07/2026).
+   *  Antes esse número era digitado à mão e tinha parado em 17. */
+  resumo_automacoes?: {
+    total: number;
+    sem_ia: number;
+    com_ia: number;
+    itens: { nome: string; categoria?: string; usa_ia: boolean; custo?: string }[];
+  } | null;
   radar_por_status: Record<string, number>;
   enviados_total: number;
   horas_economizadas: number;
