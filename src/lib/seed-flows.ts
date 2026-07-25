@@ -675,6 +675,28 @@ const lembreteGravarReels: SeedFlow = {
   edges: [{ id: "e1-2", source: "1", target: "2" }, { id: "e2-3", source: "2", target: "3" }],
 };
 
+
+const envioImediato: SeedFlow = {
+  title: "Envio imediato marcado no Radar",
+  category: "automation",
+  description:
+    "Você marca um card como 'Enviar agora' no Radar e ele fura a fila: sai em até 5 minutos, sem esperar o intervalo de 2h nem a alternância notícia/dica. Só respeita a janela de 8h às 20h30 — fora dela, espera as 8h. Zero IA.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Você marca no Notion", icon: "⚡", details: "Campo 'Prioridade de envio' do Radar:\n· Enviar agora → fura a fila\n· Próximo → primeiro no próximo envio normal", executor: "Andréia", tags: ["Notion"] } },
+    { id: "2", type: "start", position: col(1), data: { label: "A cada 5 minutos", icon: "⏰", details: "Checagem própria, separada do envio normal (que roda a cada 30 min).", executor: "cron → ia_group_sender.py agora" } },
+    { id: "3", type: "condition", position: col(2), data: { label: "Está dentro da janela?", icon: "🕗", details: "8h às 20h30 BRT. Fora disso, espera — decisão dela: 'envio de notícia sempre dentro da janela, mesmo eu mandando agora'.", executor: "ia_group_sender.py" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Pega o texto ATUAL do card", icon: "📄", details: "Lê o corpo do card no Notion na hora do envio, então suas edições valem.", executor: "notion_radar.py", tags: ["Notion"] } },
+    { id: "5", type: "end", position: col(4), data: { label: "Envia e limpa a marcação", icon: "📤", details: "Manda no grupo, marca como Enviado e apaga a prioridade — senão o card ficaria furando a fila pra sempre.", executor: "OpenClaw", tags: ["WhatsApp"] } },
+  ],
+  edges: [
+    { id: "e1-3", source: "1", target: "3" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4" },
+    { id: "e4-5", source: "4", target: "5" },
+  ],
+};
+
 export const SEED_FLOWS: SeedFlow[] = [
   // Automações
   briefingTelegram,
@@ -704,6 +726,7 @@ export const SEED_FLOWS: SeedFlow[] = [
   escolaAvisoD2,
   escolaRelatorioSemana,
   lembreteGravarReels,
+  envioImediato,
   // Squads
   squadInstagramCarrossel,
   squadLicitacao,
