@@ -251,19 +251,19 @@ function SecaoIAConstroi() {
   }
 
   return (
-    <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[#E5DED4] text-center">
-      <p className="text-lg md:text-xl font-semibold text-[var(--text-primary)]">
+    <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[#E5DED4]">
+      <p className="text-base font-semibold text-[var(--text-primary)]">
         🧮 Das <span style={{ color: "#2D6B6B" }}>{r.total} automações</span> no ar,{" "}
         <span style={{ color: "#A0583C" }}>{r.sem_ia} rodam sem gastar 1 token de IA</span>
       </p>
-      <p className="text-sm text-[var(--text-secondary)] mt-1">
+      <p className="text-xs text-[var(--text-secondary)] mt-1">
         Todas foram <strong>construídas</strong> com IA — mas a maioria <strong>roda</strong> só com Python, de graça, pra sempre.
       </p>
       <button onClick={() => setAberto(!aberto)} className="text-xs underline decoration-dotted mt-2 text-[var(--text-secondary)] cursor-pointer">
         {aberto ? "esconder a lista" : "ver quem é quem"}
       </button>
       {aberto && (
-        <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-1.5 mt-3 text-left">
+        <div className="grid gap-1.5 mt-3 text-left max-h-[38vh] overflow-y-auto pr-1">
           {r.itens.map((a) => (
             <div key={a.nome} className="flex items-start gap-2 text-sm rounded-lg px-3 py-2"
               style={{ background: "var(--bg-primary)" }}>
@@ -308,23 +308,30 @@ function AbaGeral({ data, hoje, taxaSemanal, area }: {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="text-center py-4">
-        <p className="text-xs uppercase tracking-[0.3em]" style={{ color: "#A0583C" }}>Minha fábrica com IA</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full mt-6">
+    <div className="space-y-5">
+      {/* 25/07 (tarde) — recomposta com ela. O problema não era o tamanho da
+          página, era a ORDEM e o peso: um número gigante, um gráfico gigante e
+          a equipe lá embaixo, tudo exigindo rolagem.
+
+          Agora: a faixa de números (o resumo) fica no topo, e abaixo dela a
+          página se divide em duas colunas — à esquerda o que se OLHA (gráfico),
+          à direita o que se CONSULTA (a tese do custo e o time). Cabe numa
+          tela, que era o pedido original. */}
+      <section>
+        <p className="text-xs uppercase tracking-[0.3em] mb-4" style={{ color: "#A0583C" }}>
+          Minha fábrica com IA
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {tiles.map(([v, r]) => (
-            <div key={String(r)}>
-              <div className="text-4xl md:text-5xl font-bold" style={{ color: "#2D6B6B" }}>{v}</div>
-              <div className="mt-1 text-xs uppercase tracking-wider text-[var(--text-secondary)]">{r}</div>
+            <div key={String(r)} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
+              <div className="text-3xl md:text-4xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{v}</div>
+              <div className="mt-1.5 text-xs text-[var(--text-secondary)]">{r}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* A tese dela: IA constrói, Python roda (12/07) — vale pras duas áreas */}
-      <SecaoIAConstroi />
-
-      <div className="grid gap-4 lg:grid-cols-[3fr_2fr] items-start">
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr] items-start">
         <div className="min-w-0">
           {mostraConteudo ? (
             <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
@@ -332,23 +339,20 @@ function AbaGeral({ data, hoje, taxaSemanal, area }: {
               <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
             </CartaoGrafico>
           ) : (
-            <CartaoGrafico titulo="Aprovação de pautas 📈"
-              sub="medição chega com o hub IGAM">
+            <CartaoGrafico titulo="Aprovação de pautas 📈" sub="medição chega com o hub IGAM">
               <p className="text-sm text-[var(--text-secondary)] py-6 text-center">—</p>
             </CartaoGrafico>
           )}
         </div>
-        <EquipeGrid />
-      </div>
 
-      <div className="flex justify-center text-sm">
-        <a href="/metricas/palestra" target="_blank"
-          className="px-4 py-2 rounded-lg text-white font-medium" style={{ background: "#2D6B6B" }}>
-          🎤 Modo palco (tela cheia)
-        </a>
+        <div className="space-y-4">
+          <SecaoIAConstroi />
+          <EquipeGrid />
+        </div>
       </div>
     </div>
   );
+
 }
 
 function AbaProducao({ data, hoje, taxaSemanal, area }: {
@@ -364,7 +368,7 @@ function AbaProducao({ data, hoje, taxaSemanal, area }: {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         {mostraConteudo ? (
           <Tile icone="📤" titulo="Posts no grupo IA" valor={hoje.enviados_total ?? "—"}
             sub={`${hoje.fila?.enviados_7d ?? 0} nos últimos 7 dias`} />

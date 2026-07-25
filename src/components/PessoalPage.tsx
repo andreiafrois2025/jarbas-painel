@@ -72,27 +72,97 @@ export default function PessoalPage() {
         <div className="p-4 md:p-6 w-full space-y-4">
           {aba === "luiz" ? (
             <>
-              {escola.length > 0 && (
-                <div className="grid gap-4 md:grid-cols-3 items-start">
-                  {([
-                    ["prova", "🔴 Provas"],
-                    ["paracasa", "🟢 Para casa"],
-                    ["avaliativa", "🟡 Atividades avaliativas"],
-                  ] as const).map(([tipo, titulo]) => {
-                    const doTipo = escola.filter((e) => e.tipo === tipo);
+              {/* 25/07 (tarde) — repensado com ela.
+                  Ordem de leitura: primeiro O QUE É (contexto, lido uma vez),
+                  depois O QUE TEM (as entregas, consultadas sempre). A
+                  explicação absorveu os links do antigo "Enquanto isso": dois
+                  cards lado a lado dizendo a mesma coisa gastavam espaço e
+                  atenção sem acrescentar nada. */}
+              <section className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] p-5">
+                <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] items-start">
+                  <div>
+                    <h2 className="font-semibold text-[var(--text-primary)] mb-2">
+                      📚 Como funciona a agenda escolar
+                    </h2>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      Você manda foto do caderno, print do Teams ou bilhete da escola{" "}
+                      <strong>direto no WhatsApp</strong>, e a Donna identifica a atividade, a
+                      disciplina e o prazo — colocando na sua agenda e na lista de tarefas.
+                    </p>
+                    <p className="text-xs text-[var(--text-muted)] mt-2">
+                      As regras do assistente (horário das aulas, alternância Matemática/Robótica
+                      das terças, envio × entrega) já estão salvas na VPS ✅.
+                    </p>
+                  </div>
+                  <div className="space-y-3.5">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                        Como ler as cores
+                      </p>
+                      <ul className="text-sm text-[var(--text-secondary)] space-y-0.5">
+                        <li>🔴 Prova · 🟡 Atividade avaliativa</li>
+                        <li>🟢 Para casa · ➡️ Envio da atividade</li>
+                        <li>📌 Observação importante</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                        Atalhos
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <a href="https://calendar.google.com" target="_blank" rel="noreferrer"
+                          className="text-xs px-3 py-1.5 rounded-full border font-medium"
+                          style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
+                          Agenda Google ↗
+                        </a>
+                        <a href="https://app.notion.com/p/a73b90b9061d8299899f81c8938e9de6" target="_blank" rel="noreferrer"
+                          className="text-xs px-3 py-1.5 rounded-full border font-medium"
+                          style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
+                          Lista de tarefas ↗
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {escola.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 items-start">
+                  {(
+                    [
+                      ["prova", "🔴 Provas"],
+                      ["paracasa", "🟢 Para casa"],
+                      ["avaliativa", "🟡 Avaliativas"],
+                      ["outros", "➡️ Outros avisos"],
+                    ] as const
+                  ).map(([tipo, titulo]) => {
+                    const doTipo =
+                      tipo === "outros"
+                        ? escola.filter((e) => !["prova", "paracasa", "avaliativa"].includes(e.tipo))
+                        : escola.filter((e) => e.tipo === tipo);
                     return (
-                      <div key={tipo} className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
-                        <h2 className="font-semibold text-[var(--text-primary)] mb-3">{titulo}</h2>
+                      <div key={tipo} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
+                        <div className="flex items-baseline justify-between gap-2 mb-2.5">
+                          <h2 className="font-semibold text-sm text-[var(--text-primary)]">{titulo}</h2>
+                          {doTipo.length > 0 && (
+                            <span className="text-xs text-[var(--text-muted)]">{doTipo.length}</span>
+                          )}
+                        </div>
                         {doTipo.length === 0 ? (
                           <p className="text-sm text-[var(--text-muted)]">nada por enquanto</p>
                         ) : (
-                          <ul className="space-y-2">
+                          <ul className="space-y-2.5">
                             {doTipo.map((e, i) => (
-                              <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
-                                <span className="text-[var(--text-muted)] whitespace-nowrap">
+                              <li key={i} className="text-sm">
+                                <span className="text-[11px] font-medium text-[var(--text-muted)] block">
                                   {new Date(e.data + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                                  {tipo === "outros" ? ` ${EMOJI_TIPO[e.tipo] || "📌"}` : ""}
                                 </span>
-                                <span><strong>{e.disciplina}</strong>{e.nome ? ` — ${e.nome}` : ""}{e.pontos ? ` (${e.pontos})` : ""}</span>
+                                <span className="text-[var(--text-primary)]">
+                                  <strong>{e.disciplina}</strong>
+                                  {e.nome ? ` — ${e.nome}` : ""}
+                                  {e.pontos ? <span className="text-[var(--text-muted)]"> ({e.pontos})</span> : null}
+                                </span>
                               </li>
                             ))}
                           </ul>
@@ -100,57 +170,15 @@ export default function PessoalPage() {
                       </div>
                     );
                   })}
-                  {escola.some((e) => !["prova", "paracasa", "avaliativa"].includes(e.tipo)) && (
-                    <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)] md:col-span-3">
-                      <h2 className="font-semibold text-[var(--text-primary)] mb-3">➡️ Outros avisos</h2>
-                      <ul className="space-y-2">
-                        {escola.filter((e) => !["prova", "paracasa", "avaliativa"].includes(e.tipo)).map((e, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
-                            <span className="text-[var(--text-muted)] whitespace-nowrap">
-                              {new Date(e.data + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                            </span>
-                            <span>{EMOJI_TIPO[e.tipo] || "📌"}</span>
-                            <span><strong>{e.disciplina}</strong>{e.nome ? ` — ${e.nome}` : ""}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                </div>
+              ) : (
+                <div className="bg-[var(--bg-secondary)] rounded-xl p-8 border border-[var(--border)] text-center">
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    Nada na agenda do Luiz por enquanto. Quando você mandar uma foto do caderno
+                    pra Donna, aparece aqui.
+                  </p>
                 </div>
               )}
-              <div className="grid gap-4 lg:grid-cols-[2fr_1fr] items-start">
-              <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
-                <h2 className="font-semibold text-[var(--text-primary)] mb-2">📚 Como funciona a agenda escolar</h2>
-                <p className="text-sm text-[var(--text-secondary)]">
-                  A Central de Captura da Donna está em implantação: você vai mandar foto do
-                  caderno, print do Teams ou bilhete da escola <strong>direto no WhatsApp</strong>,
-                  e ela identifica a atividade, a disciplina e o prazo — colocando na sua agenda
-                  e na lista de tarefas, no padrão que você já usa:
-                </p>
-                <div className="mt-3 text-sm rounded-lg p-3 font-mono" style={{ background: "var(--bg-primary)" }}>
-                  🔴 Prova · 🟡 Atividade avaliativa · 🟢 Para casa<br />
-                  ➡️ Envio da atividade · 📌 Observação importante
-                </div>
-                <p className="text-xs text-[var(--text-muted)] mt-3">
-                  As regras do seu assistente (horário semanal das aulas, alternância
-                  Matemática/Robótica das terças, envio × entrega) já estão salvas na VPS ✅.
-                  Quando a captura entrar no ar, a agenda completa aparece aqui nesta tela.
-                </p>
-              </div>
-              <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border)]">
-                <h2 className="font-semibold text-[var(--text-primary)] mb-2">Enquanto isso</h2>
-                <div className="flex flex-wrap gap-2">
-                  <a href="https://calendar.google.com" target="_blank" rel="noreferrer"
-                    className="text-xs px-3 py-1.5 rounded-full border font-medium" style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
-                    Agenda Google ↗
-                  </a>
-                  <a href="https://app.notion.com/p/a73b90b9061d8299899f81c8938e9de6" target="_blank" rel="noreferrer"
-                    className="text-xs px-3 py-1.5 rounded-full border font-medium" style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
-                    Lista de tarefas ↗
-                  </a>
-                </div>
-              </div>
-              </div>
             </>
           ) : (
             <>
@@ -164,7 +192,7 @@ export default function PessoalPage() {
                 <p className="text-sm text-[var(--text-muted)]">Carregando resumo do mês…</p>
               )}
               {financas && (
-                <div className="grid gap-4 lg:grid-cols-2 items-start">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 items-start">
                   {cardResumo("Pessoal", financas.pessoal)}
                   {cardResumo("Empresa (Meraki)", financas.empresa)}
                   <p className="text-[11px] text-[var(--text-muted)] lg:col-span-2">

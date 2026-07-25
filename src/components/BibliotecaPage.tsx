@@ -209,7 +209,9 @@ export default function BibliotecaPage() {
         {aba === "grafo" ? (
           <GrafoView />
         ) : (
-          <div className={`p-4 md:p-6 mx-auto space-y-6 ${aba === "skills" || aba === "prompts" || aba === "plugins" ? "max-w-7xl" : "max-w-4xl"}`}>
+          // 25/07: o invólucro tinha teto de largura e era ELE que segurava as
+          // Criações no meio da tela, mesmo depois de eu montar a grade dentro.
+          <div className="p-4 md:p-6 space-y-6 w-full">
             {aba === "criacoes" ? (
               <>
                 <div className="flex items-center justify-between gap-2">
@@ -224,7 +226,7 @@ export default function BibliotecaPage() {
                     + Nova criação
                   </button>
                 </div>
-                <div className="grid gap-x-6 gap-y-5 xl:grid-cols-2 items-start">
+                <div className="grid gap-x-6 gap-y-5 md:grid-cols-2 2xl:grid-cols-3 items-start">
                 {[...gruposCriacoes.entries()].map(([grupo, itens]) => (
                   <section key={grupo}>
                     <h2 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">

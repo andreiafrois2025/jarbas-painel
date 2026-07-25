@@ -26,7 +26,7 @@ export default function InicioPanel() {
 
   return (
     <div className="p-4 md:p-6 pt-0 w-full">
-      <section className="rounded-xl border border-[var(--border)] overflow-hidden">
+      <section className="rounded-xl border border-[var(--border)] overflow-hidden max-w-[900px] mx-auto">
         <div className="flex items-center justify-between px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)]">
           <span className="text-sm font-semibold text-[var(--text-primary)]">🏢 Escritório</span>
           <div className="flex items-center gap-1.5">
@@ -47,7 +47,7 @@ export default function InicioPanel() {
         {officeUrl ? (
           <iframe
             src={officeUrl}
-            className={`w-full border-0 h-[52vh] md:h-[58vh] ${interagindo ? "" : "pointer-events-none"}`}
+            className={`w-full border-0 h-[70vh] md:h-[78vh] ${interagindo ? "" : "pointer-events-none"}`}
             title="Escritório virtual"
             loading="lazy"
           />
