@@ -51,19 +51,18 @@ export default function FlowsPageV2() {
     });
   }, []);
 
-  // 25/07/2026: o "voltar" do navegador não voltava pra tela anterior — esta
-  // página reescrevia a entrada do histórico (replaceState) em vez de criar uma
-  // nova, então o navegador perdia a referência de onde a Andréia veio.
-  // Agora a URL só é sincronizada quando o fluxo muda POR DENTRO da tela, e o
-  // botão "Voltar" leva explicitamente pra Automações, que é a porta de entrada.
-  useEffect(() => {
-    const aoVoltar = () => {
-      const f = new URLSearchParams(window.location.search).get("fluxo");
-      setSelectedId(f);
-    };
-    window.addEventListener("popstate", aoVoltar);
-    return () => window.removeEventListener("popstate", aoVoltar);
-  }, []);
+  // 25/07/2026 — sobre o "voltar" do navegador.
+  //
+  // Primeira tentativa (de manhã): eu tinha posto um ouvinte de "popstate" aqui
+  // pra sincronizar o fluxo aberto com a URL. Ele criava um efeito colateral
+  // ruim: ao apertar Voltar, esta tela re-renderizava por um instante no estado
+  // "nenhum fluxo aberto" ANTES do navegador concluir a saída. Dava a impressão
+  // de que o Voltar não tinha funcionado — e a reação natural é apertar de novo,
+  // aí sim pulando duas páginas pra trás (foi como ela caiu no painel de Saúde).
+  //
+  // Correção: esta tela não mexe mais no histórico nem escuta popstate. Quem
+  // manda é o navegador. O caminho de ida é sempre router.push a partir de um
+  // card de Automações, então o Voltar desfaz exatamente esse passo.
 
   const selected = flows.find((f) => f.id === selectedId) || null;
 
