@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useUI } from "./ui";
 import { Squad, SquadDocument } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { SQUAD_API_BASE } from "@/lib/config";
@@ -32,6 +33,7 @@ function extractSquadCode(link: string | undefined): string | null {
 }
 
 export default function StartSquadModal({ squad, open, onClose }: StartSquadModalProps) {
+  const { confirmar, avisar } = useUI();
   const [topic, setTopic] = useState("");
   const [documents, setDocuments] = useState<SquadDocument[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -92,7 +94,7 @@ export default function StartSquadModal({ squad, open, onClose }: StartSquadModa
   };
 
   const handleRemoveDoc = async (doc: SquadDocument) => {
-    if (!confirm(`Remover "${doc.name}"?`)) return;
+    if (!(await confirmar({ titulo: `Remover "${doc.name}"?`, acao: "Remover", destrutivo: true }))) return;
     try {
       await supabase.storage.from("squad-documents").remove([doc.path]);
     } catch (err) {

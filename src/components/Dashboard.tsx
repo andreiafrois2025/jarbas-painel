@@ -14,6 +14,7 @@ import {
 import type { Category as CategoryType } from "@/lib/types";
 import JobsMonitor from "./JobsMonitor";
 import { PainelContext } from "@/lib/painel-context";
+import { ProvedorUI } from "./ui";
 import type { Session } from "@supabase/supabase-js";
 
 interface DashboardProps {
@@ -21,15 +22,19 @@ interface DashboardProps {
   children: ReactNode;
 }
 
-const NAV_ITEMS: { path: string; icon: string; title: string; match: string }[] = [
-  { path: "/inicio", icon: "🏠", title: "Início", match: "/inicio" },
-  { path: "/equipe", icon: "👥", title: "Equipe", match: "/equipe" },
-  { path: "/producao/automacoes", icon: "🚀", title: "Produção (Squads, Automações, Fluxos)", match: "/producao" },
-  { path: "/saude", icon: "🩺", title: "Saúde (do sistema + integrações)", match: "/saude" },
-  { path: "/pessoal", icon: "🤎", title: "Pessoal (Luiz + Finanças)", match: "/pessoal" },
-  { path: "/metricas", icon: "📊", title: "Métricas", match: "/metricas" },
-  { path: "/biblioteca", icon: "📚", title: "Biblioteca (Criações + Skills)", match: "/biblioteca" },
-  { path: "/config", icon: "⚙️", title: "Config (Conta + Integrações)", match: "/config" },
+// 25/07/2026 (F4.6): o menu ganhou NOME. Antes eram 7 emojis sem legenda, e o
+// nome só aparecia parando o mouse em cima por um segundo — o que no celular,
+// onde a barra vai pra baixo, é impossível. Funcionava pra ela porque ela
+// construiu; não funcionaria pra mais ninguém, nem pra ela daqui a 3 meses.
+const NAV_ITEMS: { path: string; icon: string; nome: string; title: string; match: string }[] = [
+  { path: "/inicio", icon: "🏠", nome: "Hoje", title: "Hoje — agenda, tarefas e a caixa de aprovação", match: "/inicio" },
+  { path: "/equipe", icon: "👥", nome: "Equipe", title: "Equipe — colaboradores, setores e assistentes", match: "/equipe" },
+  { path: "/producao/automacoes", icon: "🚀", nome: "Produção", title: "Produção — squads, automações, fluxos e estúdio", match: "/producao" },
+  { path: "/saude", icon: "🩺", nome: "Saúde", title: "Saúde — do sistema e das integrações", match: "/saude" },
+  { path: "/pessoal", icon: "🤎", nome: "Pessoal", title: "Pessoal — escola do Luiz e finanças", match: "/pessoal" },
+  { path: "/metricas", icon: "📊", nome: "Métricas", title: "Métricas — números e diário de bordo", match: "/metricas" },
+  { path: "/biblioteca", icon: "📚", nome: "Biblioteca", title: "Biblioteca — criações, skills, prompts e grafo", match: "/biblioteca" },
+  { path: "/config", icon: "⚙️", nome: "Config", title: "Config — sua conta", match: "/config" },
 ];
 
 // Shell do painel: sidebar + JobsMonitor + dados compartilhados.
@@ -43,6 +48,15 @@ export default function Dashboard({ session, children }: DashboardProps) {
   const [categories, setCategories] = useState<CategoryType[]>([]);
   const [quickLinks, setQuickLinks] = useState<QuickLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aberto, setAberto] = useState(false);
+
+  // Lembra se ela deixou o menu aberto — é preferência, não estado de tela.
+  useEffect(() => {
+    setAberto(window.localStorage.getItem("menuAberto") === "1");
+  }, []);
+  useEffect(() => {
+    window.localStorage.setItem("menuAberto", aberto ? "1" : "0");
+  }, [aberto]);
 
   const loadData = useCallback(async () => {
     try {
@@ -100,26 +114,52 @@ export default function Dashboard({ session, children }: DashboardProps) {
 
   return (
     <PainelContext.Provider value={{ collaborators, assignments, categories, quickLinks, reload: loadData }}>
+      <ProvedorUI>
       <div className="h-screen flex flex-col md:flex-row dashboard-bg">
         {/* ===== SIDEBAR ===== */}
-        <aside className="order-2 md:order-none w-full md:w-16 bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-2 shrink-0">
-          <div className="hidden md:block text-2xl mb-4 cursor-default" title="Jarbas">⚡</div>
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => router.push(item.path)}
-              className={`w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all ${
-                pathname?.startsWith(item.match)
-                  ? "bg-[var(--accent-soft)]"
-                  : "hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"
-              }`}
-              title={item.title}
-            >
-              {item.icon}
-            </button>
-          ))}
+        <aside
+          className={`order-2 md:order-none w-full ${aberto ? "md:w-52" : "md:w-16"} bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center md:items-stretch justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-1 shrink-0 transition-[width] duration-150`}
+          aria-label="Menu principal"
+        >
+          <button
+            onClick={() => setAberto(!aberto)}
+            className="hidden md:flex items-center gap-2 px-3 mb-3 text-2xl cursor-pointer"
+            title={aberto ? "Encolher o menu" : "Expandir o menu"}
+            aria-label={aberto ? "Encolher o menu" : "Expandir o menu"}
+          >
+            <span>⚡</span>
+            {aberto && <span className="text-sm font-semibold text-[var(--text-primary)]">Jarbas</span>}
+          </button>
+          {NAV_ITEMS.map((item) => {
+            const ativo = pathname?.startsWith(item.match);
+            return (
+              <button
+                key={item.path}
+                onClick={() => router.push(item.path)}
+                className={`flex md:w-full flex-col md:flex-row items-center md:gap-2.5 md:px-3 py-1.5 md:py-2 rounded-xl cursor-pointer transition-all ${
+                  ativo ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-70 hover:opacity-100"
+                }`}
+                title={item.title}
+                aria-current={ativo ? "page" : undefined}
+              >
+                <span className="text-lg leading-none">{item.icon}</span>
+                {/* No celular o nome fica embaixo do ícone, pequeno: lá não
+                    existe parar o mouse em cima pra descobrir o que é. */}
+                <span className={`text-[10px] md:text-sm md:font-medium ${aberto ? "md:inline" : "md:hidden"} ${ativo ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
+                  {item.nome}
+                </span>
+              </button>
+            );
+          })}
           <div className="hidden md:block flex-1" />
-          <button onClick={handleLogout} className="w-10 h-10 rounded-xl text-lg flex items-center justify-center cursor-pointer transition-all hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100" title="Sair">🚪</button>
+          <button
+            onClick={handleLogout}
+            className="flex md:w-full flex-col md:flex-row items-center md:gap-2.5 md:px-3 py-1.5 md:py-2 rounded-xl cursor-pointer opacity-70 hover:opacity-100 hover:bg-[var(--bg-tertiary)]"
+            title="Sair da conta"
+          >
+            <span className="text-lg leading-none">🚪</span>
+            <span className={`text-[10px] md:text-sm ${aberto ? "md:inline" : "md:hidden"} text-[var(--text-secondary)]`}>Sair</span>
+          </button>
         </aside>
 
         {/* ===== CONTEÚDO PRINCIPAL ===== */}
@@ -128,6 +168,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
           {children}
         </main>
       </div>
+      </ProvedorUI>
     </PainelContext.Provider>
   );
 }

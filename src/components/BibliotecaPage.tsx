@@ -14,6 +14,7 @@ import {
   type NovaCriacaoPayload,
 } from "@/lib/biblioteca";
 import dynamic from "next/dynamic";
+import { useUI } from "./ui";
 
 // O grafo é uma aba entre seis; não precisa ser baixado por quem abre Criações.
 const GrafoView = dynamic(() => import("./GrafoView"), {
@@ -50,6 +51,7 @@ interface CriacaoUnificada {
 }
 
 export default function BibliotecaPage() {
+  const { confirmar, comDesfazer } = useUI();
   const [aba, setAba] = useState<Aba>("criacoes");
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -268,9 +270,13 @@ export default function BibliotecaPage() {
                                     </button>
                                     <button
                                       onClick={async () => {
-                                        if (!confirm(`Excluir "${c.nome}"?`)) return;
-                                        await excluirCriacao(c.id!);
-                                        await recarregar();
+                                        if (!(await confirmar({ titulo: `Excluir "${c.nome}"?`, descricao: "A criação sai da sua biblioteca.", acao: "Excluir", destrutivo: true }))) return;
+                                        // A exclusão só acontece de verdade depois de 5s: até lá,
+                                        // o "Desfazer" cancela. Antes desta mudança, apagou = foi.
+                                        comDesfazer(`"${c.nome}" excluída`, async () => {
+                                          await excluirCriacao(c.id!);
+                                          await recarregar();
+                                        });
                                       }}
                                       className="text-xs px-3 py-1.5 rounded-full border font-medium text-red-500 hover:text-red-600 border-[var(--border)]"
                                     >

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Squad, SquadDocument, Collaborator, CONTEXTS } from "@/lib/types";
 import { getSquads, addSquad, updateSquad, deleteSquad, getCollaborators } from "@/lib/storage";
+import { useUI } from "./ui";
 import { supabase } from "@/lib/supabase";
 import { SQUAD_API_BASE } from "@/lib/config";
 import StartSquadModal from "./StartSquadModal";
@@ -40,6 +41,7 @@ function PipelineView({ collaboratorIds, collaborators }: { collaboratorIds: str
 }
 
 export default function SquadsPage({ onNavigate }: SquadsPageProps) {
+  const { confirmar, avisar } = useUI();
   const [squads, setSquads] = useState<Squad[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +166,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
 
   /** Remove documento do form (e tenta deletar do Storage) */
   const handleRemoveDocument = async (doc: SquadDocument) => {
-    if (!confirm(`Remover o arquivo "${doc.name}"?`)) return;
+    if (!(await confirmar({ titulo: `Remover o arquivo "${doc.name}"?`, descricao: "Ele deixa de estar disponível pra esta squad.", acao: "Remover", destrutivo: true }))) return;
     try {
       await supabase.storage.from("squad-documents").remove([doc.path]);
     } catch (err) {
@@ -199,7 +201,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Excluir este squad?")) return;
+    if (!(await confirmar({ titulo: "Excluir este squad?", descricao: "O squad sai do painel. Os trabalhos que ele já produziu continuam salvos.", acao: "Excluir", destrutivo: true }))) return;
     try {
       await deleteSquad(id);
       await loadData();

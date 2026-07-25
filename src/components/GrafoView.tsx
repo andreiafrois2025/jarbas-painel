@@ -165,14 +165,14 @@ export default function GrafoView() {
   if (modo === "conhecimento") {
     return (
       <div className="space-y-3">
-        <div className="p-4 md:p-6 pb-0 max-w-5xl mx-auto">{toggle}</div>
+        <div className="p-4 md:p-6 pb-0 w-full">{toggle}</div>
         <GrafoConteudoView />
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-3">
+    <div className="p-4 md:p-6 w-full space-y-3">
       {/* Toggle de camadas */}
       {toggle}
 

@@ -218,7 +218,7 @@ export default function MetricasPage() {
       )}
 
       <div className="flex-1 overflow-y-auto">
-        <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+        <div className="p-4 md:p-6 w-full space-y-6">
           <p className="text-xs text-[var(--text-secondary)] text-right">
             snapshot diário · atualizado {tempoRelativo(data.updated_at)}
           </p>
@@ -311,7 +311,7 @@ function AbaGeral({ data, hoje, taxaSemanal, area }: {
     <div className="space-y-6">
       <section className="text-center py-4">
         <p className="text-xs uppercase tracking-[0.3em]" style={{ color: "#A0583C" }}>Minha fábrica com IA</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full mt-6">
           {tiles.map(([v, r]) => (
             <div key={String(r)}>
               <div className="text-4xl md:text-5xl font-bold" style={{ color: "#2D6B6B" }}>{v}</div>
@@ -361,7 +361,7 @@ function AbaProducao({ data, hoje, taxaSemanal, area }: {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-6 gap-3">
         {mostraConteudo ? (
           <Tile icone="📤" titulo="Posts no grupo IA" valor={hoje.enviados_total ?? "—"}
             sub={`${hoje.fila?.enviados_7d ?? 0} nos últimos 7 dias`} />

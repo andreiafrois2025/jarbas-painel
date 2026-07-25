@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useUI } from "./ui";
 
 import { squadFetch } from "@/lib/squadFetch";
 const POLL_INTERVAL_MS = 5000;
@@ -63,6 +64,7 @@ interface JobFile {
 }
 
 export default function JobsMonitor() {
+  const { confirmar, avisar } = useUI();
   const [runningJobs, setRunningJobs] = useState<Job[]>([]);
   const [troubledJobs, setTroubledJobs] = useState<Job[]>([]); // failed, paused, interrupted
   const [archivedJobs, setArchivedJobs] = useState<Job[]>([]); // marcados manualmente (done/paused/archived)
@@ -185,7 +187,7 @@ export default function JobsMonitor() {
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        alert(`Falha ao retomar: ${err.error || r.statusText}`);
+        avisar(`Falha ao retomar: ${err.error || r.statusText}`);
       } else {
         setResumeModal(null);
         await fetchData();
@@ -211,7 +213,7 @@ export default function JobsMonitor() {
       const r = await squadFetch(`/api/jobs/${jobId}/sync-drive`, { method: "POST" });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        alert(`Falha ao iniciar sync: ${err.error || r.statusText}`);
+        avisar(`Falha ao iniciar sync: ${err.error || r.statusText}`);
       } else {
         // Recarrega jobs em 3 e 15 segundos pra pegar o driveFolder após sync completar
         setTimeout(() => fetchData(), 3000);
@@ -232,7 +234,7 @@ export default function JobsMonitor() {
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        alert(`Falha ao marcar: ${err.error || r.statusText}`);
+        avisar(`Falha ao marcar: ${err.error || r.statusText}`);
       } else {
         await fetchData();
       }
@@ -241,14 +243,14 @@ export default function JobsMonitor() {
     }
   }
 
-  async function deleteJob(jobId: string, confirmar = true) {
-    if (confirmar && !window.confirm("Excluir este registro? Os arquivos de saída dele na VPS também serão apagados.")) return;
+  async function deleteJob(jobId: string, pedeConfirmacao = true) {
+    if (pedeConfirmacao && !(await confirmar({ titulo: "Excluir este registro?", descricao: "Os arquivos que essa squad produziu na VPS também serão apagados.", acao: "Excluir", destrutivo: true }))) return;
     setActionLoading(`delete:${jobId}`);
     try {
       const r = await squadFetch(`/api/jobs/${jobId}`, { method: "DELETE" });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        alert(`Falha ao excluir: ${err.error || r.statusText}`);
+        avisar(`Falha ao excluir: ${err.error || r.statusText}`);
       } else {
         setArchivedJobs((js) => js.filter((j) => j.jobId !== jobId));
       }
@@ -258,7 +260,7 @@ export default function JobsMonitor() {
   }
 
   async function deleteAllArchived() {
-    if (!window.confirm(`Excluir os ${archivedJobs.length} registros? Os arquivos de saída deles na VPS também serão apagados.`)) return;
+    if (!(await confirmar({ titulo: `Excluir os ${archivedJobs.length} registros?`, descricao: "Os arquivos que essas squads produziram na VPS também serão apagados.", acao: "Excluir tudo", destrutivo: true }))) return;
     for (const j of [...archivedJobs]) {
       await deleteJob(j.jobId, false);
     }
@@ -280,7 +282,7 @@ export default function JobsMonitor() {
   }
 
   async function stopJob(jobId: string) {
-    if (!confirm("Parar este job? O squad vai ser interrompido e o que já foi produzido continua salvo.")) return;
+    if (!(await confirmar({ titulo: "Parar esta squad?", descricao: "Ela é interrompida onde está. O que já foi produzido continua salvo.", acao: "Parar", destrutivo: true }))) return;
     setActionLoading(jobId);
     try {
       await squadFetch(`/api/jobs/${jobId}/stop`, { method: "POST" });
@@ -846,7 +848,7 @@ export default function JobsMonitor() {
                 <button
                   onClick={async () => {
                     if (!rejectComment.trim()) {
-                      alert("Por favor escreva o que precisa mudar.");
+                      avisar("Por favor escreva o que precisa mudar.");
                       return;
                     }
                     await approveCheckpoint(rejectModal.jobId, rejectModal.stepId, false, rejectComment);

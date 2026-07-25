@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useUI } from "./ui";
 import type { Collaborator, Assignment, Category, QuickLink, SubLink } from "@/lib/types";
 import { CONTEXTS } from "@/lib/types";
 import {
@@ -38,6 +39,7 @@ interface HRPageProps {
 }
 
 export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
+  const { confirmar, avisar, comDesfazer } = useUI();
   // Data
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -229,7 +231,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     const msg = asgCount > 0
       ? `Excluir "${name}"? Isso removerá ${asgCount} atribuição(ões) também.`
       : `Excluir "${name}"?`;
-    if (!confirm(msg)) return;
+    if (!(await confirmar({ titulo: msg, acao: "Excluir", destrutivo: true }))) return;
     setSaving(true);
     try {
       await deleteCollaborator(id);
@@ -334,12 +336,12 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   };
 
   const handleDeleteAssignment = async (id: string) => {
-    if (!confirm("Excluir esta atribuição?")) return;
-    setSaving(true);
-    try {
+    if (!(await confirmar({ titulo: "Excluir esta atribuição?", descricao: "O assistente sai da mesa, mas o colaborador continua na equipe.", acao: "Excluir", destrutivo: true }))) return;
+    // 5 segundos de arrependimento antes de valer (F4.5).
+    comDesfazer("Atribuição excluída", async () => {
       await deleteAssignment(id);
       await reload();
-    } finally { setSaving(false); }
+    });
   };
 
   // Sector CRUD
@@ -369,7 +371,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     const msg = count > 0
       ? `Excluir setor "${cat.name}"? ${count} atribuição(ões) serão excluídas.`
       : `Excluir setor "${cat.name}"?`;
-    if (!confirm(msg)) return;
+    if (!(await confirmar({ titulo: msg, acao: "Excluir", destrutivo: true }))) return;
     setSaving(true);
     try {
       await deleteCategory(cat.id);
@@ -395,12 +397,11 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   };
 
   const handleDeleteQL = async (id: string) => {
-    if (!confirm("Excluir este atalho?")) return;
-    setSaving(true);
-    try {
+    if (!(await confirmar({ titulo: "Excluir este atalho?", descricao: "Ele some da barra de atalhos da tela Hoje.", acao: "Excluir", destrutivo: true }))) return;
+    comDesfazer("Atalho excluído", async () => {
       await deleteQuickLink(id);
       await reload();
-    } finally { setSaving(false); }
+    });
   };
 
   const openEditQL = (ql: QuickLink) => {
@@ -948,7 +949,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
         {/* ===== TAB: ATALHOS RÁPIDOS ===== */}
         {activeTab === "quicklinks" && (
           <div className="flex-1 overflow-y-auto p-4 md:p-6">
-            <div className="max-w-2xl mx-auto space-y-4">
+            <div className="w-full space-y-4">
               <p className="text-sm text-[var(--text-secondary)]">
                 Atalhos aparecem na parede do escritório. Todos com o mesmo visual.
               </p>

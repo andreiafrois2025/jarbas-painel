@@ -38,7 +38,7 @@ export default function PessoalPage() {
       {r.n === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">Sem lançamentos registrados este mês.</p>
       ) : (
-        <div className="flex flex-wrap gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div><p className="text-[11px] text-[var(--text-muted)]">Receitas</p><p className="text-base font-semibold" style={{ color: "#2D6B6B" }}>{brl(r.receitas)}</p></div>
           <div><p className="text-[11px] text-[var(--text-muted)]">Despesas</p><p className="text-base font-semibold" style={{ color: "#A0583C" }}>{brl(r.despesas)}</p></div>
           <div><p className="text-[11px] text-[var(--text-muted)]">Saldo</p><p className="text-base font-semibold" style={{ color: r.saldo >= 0 ? "#2D6B6B" : "#C0392B" }}>{brl(r.saldo)}</p></div>
@@ -69,7 +69,7 @@ export default function PessoalPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
+        <div className="p-4 md:p-6 w-full space-y-4">
           {aba === "luiz" ? (
             <>
               {escola.length > 0 && (

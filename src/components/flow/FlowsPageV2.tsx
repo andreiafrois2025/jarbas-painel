@@ -7,6 +7,7 @@ import { getFlowDocs, duplicateFlowDoc, updateFlowDoc } from "@/lib/storage";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { interpretaCron, formataProxima } from "@/lib/cron";
 import FlowCanvas from "./FlowCanvas";
+import { useUI } from "../ui";
 import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 
 // =============================================
@@ -19,6 +20,7 @@ import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 
 export default function FlowsPageV2() {
   const router = useRouter();
+  const { avisar } = useUI();
   const [flows, setFlows] = useState<FlowDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -144,7 +146,7 @@ export default function FlowsPageV2() {
             <button
               onClick={async () => {
                 await copy(toMermaid(selected));
-                alert("Mermaid copiado! Cola em qualquer IA.");
+                avisar("Mermaid copiado — cola em qualquer IA.");
               }}
               className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--bg-tertiary)]"
               title="Copia como Mermaid (formato de fluxo em texto)"
@@ -154,7 +156,7 @@ export default function FlowsPageV2() {
             <button
               onClick={async () => {
                 await copy(toPrompt(selected));
-                alert("Descrição copiada! Cola em qualquer IA sem estrutura de código.");
+                avisar("Descrição copiada — cola em qualquer IA.");
               }}
               className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--bg-tertiary)]"
               title="Copia como prompt textual"
