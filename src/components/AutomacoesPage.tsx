@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { getFlowDocs, addFlowDoc } from "@/lib/storage";
@@ -172,6 +172,66 @@ export default function AutomacoesPage() {
     if (v === "gatilho" || v === "categoria" || v === "tipo") setVisao(v);
   }, []);
 
+  // 25/07/2026 — o "Voltar" do navegador precisa fechar a janela do card.
+  //
+  // Ela relatou: clicou no foguete, clicou num card, "abriu o fluxo", apertou
+  // Voltar e caiu no painel de Saúde. O navegador estava certo: abrir o card é
+  // uma janela por cima da MESMA página, não uma navegação — então Voltar saía
+  // de Automações e ia pra tela anterior, que por acaso era a Saúde.
+  //
+  // Mas abrir o fluxo PARECE navegação, e no celular o Voltar é o gesto natural
+  // de fechar. Então a janela passa a marcar presença no histórico: abrir
+  // empilha uma entrada, Voltar desfaz essa entrada e fecha a janela. Só depois
+  // disso o Voltar sai da página, como antes.
+  const marcouHistorico = useRef(false);
+  const navPendente = useRef<string | null>(null);
+
+  const abrirCard = (i: ItemUnificado) => {
+    setAberto(i);
+    window.history.pushState({ janelaJarbas: true }, "");
+    marcouHistorico.current = true;
+  };
+
+  const fecharCard = () => {
+    setAberto(null);
+    setCriando(false);
+    if (marcouHistorico.current) {
+      marcouHistorico.current = false;
+      window.history.back(); // devolve a entrada que a janela tinha empilhado
+    }
+  };
+
+  // Ir pro editor: consome a entrada da janela ANTES de navegar, senão o Voltar
+  // lá de dentro exigiria dois cliques pra sair de Automações.
+  const abrirEditor = (idFluxo: string) => {
+    const destino = `/producao/fluxos?fluxo=${idFluxo}`;
+    setAberto(null);
+    if (marcouHistorico.current) {
+      marcouHistorico.current = false;
+      navPendente.current = destino;
+      window.history.back();
+    } else {
+      router.push(destino);
+    }
+  };
+
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (navPendente.current) {
+        const destino = navPendente.current;
+        navPendente.current = null;
+        router.push(destino);
+        return;
+      }
+      // Voltou com a janela aberta: fecha a janela e fica na página.
+      marcouHistorico.current = false;
+      setAberto(null);
+      setCriando(false);
+    };
+    window.addEventListener("popstate", aoVoltar);
+    return () => window.removeEventListener("popstate", aoVoltar);
+  }, [router]);
+
   const trocaVisao = (v: "categoria" | "tipo" | "gatilho") => {
     setVisao(v);
     const params = new URLSearchParams(window.location.search);
@@ -322,7 +382,11 @@ export default function AutomacoesPage() {
               className="text-sm px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)] w-full sm:w-56"
             />
             <button
-              onClick={() => setCriando(true)}
+              onClick={() => {
+                setCriando(true);
+                window.history.pushState({ janelaJarbas: true }, "");
+                marcouHistorico.current = true;
+              }}
               className="text-sm px-4 py-2 rounded-lg font-medium text-white hover:opacity-90 cursor-pointer whitespace-nowrap"
               style={{ background: "var(--accent, #2D6B6B)" }}
             >
@@ -393,7 +457,7 @@ export default function AutomacoesPage() {
               {explica && <p className="text-xs text-[var(--text-muted)] mb-2">{explica}</p>}
               <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-2">
                 {doGrupo.map((i) => (
-                  <Card key={i.chave} item={i} onAbrir={() => setAberto(i)} />
+                  <Card key={i.chave} item={i} onAbrir={() => abrirCard(i)} />
                 ))}
               </div>
             </section>
@@ -408,7 +472,7 @@ export default function AutomacoesPage() {
       {criando && (
         <NovoFluxo
           categorias={[...new Set([...itens.map((i) => i.categoria), CATEGORIA_PADRAO])].sort()}
-          onFechar={() => setCriando(false)}
+          onFechar={fecharCard}
           onCriado={(id) => {
             setCriando(false);
             router.push(`/producao/fluxos?fluxo=${id}`);
@@ -419,7 +483,7 @@ export default function AutomacoesPage() {
       {aberto && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-          onClick={() => setAberto(null)}
+          onClick={fecharCard}
         >
           <div
             className="bg-[var(--bg-primary)] rounded-xl border border-[var(--border)] max-w-4xl w-full max-h-[88vh] overflow-y-auto"
@@ -435,7 +499,7 @@ export default function AutomacoesPage() {
                 </p>
               </div>
               <button
-                onClick={() => setAberto(null)}
+                onClick={fecharCard}
                 className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none shrink-0 cursor-pointer"
                 aria-label="Fechar"
               >
@@ -510,7 +574,7 @@ export default function AutomacoesPage() {
                       <FlowCanvas flow={aberto.fluxo} />
                     </div>
                     <button
-                      onClick={() => router.push(`/producao/fluxos?fluxo=${aberto.fluxo!.id}`)}
+                      onClick={() => abrirEditor(aberto.fluxo!.id)}
                       className="mt-2 text-xs px-3 py-1.5 rounded-full border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
                     >
                       ✏️ Abrir no editor de fluxos
