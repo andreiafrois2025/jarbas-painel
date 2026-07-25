@@ -8,7 +8,10 @@
 // reels ficam no kanban do Notion). Notícia UAU (Prioridade) em evidência.
 
 import { useState } from "react";
-import { useHoje, decidirCard, marcarLido, promoverProGrupo, promoverProConteudo, type CardCaixa, type ItemParaMim } from "@/lib/hoje";
+import { useRouter } from "next/navigation";
+import { useStatus } from "@/lib/status";
+import { useUI } from "./ui";
+import { useHoje, useTarefas, marcarLido, promoverProGrupo, promoverProConteudo, type CardCaixa, type ItemParaMim } from "@/lib/hoje";
 import { tempoRelativo } from "@/lib/metrics";
 
 const AGENDA_URL = "https://calendar.google.com/calendar/u/0/r";
@@ -22,20 +25,66 @@ const COLUNAS_CAIXA = new Set(["Pra avaliar - Prioridade", "Pra avaliar - Notíc
 const ehUau = (c: CardCaixa) =>
   c.titulo.includes("[Prioridade]") || c.coluna === "Pra avaliar - Prioridade";
 
-function CardAprovacao({ card, onDecidir }: { card: CardCaixa; onDecidir: (id: string, a: "aprovar" | "prioridade" | "descartar") => void }) {
-  const [ocupado, setOcupado] = useState(false);
+// 25/07/2026 (F6.4) — a primeira linha da home.
+//
+// Antes era preciso varrer a tela pra saber se havia algo esperando você. Esta
+// linha responde de uma vez: o que precisa de você, o que está andando sozinho
+// e se tem algo quebrado. Cada pedaço leva pro lugar de resolver.
+function PrimeiroOlhar({ naCaixa, paraLer }: { naCaixa: number; paraLer: number }) {
+  const { status, mudo } = useStatus();
+  const router = useRouter();
+
+  const nivel = mudo ? "vermelho" : status?.nivel;
+  const saude =
+    nivel === "verde" ? { txt: "tudo saudável", cor: "text-emerald-700", ir: "/saude" }
+    : nivel === "amarelo" ? { txt: `${status?.problemas?.length ?? 1} ponto(s) de atenção`, cor: "text-amber-700", ir: "/saude" }
+    : nivel === "vermelho" ? { txt: "algo caiu", cor: "text-red-700", ir: "/saude" }
+    : null;
+
+  const partes: { txt: string; cor?: string; ir?: string }[] = [];
+  if (naCaixa > 0) partes.push({ txt: `${naCaixa} ${naCaixa === 1 ? "notícia esperando" : "notícias esperando"} você`, cor: "text-[var(--text-primary)] font-semibold" });
+  if (paraLer > 0) partes.push({ txt: `${paraLer} pra você ficar por dentro` });
+  if (saude) partes.push({ txt: saude.txt, cor: saude.cor, ir: saude.ir });
+
+  if (!partes.length) return null;
+
+  return (
+    <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl px-4 py-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <span className="text-[var(--text-muted)] text-xs uppercase tracking-wider mr-1">Agora</span>
+      {partes.map((p, i) => (
+        <span key={i} className="flex items-center gap-2">
+          {i > 0 && <span className="text-[var(--text-muted)]">·</span>}
+          {p.ir ? (
+            <button onClick={() => router.push(p.ir!)} className={`cursor-pointer underline decoration-dotted ${p.cor ?? "text-[var(--text-secondary)]"}`}>
+              {p.txt}
+            </button>
+          ) : (
+            <span className={p.cor ?? "text-[var(--text-secondary)]"}>{p.txt}</span>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// 25/07/2026 (F6.2) — os três botões saíram.
+//
+// Decisão dela: "eu não aprovo ou reprovo do jeito que ela tá ali, porque ali eu
+// só vejo o título. Não tem como eu aprovar sem ter lido o texto pra ver como
+// ficou. Acho que poderia inclusive tirar os botões."
+//
+// Botão que decide o destino de um texto que você não leu é armadilha, não
+// atalho. O card agora só mostra e leva pro Notion, que é onde dá pra ler.
+function CardAprovacao({ card }: { card: CardCaixa }) {
   const uau = ehUau(card);
   const meta = uau ? { rotulo: "🔥 UAU", cor: "#A0583C" } : { rotulo: "Notícia", cor: "#456B74" };
-  const agir = async (a: "aprovar" | "prioridade" | "descartar") => {
-    setOcupado(true);
-    onDecidir(card.id, a);
-  };
   return (
-    <div
-      className={`rounded-xl p-3 border ${ocupado ? "opacity-40" : ""} ${
-        uau
-          ? "border-2 border-[#A0583C] shadow-md"
-          : "bg-[var(--bg-secondary)] border-[var(--border)]"
+    <a
+      href={card.url}
+      target="_blank"
+      rel="noreferrer"
+      className={`block rounded-xl p-3 border transition-colors hover:border-[var(--accent)] ${
+        uau ? "border-2 border-[#A0583C] shadow-md" : "bg-[var(--bg-secondary)] border-[var(--border)]"
       }`}
       style={uau ? { background: "color-mix(in srgb, #A0583C 12%, var(--bg-secondary))" } : undefined}
     >
@@ -43,26 +92,12 @@ function CardAprovacao({ card, onDecidir }: { card: CardCaixa; onDecidir: (id: s
         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: meta.cor }}>
           {meta.rotulo}
         </span>
-        <a href={card.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--text-muted)] underline">abrir</a>
+        <span className="text-[11px] text-[var(--text-muted)] ml-auto">abrir no Notion ↗</span>
       </div>
       <p className={`text-sm text-[var(--text-primary)] ${uau ? "font-semibold" : ""}`}>
         {card.titulo.replace("[Prioridade] ", "")}
       </p>
-      <div className="flex gap-1.5 mt-2 flex-wrap">
-        <button disabled={ocupado} onClick={() => agir("aprovar")}
-          className="text-xs px-2.5 py-1 rounded-lg text-white font-medium" style={{ background: "#2D6B6B" }}>
-          ✓ Aprovar
-        </button>
-        <button disabled={ocupado} onClick={() => agir("prioridade")}
-          className="text-xs px-2.5 py-1 rounded-lg font-medium border" style={{ borderColor: "#A0583C", color: "#A0583C" }}>
-          ★ Prioridade
-        </button>
-        <button disabled={ocupado} onClick={() => agir("descartar")}
-          className="text-xs px-2.5 py-1 rounded-lg font-medium border border-red-300 text-red-600">
-          ✕ Descartar
-        </button>
-      </div>
-    </div>
+    </a>
   );
 }
 
@@ -135,14 +170,9 @@ function LinkCanto({ href, rotulo }: { href: string; rotulo: string }) {
 
 export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
   const { dados, erro, recarregar } = useHoje();
-  const [feitos, setFeitos] = useState<Set<string>>(new Set());
   const [lidosOverride, setLidosOverride] = useState<Map<string, boolean>>(new Map());
   const [promovidos, setPromovidos] = useState<Set<string>>(new Set());
 
-  const onDecidir = async (id: string, acao: "aprovar" | "prioridade" | "descartar") => {
-    const ok = await decidirCard(id, acao);
-    if (ok) setFeitos((s) => new Set(s).add(id));
-  };
 
   // caixa de seleção lido/não lido: alterna o estado, o item continua na lista
   const onToggleLido = async (url: string, novo: boolean) => {
@@ -179,7 +209,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
 
   // Só notícias, UAU primeiro
   const caixa = dados.caixa
-    .filter((c) => COLUNAS_CAIXA.has(c.coluna) && !feitos.has(c.id))
+    .filter((c) => COLUNAS_CAIXA.has(c.coluna))
     .sort((a, b) => Number(ehUau(b)) - Number(ehUau(a)));
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
 
@@ -197,6 +227,11 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
             </button>
           </span>
         </div>
+
+        <PrimeiroOlhar
+          naCaixa={caixa.length}
+          paraLer={(dados.para_mim || []).filter((n) => !n.lido && !promovidos.has(n.url)).length}
+        />
 
         <div className="flex flex-col lg:flex-row gap-5 items-start">
           {/* Lateral esquerda: assistentes por área (coluna estreita, do topo).
@@ -238,9 +273,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                   <h2 className="text-sm font-semibold text-[var(--text-primary)]">✅ Tarefas</h2>
                   <LinkCanto href={REVISAO_DIARIA_URL} rotulo="revisão diária" />
                 </div>
-                <pre className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap font-sans">
-                  {dados.tarefas || "Sem tarefas pendentes pra hoje."}
-                </pre>
+                <ListaTarefas textoCru={dados.tarefas} />
                 {dados.tarefas_semana && (
                   <details className="mt-3 border-t border-[var(--border)] pt-2">
                     <summary className="text-xs font-semibold text-[var(--text-primary)] cursor-pointer select-none">
@@ -257,7 +290,25 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
             {/* Escola do Luiz (23/07: card tirado da home a pedido da Andréia —
                 fica só em Pessoal → Luiz escola) */}
 
-            {/* Feed do que os agentes fizeram */}
+            {/* Notícias de mercado (separado da caixa do grupo) */}
+            <ParaVoceFicarPorDentro
+              itens={(dados.para_mim || [])
+                .filter((n) => !promovidos.has(n.url))
+                .map((n) => ({
+                  ...n,
+                  lido: lidosOverride.has(n.url) ? !!lidosOverride.get(n.url) : !!n.lido,
+                }))
+                // lidas vão pro fim da lista na hora, sem esperar recarregar
+                .sort((a, b) => Number(a.lido) - Number(b.lido))}
+              onToggleLido={onToggleLido}
+              onProGrupo={onProGrupo}
+              onProConteudo={onProConteudo}
+            />
+
+            {/* 25/07 (F6.5): o feed da equipe DESCEU e as notícias SUBIRAM,
+                a pedido dela. Notícia é coisa pra ler quando está tranquila;
+                o feed é pra confirmar que os agentes estão trabalhando —
+                ela olha, gosta e segue. Ordem certa é a da urgência. */}
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2">
                 ⚡ O que a equipe fez
@@ -275,20 +326,6 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
               </div>
             </section>
 
-            {/* Notícias de mercado (separado da caixa do grupo) */}
-            <ParaVoceFicarPorDentro
-              itens={(dados.para_mim || [])
-                .filter((n) => !promovidos.has(n.url))
-                .map((n) => ({
-                  ...n,
-                  lido: lidosOverride.has(n.url) ? !!lidosOverride.get(n.url) : !!n.lido,
-                }))
-                // lidas vão pro fim da lista na hora, sem esperar recarregar
-                .sort((a, b) => Number(a.lido) - Number(b.lido))}
-              onToggleLido={onToggleLido}
-              onProGrupo={onProGrupo}
-              onProConteudo={onProConteudo}
-            />
           </div>
 
           {/* Coluna direita: caixa de aprovação (fila única, só notícias) */}
@@ -304,7 +341,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
               // Altura limitada + rolagem interna: fila cheia não empurra mais o
               // escritório lá pra baixo (pedido 19/07). Rola por dentro da coluna.
               <div className="space-y-2 lg:max-h-[calc(100vh-11rem)] overflow-y-auto pr-1">
-                {caixa.map((c) => <CardAprovacao key={c.id} card={c} onDecidir={onDecidir} />)}
+                {caixa.map((c) => <CardAprovacao key={c.id} card={c} />)}
               </div>
             )}
           </section>
@@ -387,5 +424,63 @@ function EsqueletoHoje({ lateral }: { lateral?: React.ReactNode }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// 25/07/2026 (F6.3) — tarefas clicáveis, com a condição dela.
+//
+// "Gostei, mas desde que seja compatibilizado, integrado com o Notion. Eu
+// cliquei aqui, automaticamente no Notion também é clicado. Porque se eu clicar
+// aqui e chegar no Notion o negócio não tá clicado, aí vai dar mais trabalho."
+//
+// Por isso o risco fica todo do lado certo: o item só sai da lista DEPOIS que o
+// Notion confirmou. Se o Notion recusar, nada muda na tela e aparece o aviso —
+// duas listas divergindo seria pior que o texto cru de antes.
+//
+// E se a leitura com id falhar (VPS fora, Notion fora), a tela cai no texto de
+// sempre em vez de mostrar lista vazia.
+function ListaTarefas({ textoCru }: { textoCru?: string }) {
+  const { tarefas, marcarFeita } = useTarefas();
+  const { avisar } = useUI();
+  const [emCurso, setEmCurso] = useState<string | null>(null);
+
+  if (tarefas === null) {
+    return (
+      <pre className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap font-sans">
+        {textoCru || "Sem tarefas pendentes pra hoje."}
+      </pre>
+    );
+  }
+  if (tarefas.length === 0) {
+    return <p className="text-sm text-[var(--text-secondary)]">🎉 Nenhuma tarefa pendente pra hoje.</p>;
+  }
+
+  const marcar = async (id: string, nome: string) => {
+    setEmCurso(id);
+    const ok = await marcarFeita(id);
+    setEmCurso(null);
+    avisar(ok ? `"${nome.slice(0, 40)}" marcada como feita no Notion` : "Não consegui marcar no Notion — nada foi mudado");
+  };
+
+  return (
+    <ul className="space-y-1.5">
+      {tarefas.map((t) => (
+        <li key={t.id} className="flex items-start gap-2 text-sm group">
+          <button
+            onClick={() => marcar(t.id, t.nome)}
+            disabled={emCurso === t.id}
+            aria-label={`Marcar "${t.nome}" como feita`}
+            title="Marcar como feita — muda no Notion também"
+            className="mt-0.5 w-4 h-4 rounded border border-[var(--border-light)] shrink-0 cursor-pointer hover:border-[var(--accent)] disabled:opacity-40 flex items-center justify-center text-[10px]"
+          >
+            {emCurso === t.id ? "…" : ""}
+          </button>
+          <span className="text-[var(--text-primary)] flex-1">
+            {t.nome}
+            {t.status && <span className="text-[var(--text-muted)] text-xs"> · {t.status}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -36,6 +36,45 @@ export interface ItemParaMim {
   lido?: boolean;
 }
 
+export interface TarefaNotion {
+  id: string;
+  nome: string;
+  status: string;
+  prazo: string | null;
+}
+
+/** Tarefas com id, pra poder marcar como feita direto no Notion (F6.3). */
+export function useTarefas() {
+  const [tarefas, setTarefas] = useState<TarefaNotion[] | null>(null);
+
+  const carregar = useCallback(async () => {
+    try {
+      const r = await comToken("/api/hoje/tarefas");
+      if (!r.ok) throw new Error(String(r.status));
+      const d = await r.json();
+      setTarefas(d.tarefas || []);
+    } catch {
+      setTarefas(null); // deixa a tela cair no texto de sempre
+    }
+  }, []);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  /** Só confirma na tela DEPOIS que o Notion aceitou — a condição dela. */
+  const marcarFeita = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      const r = await comToken(`/api/hoje/tarefas/${id}/feita`, { method: "POST" });
+      if (!r.ok) return false;
+      setTarefas((t) => (t || []).filter((x) => x.id !== id));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  return { tarefas, marcarFeita, recarregar: carregar };
+}
+
 export interface DadosHoje {
   gerado_em: string;
   agenda: string;
