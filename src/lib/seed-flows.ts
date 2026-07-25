@@ -730,6 +730,31 @@ const donnaGuardaPessoal: SeedFlow = {
   ],
 };
 
+
+const curadorFluxos: SeedFlow = {
+  title: "Curador de fluxos semanal",
+  category: "automation",
+  description:
+    "Domingo à noite, o Claude compara o relógio da VPS com os desenhos do painel e conserta o que estiver desencontrado — sem você pedir. Ideia dela em 25/07/2026, resolvendo o problema de os desenhos envelhecerem em silêncio.",
+  is_seed: true,
+  nodes: [
+    { id: "1", type: "start", position: col(0), data: { label: "Domingo, 21h", icon: "⏰", details: "Uma vez por semana. Se falhar, fica quieto e tenta no domingo seguinte.", executor: "cron → curador-fluxos.py" } },
+    { id: "2", type: "action", position: col(1), data: { label: "Compara relógio com desenhos", icon: "🔎", details: "Guarda uma impressão digital de cada automação (horário + comando). Se ela mudar, o desenho precisa mudar.", executor: "curador-fluxos.py" } },
+    { id: "3", type: "condition", position: col(2), data: { label: "Achou desencontro?", icon: "❓", details: "Sem desencontro, não gasta nada de IA — que é o caso comum.", executor: "curador-fluxos.py" } },
+    { id: "4", type: "action", position: col(3), data: { label: "Lê o script e desenha", icon: "✏️", details: "Automação nova → desenha do zero.\nMudou → redesenha.\nSumiu do relógio → marca como aposentada, nunca apaga.", executor: "Claude (assinatura)", tags: ["Claude"] } },
+    { id: "5", type: "action", position: col(4), data: { label: "Grava só no que é dele", icon: "🔒", details: "Mexe apenas em fluxo-semente. O que você criou ou editou fica intocado.", executor: "Supabase", tags: ["Supabase"] } },
+    { id: "6", type: "end", position: col(5), data: { label: "Conta o que fez", icon: "📣", details: "Sempre no feed \"O que a equipe fez\".\nNo WhatsApp só quando algo mudou de verdade: automação nova ou automação que sumiu.", executor: "Donna", tags: ["WhatsApp"] } },
+  ],
+  edges: [
+    { id: "e1-2", source: "1", target: "2" },
+    { id: "e2-3", source: "2", target: "3" },
+    { id: "e3-4", source: "3", target: "4", label: "sim" },
+    { id: "e4-5", source: "4", target: "5" },
+    { id: "e5-6", source: "5", target: "6" },
+    { id: "e3-6", source: "3", target: "6", label: "nada mudou" },
+  ],
+};
+
 export const SEED_FLOWS: SeedFlow[] = [
   // Automações
   briefingTelegram,
@@ -761,6 +786,7 @@ export const SEED_FLOWS: SeedFlow[] = [
   escolaRelatorioSemana,
   lembreteGravarReels,
   envioImediato,
+  curadorFluxos,
   // Squads
   squadInstagramCarrossel,
   squadLicitacao,
