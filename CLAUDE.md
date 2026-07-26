@@ -53,11 +53,19 @@ O shell (sidebar + JobsMonitor + dados compartilhados) vive em
 `quick_links`, `flows`/`flow_docs` + `flow_columns` (kanban), `executions`.
 Tudo com RLS por `user_id`. CRUD centralizado em `src/lib/storage.ts`.
 
-## Catálogos hardcoded (dívida conhecida — F2 do plano)
-`src/lib/equipe.ts`, `src/lib/biblioteca.ts` e `src/lib/automacoes.ts` são
-escritos à mão e desatualizam. O plano é substituí-los por JSON publicado da
-VPS (`catalogo-sync`). Até lá: quem mexer no ecossistema DEVE atualizar esses
-arquivos.
+## Catálogos: o que já é vivo e o que ainda é à mão (F2 do plano, 25/07/2026)
+- **Automações — resolvido.** `src/lib/automacoes.ts` não existe mais. A lista
+  vem do crontab real da VPS (`src/lib/cron.ts` traduz a expressão pra
+  português). Mudar horário ou criar/aposentar uma automação na VPS já aparece
+  no painel sozinho — não há arquivo pra editar. Mudança só no comportamento
+  interno de um script não muda nada aqui.
+- **Desenhos dos fluxos — resolvido por rotina.** `/root/curador-fluxos.py`
+  roda domingo 21h BRT (cron `0 0 * * 1` UTC), compara o relógio real com os
+  desenhos e desenha/redesenha/marca o que saiu do lugar, registrando em
+  "⚡ O que a equipe fez".
+- **Ainda à mão:** `src/lib/equipe.ts` (tem `fetchEquipePublica` ao vivo, mas
+  com `EQUIPE`/`fallbackPublico` escritos aqui) e `src/lib/biblioteca.ts`.
+  Quem mexer no ecossistema DEVE atualizar esses dois.
 
 ## Convenções
 - Commits em português `tipo: descrição`; código em inglês, comentários PT-BR
