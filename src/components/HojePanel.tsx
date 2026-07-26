@@ -53,14 +53,25 @@ function PrimeiroOlhar({ naCaixa, paraLer }: { naCaixa: number; paraLer: number 
 
   if (!partes.length && !excesso.length) return null;
 
+  // Datas do aviso vêm em horário de Brasília. Comparar com a data em UTC dava
+  // erro depois das 21h: o navegador já estava no dia seguinte e o aviso de
+  // hoje aparecia como se fosse de outro dia (visto por ela às 21h20 de 25/07).
+  const emBrasilia = (t: number) =>
+    new Date(t - 3 * 3600 * 1000).toISOString().slice(0, 10);
+  const hojeBRT = emBrasilia(Date.now());
+  const amanhaBRT = emBrasilia(Date.now() + 864e5);
+
   const dataCurta = (d: string) => {
-    const [a, m, dia] = d.split("-");
-    const hoje = new Date().toISOString().slice(0, 10);
-    if (d === hoje) return "hoje";
-    const amanha = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
-    if (d === amanha) return "amanhã";
+    const [, m, dia] = d.split("-");
+    if (d === hojeBRT) return "hoje";
+    if (d === amanhaBRT) return "amanhã";
     return `${dia}/${m}`;
   };
+
+  // A janela de envio vai até 20h30. Depois disso, o que estava marcado pra
+  // hoje não sai mais — e dizer "vão ficar pra depois" seria enganoso.
+  const agoraBRT = new Date(Date.now() - 3 * 3600 * 1000);
+  const janelaFechada = agoraBRT.getUTCHours() * 60 + agoraBRT.getUTCMinutes() > 20 * 60 + 30;
 
   return (
     <div className="space-y-2">
@@ -71,8 +82,10 @@ function PrimeiroOlhar({ naCaixa, paraLer }: { naCaixa: number; paraLer: number 
           {excesso.map((c) => (
             <li key={c.data}>
               <strong className="text-[var(--text-primary)]">{dataCurta(c.data)}</strong>: você marcou{" "}
-              <strong>{c.marcados}</strong>, cabem <strong>{c.cabem}</strong> —{" "}
-              {c.sobra} {c.sobra === 1 ? "vai ficar pra depois" : "vão ficar pra depois"}.
+              <strong>{c.marcados}</strong>, {c.data === hojeBRT && janelaFechada ? "e a janela de hoje já fechou" : <>cabem <strong>{c.cabem}</strong></>} —{" "}
+              {c.data === hojeBRT && janelaFechada
+                ? `${c.marcados === 1 ? "ele precisa" : `os ${c.marcados} precisam`} de uma data nova.`
+                : `${c.sobra} ${c.sobra === 1 ? "vai ficar pra depois" : "vão ficar pra depois"}.`}
             </li>
           ))}
         </ul>
