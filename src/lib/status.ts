@@ -47,6 +47,8 @@ export interface StatusSaude {
   fila_kanban?: Record<string, number>;
   atividades?: { quando: string; quem: string; icone: string; texto: string }[];
   ronda_diaria?: unknown;
+  /** Dias com mais posts marcados do que cabem (25/07/2026). */
+  capacidade_agenda?: { data: string; marcados: number; cabem: number; sobra: number }[];
 }
 
 export interface EstadoStatus {

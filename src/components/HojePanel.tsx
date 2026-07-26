@@ -41,14 +41,46 @@ function PrimeiroOlhar({ naCaixa, paraLer }: { naCaixa: number; paraLer: number 
     : nivel === "vermelho" ? { txt: "algo caiu", cor: "text-red-700", ir: "/saude" }
     : null;
 
+  // 25/07 — o aviso mais importante da linha: ela marcou mais posts pro dia do
+  // que cabem, e antes disso ninguém dizia nada. Ela descobria pelo Radar, no
+  // dia seguinte, com os cards ainda em "Aprovado".
+  const excesso = (status?.capacidade_agenda ?? []).filter((c) => c.sobra > 0);
+
   const partes: { txt: string; cor?: string; ir?: string }[] = [];
   if (naCaixa > 0) partes.push({ txt: `${naCaixa} ${naCaixa === 1 ? "notícia esperando" : "notícias esperando"} você`, cor: "text-[var(--text-primary)] font-semibold" });
   if (paraLer > 0) partes.push({ txt: `${paraLer} pra você ficar por dentro` });
   if (saude) partes.push({ txt: saude.txt, cor: saude.cor, ir: saude.ir });
 
-  if (!partes.length) return null;
+  if (!partes.length && !excesso.length) return null;
+
+  const dataCurta = (d: string) => {
+    const [a, m, dia] = d.split("-");
+    const hoje = new Date().toISOString().slice(0, 10);
+    if (d === hoje) return "hoje";
+    const amanha = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+    if (d === amanha) return "amanhã";
+    return `${dia}/${m}`;
+  };
 
   return (
+    <div className="space-y-2">
+    {excesso.length > 0 && (
+      <div className="rounded-xl px-4 py-2.5 text-sm border" style={{ borderColor: "#A0583C", background: "color-mix(in srgb, #A0583C 8%, var(--bg-secondary))" }}>
+        <span className="font-semibold" style={{ color: "#A0583C" }}>⚠️ Mais posts marcados do que cabem</span>
+        <ul className="mt-1 space-y-0.5 text-[var(--text-secondary)]">
+          {excesso.map((c) => (
+            <li key={c.data}>
+              <strong className="text-[var(--text-primary)]">{dataCurta(c.data)}</strong>: você marcou{" "}
+              <strong>{c.marcados}</strong>, cabem <strong>{c.cabem}</strong> —{" "}
+              {c.sobra} {c.sobra === 1 ? "vai ficar pra depois" : "vão ficar pra depois"}.
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-[var(--text-muted)] mt-1">
+          O limite existe pra não encher o grupo: 4 por dia em fim de semana e feriado, 7 nos dias úteis.
+        </p>
+      </div>
+    )}
     <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl px-4 py-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
       <span className="text-[var(--text-muted)] text-xs uppercase tracking-wider mr-1">Agora</span>
       {partes.map((p, i) => (
@@ -63,6 +95,7 @@ function PrimeiroOlhar({ naCaixa, paraLer }: { naCaixa: number; paraLer: number 
           )}
         </span>
       ))}
+    </div>
     </div>
   );
 }
