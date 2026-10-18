@@ -6,11 +6,34 @@
 
 import { supabase } from "./supabase";
 import { SQUAD_API_BASE } from "./config";
+import { MEDIDAS_MASCOTE } from "./mascotes-medidas";
 
-export const LARGURA = 1300;
-export const ALTURA = 732;
+export const LARGURA = 1448;
+export const ALTURA = 1086;
 
-export type SalaId = "estudio" | "comando" | "docs" | "secretaria" | "bemestar" | "lab";
+// ── Tamanho dos mascotes (escritório v3) ─────────────────────────────────
+// As imagens têm margens transparentes diferentes; medimos o desenho real
+// (scripts/medir-mascotes.py) para que TODOS tenham a mesma altura visível.
+// O Jarbas fica 15% maior (ela gostou dele maior).
+export const ALTURA_VISIVEL = 92;
+export const ESCALA_JARBAS = 1.15;
+/** Parte do corpo escondida atrás da mesa quando o agente trabalha (0 a 1 da altura visível). */
+export const SENTADO_PADRAO = 0.36;
+
+export interface GeomMascote {
+  w: number;    // largura da imagem (px do palco)
+  esq: number;  // deslocamento horizontal para centralizar o DESENHO (px)
+  rodape: number; // faixa transparente embaixo (px)
+  alt: number;  // altura visível (px)
+}
+export function geomMascote(id: string): GeomMascote {
+  const m = MEDIDAS_MASCOTE[id] ?? { l: 0, t: 0, r: 1, b: 1 };
+  const alt = ALTURA_VISIVEL * (id === "jarbas" ? ESCALA_JARBAS : 1);
+  const w = alt / (m.b - m.t);
+  return { w, esq: -((m.l + m.r) / 2 - 0.5) * w, rodape: (1 - m.b) * w, alt };
+}
+
+export type SalaId = "hall" | "estudio" | "comando" | "docs" | "secretaria" | "bemestar" | "lab";
 
 export interface Sala { id: SalaId; rotulo: string; x: number; y: number }
 // canto superior esquerdo da etiqueta da sala (mock)
@@ -23,7 +46,7 @@ export const SALAS: Sala[] = [
   { id: "lab", rotulo: "🔬 Laboratório", x: 1170, y: 392 },
 ];
 
-type Ponto = { x: number; y: number };
+type Ponto = { x: number; y: number; sit?: number };
 
 export interface PerfilAgente {
   id: string;
@@ -33,26 +56,25 @@ export interface PerfilAgente {
   trab: Ponto;           // posição de trabalho (na mesa)
   livre: Ponto;          // posição livre, na própria sala
   ocio: string;          // atividade típica quando livre
-  tam: number;           // largura do mascote na tela de 1300 px
 }
 
 export const AGENTES: PerfilAgente[] = [
-  { id: "izzy", nome: "Izzy", cargo: "redatora", sala: "estudio", trab: { x: 312, y: 262 }, livre: { x: 235, y: 280 }, ocio: "✍️ relendo um rascunho", tam: 78 },
-  { id: "felipe", nome: "Felipe", cargo: "designer", sala: "estudio", trab: { x: 395, y: 270 }, livre: { x: 188, y: 262 }, ocio: "🎨 rabiscando no cavalete", tam: 78 },
-  { id: "theo", nome: "Theo", cargo: "vídeo e roteiro", sala: "estudio", trab: { x: 262, y: 288 }, livre: { x: 96, y: 288 }, ocio: "🎥 ajustando a câmera", tam: 70 },
-  { id: "jarbas", nome: "Jarbas", cargo: "orquestrador", sala: "comando", trab: { x: 622, y: 292 }, livre: { x: 545, y: 292 }, ocio: "🛰️ vigiando o painel", tam: 96 },
-  { id: "rafaela", nome: "Rafaela", cargo: "estrategista", sala: "comando", trab: { x: 772, y: 284 }, livre: { x: 835, y: 298 }, ocio: "📌 revendo metas", tam: 70 },
-  { id: "harvey", nome: "Dr. Harvey", cargo: "advogado revisor", sala: "docs", trab: { x: 990, y: 322 }, livre: { x: 935, y: 300 }, ocio: "⚖️ pesando um caso", tam: 78 },
-  { id: "katrina", nome: "Katrina", cargo: "advogada estruturadora", sala: "docs", trab: { x: 1075, y: 326 }, livre: { x: 1130, y: 328 }, ocio: "📑 relendo uma minuta", tam: 72 },
-  { id: "sofia", nome: "Sofia", cargo: "arquiteta da informação", sala: "docs", trab: { x: 1195, y: 312 }, livre: { x: 1196, y: 334 }, ocio: "🗂️ etiquetando pastas", tam: 66 },
-  { id: "donna", nome: "Donna", cargo: "assistente administrativa", sala: "secretaria", trab: { x: 225, y: 548 }, livre: { x: 322, y: 566 }, ocio: "📅 conferindo a agenda", tam: 78 },
-  { id: "louis", nome: "Louis", cargo: "finanças", sala: "secretaria", trab: { x: 355, y: 514 }, livre: { x: 425, y: 528 }, ocio: "🪙 contando moedinhas", tam: 70 },
-  { id: "nara", nome: "Dra. Nara", cargo: "psicóloga", sala: "bemestar", trab: { x: 470, y: 548 }, livre: { x: 505, y: 600 }, ocio: "🧘 respirando fundo", tam: 70 },
-  { id: "lara", nome: "Lara", cargo: "nutricionista", sala: "bemestar", trab: { x: 556, y: 490 }, livre: { x: 672, y: 556 }, ocio: "🍎 provando uma receita", tam: 64 },
-  { id: "tonny", nome: "Tonny", cargo: "dados e BI", sala: "lab", trab: { x: 900, y: 522 }, livre: { x: 905, y: 592 }, ocio: "📊 ajustando os gráficos", tam: 72 },
-  { id: "junior", nome: "Junior", cargo: "desenvolvedor", sala: "lab", trab: { x: 975, y: 566 }, livre: { x: 1040, y: 600 }, ocio: "🐞 caçando um bug", tam: 78 },
-  { id: "mike", nome: "Mike", cargo: "pesquisa e OSINT", sala: "lab", trab: { x: 842, y: 548 }, livre: { x: 1196, y: 598 }, ocio: "🔎 conferindo fontes", tam: 66 },
-  { id: "eric", nome: "Eric", cargo: "geoprocessamento", sala: "lab", trab: { x: 1112, y: 522 }, livre: { x: 1148, y: 546 }, ocio: "🗺️ olhando o mapa das bacias", tam: 70 },
+  { id: "izzy", nome: "Izzy", cargo: "redatora", sala: "estudio", trab: { x: 312, y: 262 }, livre: { x: 235, y: 280 }, ocio: "✍️ relendo um rascunho" },
+  { id: "felipe", nome: "Felipe", cargo: "designer", sala: "estudio", trab: { x: 395, y: 270 }, livre: { x: 188, y: 262 }, ocio: "🎨 rabiscando no cavalete" },
+  { id: "theo", nome: "Theo", cargo: "vídeo e roteiro", sala: "estudio", trab: { x: 262, y: 288 }, livre: { x: 96, y: 288 }, ocio: "🎥 ajustando a câmera" },
+  { id: "jarbas", nome: "Jarbas", cargo: "orquestrador", sala: "comando", trab: { x: 622, y: 292 }, livre: { x: 545, y: 292 }, ocio: "🛰️ vigiando o painel" },
+  { id: "rafaela", nome: "Rafaela", cargo: "estrategista", sala: "comando", trab: { x: 772, y: 284 }, livre: { x: 835, y: 298 }, ocio: "📌 revendo metas" },
+  { id: "harvey", nome: "Dr. Harvey", cargo: "advogado revisor", sala: "docs", trab: { x: 990, y: 322 }, livre: { x: 935, y: 300 }, ocio: "⚖️ pesando um caso" },
+  { id: "katrina", nome: "Katrina", cargo: "advogada estruturadora", sala: "docs", trab: { x: 1075, y: 326 }, livre: { x: 1130, y: 328 }, ocio: "📑 relendo uma minuta" },
+  { id: "sofia", nome: "Sofia", cargo: "arquiteta da informação", sala: "docs", trab: { x: 1195, y: 312 }, livre: { x: 1196, y: 334 }, ocio: "🗂️ etiquetando pastas" },
+  { id: "donna", nome: "Donna", cargo: "assistente administrativa", sala: "secretaria", trab: { x: 225, y: 548 }, livre: { x: 322, y: 566 }, ocio: "📅 conferindo a agenda" },
+  { id: "louis", nome: "Louis", cargo: "finanças", sala: "secretaria", trab: { x: 355, y: 514 }, livre: { x: 425, y: 528 }, ocio: "🪙 contando moedinhas" },
+  { id: "nara", nome: "Dra. Nara", cargo: "psicóloga", sala: "bemestar", trab: { x: 470, y: 548 }, livre: { x: 505, y: 600 }, ocio: "🧘 respirando fundo" },
+  { id: "lara", nome: "Lara", cargo: "nutricionista", sala: "bemestar", trab: { x: 556, y: 490 }, livre: { x: 672, y: 556 }, ocio: "🍎 provando uma receita" },
+  { id: "tonny", nome: "Tonny", cargo: "dados e BI", sala: "lab", trab: { x: 900, y: 522 }, livre: { x: 905, y: 592 }, ocio: "📊 ajustando os gráficos" },
+  { id: "junior", nome: "Junior", cargo: "desenvolvedor", sala: "lab", trab: { x: 975, y: 566 }, livre: { x: 1040, y: 600 }, ocio: "🐞 caçando um bug" },
+  { id: "mike", nome: "Mike", cargo: "pesquisa e OSINT", sala: "lab", trab: { x: 842, y: 548 }, livre: { x: 1196, y: 598 }, ocio: "🔎 conferindo fontes" },
+  { id: "eric", nome: "Eric", cargo: "geoprocessamento", sala: "lab", trab: { x: 1112, y: 522 }, livre: { x: 1148, y: 546 }, ocio: "🗺️ olhando o mapa das bacias" },
 ];
 
 export const perfil = (id: string) => AGENTES.find((a) => a.id === id);
@@ -236,6 +258,7 @@ export function somTecla() { nota(900 + Math.random() * 700, 0, 0.03, 0.012, "sq
 interface Ret { l: number; t: number; r: number; b: number }
 const bate = (a: Ret, b: Ret, folga = 3) => a.l < b.r + folga && a.r + folga > b.l && a.t < b.b + folga && a.b + folga > b.t;
 const MAX_POR_SALA_DISCRETO = 3;
+const MAX_DISCRETO_HALL = 5; // café (3) + sofá (2)
 const ORCAMENTO_NOS = 6000;
 
 interface Item {
@@ -333,7 +356,7 @@ function resolver(palco: HTMLElement, aplicar: boolean): number {
   const podeDiscreto = itens.map((it) => {
     if (!it.discreto) return true;
     contaSala[it.sala] = (contaSala[it.sala] ?? 0) + 1;
-    return contaSala[it.sala] <= MAX_POR_SALA_DISCRETO;
+    return contaSala[it.sala] <= (it.sala === "hall" ? MAX_DISCRETO_HALL : MAX_POR_SALA_DISCRETO);
   });
 
   // busca com volta atrás: por balão, tenta os melhores lugares de cada coluna (dx)

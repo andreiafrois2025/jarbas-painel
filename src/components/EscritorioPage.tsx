@@ -13,10 +13,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Mascote from "./Mascote";
+import Ambiente from "./EscritorioAmbiente";
 import { usePainel } from "@/lib/painel-context";
 import { ehColaboradorOculto, ehPessoal } from "@/lib/modo";
 import {
-  AGENTES, ALTURA, arrumaBaloes, CAFE, CP_DURACAO, CP_ESPERA, POS_ANDREIA, LARGURA, ROTEIROS, SALAS, SOFA,
+  AGENTES, ALTURA, arrumaBaloes, geomMascote, SENTADO_PADRAO, CAFE, CP_DURACAO, CP_ESPERA, POS_ANDREIA, LARGURA, ROTEIROS, SALAS, SOFA,
   buscaEscritorio, buscaPosicoes, liberaSom, perfil, salvaPosicoes, somDoisTons, somPlim, somTecla,
   type AgenteVivo, type DadosEscritorio, type EventoMural, type PerfilAgente, type PosicoesRel, type PosRel,
 } from "@/lib/escritorio";
@@ -29,6 +30,8 @@ const PERMANENCIA_SOFA = 4 * 60_000;
 const SEM_TAREFA_SOFA = 24 * 3600_000;
 const ATUALIZA_MS = 25_000;
 const CHAVE_SOM = "escritorioSom";
+const CHAVE_ANIM = "escritorioAnim";
+const PERMANENCIA_ENTREGA = 20_000; // quem estava livre vai à mesa e fica ~20 s com o balão ✅
 
 type Alvo = "trab" | "livre";
 const SEM_ARRASTE = 0.0005;
@@ -58,6 +61,7 @@ export default function EscritorioPage() {
   const [dados, setDados] = useState<DadosEscritorio | null>(null);
   const [erro, setErro] = useState(false);
   const [som, setSom] = useState(false);
+  const [anim, setAnim] = useState(true); // ✨ animações do ambiente (ligadas por padrão)
   const [aula, setAula] = useState(false);
   const [aulaT, setAulaT] = useState(0);
   const [roteiroId, setRoteiroId] = useState<string | null>(null); // null = escolhendo
@@ -67,7 +71,7 @@ export default function EscritorioPage() {
   const [sel, setSel] = useState<string | null>(null);
   const [lugar, setLugar] = useState<Record<string, Lugar>>({});
   const [ocioVis, setOcioVis] = useState<Record<string, number>>({});
-  const [entregaBal, setEntregaBal] = useState<Record<string, { texto: string; ate: number }>>({});
+  const [entregaBal, setEntregaBal] = useState<Record<string, { texto: string; ate: number; visita?: boolean }>>({});
   const raiz = useRef<HTMLDivElement>(null);
   const palco = useRef<HTMLDivElement>(null);
 
@@ -99,6 +103,12 @@ export default function EscritorioPage() {
 
   // ── lembrar o som ─────────────────────────────────────────────────────
   useEffect(() => { try { setSom(window.localStorage.getItem(CHAVE_SOM) === "1"); } catch { /* sem storage */ } }, []);
+  useEffect(() => { try { setAnim(window.localStorage.getItem(CHAVE_ANIM) !== "0"); } catch { /* sem storage */ } }, []);
+  const alternarAnim = () => {
+    const novo = !anim;
+    setAnim(novo);
+    try { window.localStorage.setItem(CHAVE_ANIM, novo ? "1" : "0"); } catch { /* sem storage */ }
+  };
   const alternarSom = () => {
     const novo = !som;
     if (novo) { liberaSom(); somPlim(); }
@@ -112,9 +122,15 @@ export default function EscritorioPage() {
   const somRef = useRef(som);
   useEffect(() => { somRef.current = som; }, [som]);
 
-  const darEntrega = useCallback((id: string, texto: string, ms = 7000) => {
-    // a entrega mais nova substitui a anterior (nunca dois balões do mesmo agente)
-    setEntregaBal((b) => ({ ...b, [id]: { texto, ate: Date.now() + ms } }));
+  const aulaRef = useRef(aula);
+  useEffect(() => { aulaRef.current = aula; }, [aula]);
+  const darEntrega = useCallback((id: string, texto: string, ms = 7000, visitar = false) => {
+    // a entrega mais nova substitui a anterior (nunca dois balões do mesmo agente).
+    // Com `visitar`, quem estava livre anda até a mesa e fica lá com o balão ✅ (depois volta).
+    const vai = visitar && !aulaRef.current;
+    const dur = vai ? Math.max(ms, PERMANENCIA_ENTREGA) : ms;
+    if (vai) setLugar((l) => { if (!l[id]) return l; const n = { ...l }; delete n[id]; return n; });
+    setEntregaBal((b) => ({ ...b, [id]: { texto, ate: Date.now() + dur, visita: vai } }));
     if (somRef.current) somPlim();
   }, []);
 
@@ -136,13 +152,13 @@ export default function EscritorioPage() {
             muralVisto.current.add(k);
             if (!avisados.has(e.agente) && Date.now() - new Date(e.em).getTime() < 5 * 60_000) {
               avisados.add(e.agente);
-              darEntrega(e.agente, "✅ " + (mascara(e.texto) ?? "feito"));
+              darEntrega(e.agente, "✅ " + (mascara(e.texto) ?? "feito"), 7000, true);
             }
           }
           for (const a of d.agentes) {
             const antes = anterior.current[a.id];
             if (antes?.estado === "trabalhando" && a.estado === "livre" && !avisados.has(a.id)) {
-              darEntrega(a.id, "✅ " + (mascara(antes.tarefa) ?? "tarefa concluída"));
+              darEntrega(a.id, "✅ " + (mascara(antes.tarefa) ?? "tarefa concluída"), 7000, true);
             }
           }
         } else {
@@ -193,6 +209,17 @@ export default function EscritorioPage() {
 
   const vivosRef = useRef(vivos);
   useEffect(() => { vivosRef.current = vivos; }, [vivos]);
+
+  // Prévia do Hall: abrir com ?demo=hall mostra 3 no café e 2 no sofá (só para conferir o visual).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("demo") !== "hall") return;
+    const ate = Date.now() + 6 * 3600_000;
+    const ids = ["izzy", "felipe", "theo", "donna", "mike"];
+    setLugar({
+      [ids[0]]: { tipo: "cafe", idx: 0, ate }, [ids[1]]: { tipo: "cafe", idx: 1, ate }, [ids[2]]: { tipo: "cafe", idx: 2, ate },
+      [ids[3]]: { tipo: "sofa", idx: 0, ate }, [ids[4]]: { tipo: "sofa", idx: 1, ate },
+    });
+  }, []);
 
   // ── café, sofá e balões de atividade típica (encenação) ───────────────
   const ultimoCafe = useRef(Date.now() - INTERVALO_CAFE + 30_000);   // primeira ida ~30 s depois de abrir
@@ -323,14 +350,20 @@ export default function EscritorioPage() {
   const padraoRel = (a: PerfilAgente, k: Alvo): PosRel => ({ x: a[k].x / LARGURA, y: a[k].y / ALTURA });
   const efetivaRel = (a: PerfilAgente, k: Alvo, fonte: PosicoesRel): PosRel => fonte[a.id]?.[k] ?? padraoRel(a, k);
   const abs = (r: PosRel) => ({ x: r.x * LARGURA, y: r.y * ALTURA });
+  const sentado = (a: PerfilAgente) => a.trab.sit ?? SENTADO_PADRAO;
   const ondeEsta = (a: PerfilAgente) => {
-    if (arrumar) return { ...abs(efetivaRel(a, alvo, rascunho)), modo: alvo === "trab" ? ("trab" as const) : ("livre" as const) };
-    if (vivos[a.id]?.estado === "trabalhando") return { ...abs(efetivaRel(a, "trab", pos)), modo: "trab" as const };
+    if (arrumar) return { ...abs(efetivaRel(a, alvo, rascunho)), modo: alvo === "trab" ? ("trab" as const) : ("livre" as const), sit: alvo === "trab" ? sentado(a) : 0 };
+    if (vivos[a.id]?.estado === "trabalhando") return { ...abs(efetivaRel(a, "trab", pos)), modo: "trab" as const, sit: sentado(a) };
+    // entrega nova de quem estava livre: anda até a mesa, fica ~20 s com o balão ✅ e volta
+    const ent = entregaBal[a.id];
+    if (!aula && ent?.visita && ent.ate > Date.now()) return { ...abs(efetivaRel(a, "trab", pos)), modo: "visita" as const, sit: sentado(a) };
     const l = lugar[a.id];
-    if (l?.tipo === "cafe") return { ...CAFE[l.idx], modo: "cafe" as const };
-    if (l?.tipo === "sofa") return { ...SOFA[l.idx], modo: "sofa" as const };
-    return { ...abs(efetivaRel(a, "livre", pos)), modo: "livre" as const };
+    if (l?.tipo === "cafe") return { x: CAFE[l.idx].x, y: CAFE[l.idx].y, modo: "cafe" as const, sit: CAFE[l.idx].sit ?? 0 };
+    if (l?.tipo === "sofa") return { x: SOFA[l.idx].x, y: SOFA[l.idx].y, modo: "sofa" as const, sit: SOFA[l.idx].sit ?? 0 };
+    return { ...abs(efetivaRel(a, "livre", pos)), modo: "livre" as const, sit: 0 };
   };
+  // fumacinha da xícara de quem está no café (perto do mascote)
+  const cafeNoAr = visiveis.flatMap((a) => { const p = ondeEsta(a); return p.modo === "cafe" ? [{ x: p.x / LARGURA, y: p.y / ALTURA }] : []; });
   const ordenados = [...visiveis].sort((a, b) => ondeEsta(a).y - ondeEsta(b).y);
 
   const selPerfil = sel ? perfil(sel) : undefined;
@@ -444,6 +477,7 @@ export default function EscritorioPage() {
               <p className="text-sm text-[var(--text-secondary)] mr-auto">
                 {erro ? "Sem resposta da central agora: mostrando todos livres." : "A equipe ao vivo. Clique num agente para ver o que ele faz."}
               </p>
+              <BotaoAnim anim={anim} onClick={alternarAnim} />
               <button onClick={alternarSom} aria-pressed={som} title={som ? "Desligar os sons" : "Ligar os sons (digitação baixinha e plim na entrega)"}
                 className={`text-sm font-semibold rounded-full border px-3.5 py-1.5 cursor-pointer ${som ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"}`}>
                 {som ? "🔊 Sons" : "🔇 Sons"}
@@ -461,7 +495,8 @@ export default function EscritorioPage() {
             </div>
           )}
           {aula && (
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <BotaoAnim anim={anim} onClick={alternarAnim} />
               <button onClick={alternarSom} aria-pressed={som}
                 className={`text-sm font-semibold rounded-full border px-3.5 py-1.5 cursor-pointer ${som ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border-light)] hover:bg-[var(--bg-tertiary)]"}`}>
                 {som ? "🔊 Sons" : "🔇 Sons"}
@@ -487,11 +522,12 @@ export default function EscritorioPage() {
           )}
           <div className={`overflow-x-auto max-md:-mx-3 max-md:px-3 [touch-action:pan-x_pan-y_pinch-zoom] overscroll-x-contain ${aula && !roteiro ? "hidden" : ""}`}>
             <div className="max-md:min-w-[780px] mx-auto"
-              style={{ width: `min(100%, calc((100dvh - ${aula ? 120 : 215}px) * 1.7769))` }}>
-              <div ref={palco} className="esc-palco" style={{ aspectRatio: "1672 / 941" }} onClick={() => setSel(null)}>
+              style={{ width: `min(100%, calc((100dvh - ${aula ? 120 : 215}px) * ${LARGURA / ALTURA}))` }}>
+              <div ref={palco} className="esc-palco" style={{ aspectRatio: `${LARGURA} / ${ALTURA}` }} onClick={() => setSel(null)}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/escritorio/sede.webp" alt="Prédio do escritório visto de cima, com seis salas" draggable={false}
+                <img src="/escritorio/sede.webp" alt="Prédio do escritório em cortes, com as salas da equipe" draggable={false}
                   className="absolute inset-0 w-full h-full" />
+                {anim && <Ambiente cafe={cafeNoAr} />}
                 {SALAS.map((s) => (
                   <span key={s.id} className="esc-sala" style={{ left: `${(s.x / LARGURA) * 100}%`, top: `${(s.y / ALTURA) * 100}%` }}>{s.rotulo}</span>
                 ))}
@@ -501,7 +537,7 @@ export default function EscritorioPage() {
                   if (dt < 0 || dt >= duracao) return null;
                   const aprovado = !cp.pedido && dt >= CP_ESPERA;
                   return (
-                    <div key={cp.de} data-id="andreia" data-sala="comando" data-x={POS_ANDREIA.x} data-y={POS_ANDREIA.y} className="esc-ag trab" style={{ left: `${(POS_ANDREIA.x / LARGURA) * 100}%`, top: `${(POS_ANDREIA.y / ALTURA) * 100}%`, zIndex: 1500, ["--w" as string]: `${(56 / LARGURA) * 100}cqw`, cursor: "default" }}>
+                    <div key={cp.de} data-id="andreia" data-sala="comando" data-x={POS_ANDREIA.x} data-y={POS_ANDREIA.y} className="esc-ag trab" style={{ left: `${(POS_ANDREIA.x / LARGURA) * 100}%`, top: `${(POS_ANDREIA.y / ALTURA) * 100}%`, zIndex: 2500, ["--w" as string]: `${(62 / LARGURA) * 100}cqw`, cursor: "default" }}>
                       <span className="esc-luz" />
                       <span className="esc-af">AF</span>
                       <span className="esc-nome">Andréia</span>
@@ -513,20 +549,24 @@ export default function EscritorioPage() {
                   const p = ondeEsta(a);
                   const v = vivos[a.id];
                   const trab = p.modo === "trab";
+                  const g = geomMascote(a.id);
+                  const cortePx = g.rodape + p.sit * g.alt; // faixa de baixo escondida (atrás da mesa)
+                  const cq = (px: number) => `${(px / LARGURA) * 100}cqw`;
                   const ent = entregaBal[a.id];
                   const verEntrega = !arrumar && ent && ent.ate > Date.now();
                   const verOcio = !arrumar && p.modo === "livre" && ocioVis[a.id] > Date.now();
                   const temBalao = !arrumar && (verEntrega || trab || verOcio || p.modo === "cafe" || p.modo === "sofa");
                   return (
-                    <button key={a.id} type="button" data-id={a.id} data-sala={a.sala} data-x={p.x} data-y={p.y}
+                    <button key={a.id} type="button" data-id={a.id} data-sala={p.modo === "cafe" || p.modo === "sofa" ? "hall" : a.sala} data-x={p.x} data-y={p.y}
                       className={`esc-ag ${trab ? "trab" : "livre"} ${sel === a.id ? "sel" : ""} ${arrumar ? "arr" : ""} ${arrastando === a.id ? "arrastando" : ""}`}
-                      style={{ left: `${(p.x / LARGURA) * 100}%`, top: `${(p.y / ALTURA) * 100}%`, ["--w" as string]: `${(a.tam / LARGURA) * 100}cqw`, zIndex: arrastando === a.id ? 3000 : Math.round(p.y) + (temBalao ? 700 : 0) }}
+                      style={{ left: `${(p.x / LARGURA) * 100}%`, top: `${(p.y / ALTURA) * 100}%`, zIndex: arrastando === a.id ? 3000 : Math.round(p.y) + (temBalao ? 1200 : 0) }}
                       onPointerDown={(e) => comecaArraste(e, a)} onPointerMove={(e) => moveArraste(e, a)} onPointerUp={fimArraste} onPointerCancel={fimArraste}
                       aria-label={`${a.nome}, ${a.cargo}: ${trab ? (v?.tarefaTxt ?? "trabalhando") : "livre"}`}
                       onClick={(e) => { e.stopPropagation(); if (!arrumar) setSel(sel === a.id ? null : a.id); }}>
                       {trab && <span className="esc-luz" />}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={`/mascotes/${a.id}-${a.id === "jarbas" ? 512 : 256}.webp`} alt="" draggable={false} />
+                      <img src={`/mascotes/${a.id}-${a.id === "jarbas" ? 512 : 256}.webp`} alt="" draggable={false}
+                        style={{ width: cq(g.w), left: cq(g.esq), marginBottom: `calc(${cq(-cortePx)})`, clipPath: p.sit > 0 ? `inset(0 0 ${((cortePx / g.w) * 100).toFixed(2)}% 0)` : undefined }} />
                       <span className="esc-nome">{a.nome}</span>
                       {arrumar ? null : verEntrega ? (
                         <span key="ent" data-prio={1} className="esc-fala ok">{ent.texto}</span>
@@ -592,6 +632,15 @@ export default function EscritorioPage() {
         </aside>
       </div>
     </div>
+  );
+}
+
+function BotaoAnim({ anim, onClick }: { anim: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} aria-pressed={anim} title={anim ? "Desligar as animações do ambiente" : "Ligar as animações do ambiente (planetas, telas, luzes, relógio, café)"}
+      className={`text-sm font-semibold rounded-full border px-3.5 py-1.5 cursor-pointer ${anim ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"}`}>
+      ✨ Animações
+    </button>
   );
 }
 
