@@ -43,6 +43,11 @@ export interface SnapshotDia {
   horas_economizadas: number;
   horas_conteudo?: number;
   horas_trabalho?: number | null;
+  /** Livro-caixa de entregas (18/10/2026): horas somadas de todos os agentes. */
+  horas_por_agente?: Record<string, number>;
+  horas_por_tipo?: Record<string, number>;
+  horas_semana?: number;
+  horas_mes?: number;
   atividades_por_agente?: Record<string, number>;
 }
 
@@ -55,6 +60,12 @@ export interface MetricsHistory {
   radar_semanas_por_agente?: Record<string, Record<string, { aprovados: number; descartados: number; taxa: number | null }>>;
   envios_semanas: Record<string, number>;
   formula_horas: Record<string, number>;
+  /** Tabela de minutos por tipo de entrega (/root/horas/tabela.json). */
+  tabela_horas?: {
+    nota?: string;
+    tipos: Record<string, { rotulo: string; minutos: number; dominio?: string; porque: string }>;
+    fora_da_conta?: { fonte: string; porque: string }[];
+  };
 }
 
 export function useMetricsHistory(refreshMs = 0) {
