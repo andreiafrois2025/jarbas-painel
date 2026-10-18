@@ -131,25 +131,29 @@ export const ROTEIROS: RoteiroAula[] = [
     ],
   },
   {
-    id: "licitacao", rotulo: "📑 Processo de licitação", descricao: "Para o serviço público", duracao: 90,
+    // Ordem da squad real (pipeline.yaml): ETP, mapa de riscos, preços, TR.
+    // O TR só começa depois da pesquisa de preços, porque usa os valores.
+    id: "licitacao", rotulo: "📑 Processo de licitação", descricao: "Para o serviço público", duracao: 100,
     pedido: "Andréia envia a demanda: contratar licenças de software de geoprocessamento",
     checkpoints: [
       { de: 0.3, pedido: true, espera: "📨 Demanda: contratar licenças de software de geoprocessamento", ok: "", mural: "enviou a demanda: contratar licenças de software de geoprocessamento" },
-      { de: 40, espera: "🙋 Esperando você: revisar o ETP e o TR", ok: "✔ Andréia aprovou", mural: "aprovou o ETP e o TR" },
-      { de: 64, espera: "🙋 Esperando você: aprovar o processo", ok: "✔ Andréia aprovou", mural: "aprovou o processo" },
+      { de: 53, espera: "🙋 Esperando você: revisar o ETP e o TR", ok: "✔ Andréia aprovou", mural: "aprovou o ETP e o TR" },
+      { de: 77, espera: "🙋 Esperando você: aprovar o processo", ok: "✔ Andréia aprovou", mural: "aprovou o processo" },
     ],
     trechos: [
       { agente: "jarbas", de: 3.5, ate: 8, tarefa: "Avaliando a demanda: é de tecnologia?", entrega: "Sim, é de tecnologia" },
-      { agente: "eric", de: 8, ate: 17, tarefa: "Especificando a parte de geoprocessamento", entrega: "Parte de geoprocessamento pronta" },
-      { agente: "junior", de: 9, ate: 18, tarefa: "Especificando a parte de TI: requisitos, compatibilidade e segurança", entrega: "Requisitos de TI prontos" },
-      { agente: "sofia", de: 18, ate: 25, tarefa: "Organizando as normas aplicáveis", entrega: "Normas organizadas" },
-      { agente: "katrina", de: 25, ate: 36, tarefa: "Redigindo o ETP e o TR", entrega: "ETP e TR redigidos" },
-      { agente: "louis", de: 30, ate: 40, tarefa: "Pesquisando preços de mercado", entrega: "Pesquisa de preços pronta" },
-      { agente: "harvey", de: 44.5, ate: 52, tarefa: "Fazendo o parecer", entrega: "Parecer com 1 ressalva" },
-      { agente: "katrina", de: 52, ate: 59, tarefa: "Corrigindo a ressalva", entrega: "Ressalva corrigida" },
-      { agente: "harvey", de: 59, ate: 64, tarefa: "Conferindo a correção", entrega: "Parecer sem ressalvas" },
-      { agente: "donna", de: 68.5, ate: 78, tarefa: "Organizando o envio do processo", entrega: "Envio organizado" },
-      { agente: "jarbas", de: 78, ate: 86, tarefa: "Avisando que o processo está pronto", entrega: "Processo pronto para seguir!" },
+      { agente: "eric", de: 8, ate: 16, tarefa: "Especificando a parte de geoprocessamento", entrega: "Parte de geoprocessamento pronta" },
+      { agente: "junior", de: 9, ate: 17, tarefa: "Especificando a parte de TI: requisitos, compatibilidade e segurança", entrega: "Requisitos de TI prontos" },
+      { agente: "sofia", de: 17, ate: 23, tarefa: "Organizando as normas aplicáveis", entrega: "Normas organizadas" },
+      { agente: "katrina", de: 23, ate: 31, tarefa: "Redigindo o ETP", entrega: "ETP redigido" },
+      { agente: "katrina", de: 31, ate: 35, tarefa: "Montando o mapa de riscos", entrega: "Mapa de riscos pronto" },
+      { agente: "louis", de: 35, ate: 44, tarefa: "Pesquisando preços de mercado", entrega: "Pesquisa de preços pronta" },
+      { agente: "katrina", de: 44, ate: 52, tarefa: "Redigindo o TR, já com os preços", entrega: "TR redigido" },
+      { agente: "harvey", de: 58, ate: 65, tarefa: "Fazendo o parecer do ETP e do TR", entrega: "Parecer com 1 ressalva" },
+      { agente: "katrina", de: 65, ate: 71, tarefa: "Corrigindo a ressalva", entrega: "Ressalva corrigida" },
+      { agente: "harvey", de: 71, ate: 76, tarefa: "Conferindo a correção", entrega: "Parecer sem ressalvas" },
+      { agente: "donna", de: 82, ate: 91, tarefa: "Organizando o envio do processo", entrega: "Envio organizado" },
+      { agente: "jarbas", de: 91, ate: 98, tarefa: "Avisando que o processo está pronto", entrega: "Processo pronto para seguir!" },
     ],
   },
 ];
@@ -191,3 +195,191 @@ export function somDoisTons() { nota(523, 0, 0.2, 0.08, "triangle"); nota(698, 0
 
 /** Uma tecla baixinha. */
 export function somTecla() { nota(900 + Math.random() * 700, 0, 0.03, 0.012, "square"); }
+
+// ── Arrumação dos balões (sem sobreposição) ────────────────────────────────
+// Cada balão nasce em cima do seu agente. Medimos todos no DOM e procuramos,
+// por tentativa e volta atrás (para um balão não "roubar" o lugar de outro),
+// a combinação com menos deslocamento em que ninguém bate em ninguém: nem em
+// outro balão, nem em rosto de outro agente, nem em etiqueta de sala, e tudo
+// dentro do prédio. Os balões se deslocam para os lados e para cima, em passos;
+// a setinha (--tx) e o talo (--stem) continuam apontando para o dono.
+// Prioridade: checkpoint da Andréia > entrega ✅ > trabalhando > pausa/livre.
+// Balão discreto (pausa, livre) que não achar lugar some, em vez de tapar alguém.
+interface Ret { l: number; t: number; r: number; b: number }
+const bate = (a: Ret, b: Ret, folga = 3) => a.l < b.r + folga && a.r + folga > b.l && a.t < b.b + folga && a.b + folga > b.t;
+const MAX_POR_SALA_DISCRETO = 3;
+const ORCAMENTO_NOS = 6000;
+
+interface Item {
+  el: HTMLElement; id: string; sala: string; prio: number; y: number;
+  bw: number; bh: number; gap: number; ax: number; corpo: Ret; maxDx: number; discreto: boolean;
+  outros: Ret[];
+}
+interface Cand { dx: number; dy: number; c: number }
+
+export function arrumaBaloes(palco: HTMLElement) {
+  // Se não couber com o tamanho normal, os balões de tarefa ficam mais estreitos
+  // (nível 1 e 2) antes de desistir de evitar a sobreposição.
+  const NIVEIS = ["", "cmp", "cmp2"];
+  const aplicaNivel = (n: number) => palco.querySelectorAll<HTMLElement>(".esc-fala").forEach((el) => {
+    const prio = Number(el.dataset.prio ?? 4);
+    el.classList.toggle("cmp", n === 1 && prio >= 1 && prio <= 2);
+    el.classList.toggle("cmp2", n === 2 && prio >= 1 && prio <= 2);
+  });
+  let escolhido = 0, melhorC = Infinity;
+  for (let n = 0; n < NIVEIS.length; n++) {
+    aplicaNivel(n);
+    const c = resolver(palco, false);
+    if (c < melhorC) { melhorC = c; escolhido = n; }
+    if (c < 2000) break; // coube sem esconder ninguém
+  }
+  aplicaNivel(escolhido);
+  resolver(palco, true);
+}
+
+/** Devolve o custo da melhor arrumação (>= 2000 = escondeu algum balão; >= 3000 = teve que sobrepor). */
+function resolver(palco: HTMLElement, aplicar: boolean): number {
+  const W = palco.clientWidth, H = palco.clientHeight;
+  if (!W || !H) return 0;
+  const pr = palco.getBoundingClientRect();
+  const ex = W / LARGURA, ey = H / ALTURA;
+  const margem = 4;
+  const area: Ret = { l: margem, t: margem, r: W - margem, b: H - margem };
+
+  const corpos = new Map<string, Ret>();
+  palco.querySelectorAll<HTMLElement>(".esc-ag[data-id]").forEach((ag) => {
+    const x = Number(ag.dataset.x) * ex, y = Number(ag.dataset.y) * ey;
+    const w = ag.offsetWidth, h = ag.offsetHeight;
+    corpos.set(ag.dataset.id!, { l: x - w / 2, r: x + w / 2, t: y - h, b: y });
+  });
+  const etiquetas: Ret[] = [];
+  palco.querySelectorAll<HTMLElement>(".esc-sala").forEach((e) => {
+    const r = e.getBoundingClientRect();
+    etiquetas.push({ l: r.left - pr.left, r: r.right - pr.left, t: r.top - pr.top, b: r.bottom - pr.top });
+  });
+
+  const itens: Item[] = [];
+  palco.querySelectorAll<HTMLElement>(".esc-fala").forEach((el) => {
+    const ag = el.closest<HTMLElement>(".esc-ag[data-id]");
+    const corpo = ag && corpos.get(ag.dataset.id!);
+    if (!ag || !corpo) return;
+    const bw = el.offsetWidth, bh = el.offsetHeight;
+    const prio = Number(el.dataset.prio ?? 4);
+    itens.push({
+      el, id: ag.dataset.id!, sala: ag.dataset.sala || "", prio, y: Number(ag.dataset.y), bw, bh,
+      gap: parseFloat(getComputedStyle(el).marginBottom) || 6, ax: (corpo.l + corpo.r) / 2, corpo,
+      maxDx: Math.max(0, bw / 2 - 14), discreto: prio >= 3,
+      outros: [...corpos.entries()].filter(([id]) => id !== ag.dataset.id).map(([, r]) => r),
+    });
+  });
+  itens.sort((a, b) => a.prio - b.prio || a.y - b.y);
+
+  const monta = (it: Item, dx: number, dy: number) => {
+    const b = it.corpo.t - it.gap + dy;
+    const bal: Ret = { l: it.ax - it.bw / 2 + dx, r: it.ax + it.bw / 2 + dx, b, t: b - it.bh };
+    const talo: Ret = { l: it.ax - 3, r: it.ax + 3, t: b, b: it.corpo.t };
+    return { bal, talo };
+  };
+  const livre = (it: Item, dx: number, dy: number, colocados: Ret[], comCorpos: boolean) => {
+    const { bal, talo } = monta(it, dx, dy);
+    if (bal.l < area.l || bal.r > area.r || bal.t < area.t) return false;
+    if (colocados.some((c) => bate(bal, c))) return false;
+    if (comCorpos && it.outros.some((c) => bate(bal, c, 2))) return false;
+    if (etiquetas.some((c) => bate(bal, c, 2))) return false;
+    if (dy < -2) {
+      if (colocados.some((c) => bate(talo, c, 1))) return false;
+      if (comCorpos && it.outros.some((c) => bate(talo, c, 0))) return false;
+    }
+    return true;
+  };
+  const grade = (it: Item) => {
+    const g: Cand[] = [];
+    const subida = Math.max(it.bh * 2.8, 150);
+    for (let dx = -it.maxDx; dx <= it.maxDx + 0.1; dx += 16) for (let dy = 0; dy >= -subida; dy -= 10) g.push({ dx, dy, c: Math.abs(dx) + Math.abs(dy) * 1.25 });
+    return g.sort((p, q) => p.c - q.c);
+  };
+  const grades = itens.map(grade);
+
+  // pré-corte: no máximo N balões discretos por sala (os de menor prioridade somem)
+  const contaSala: Record<string, number> = {};
+  const podeDiscreto = itens.map((it) => {
+    if (!it.discreto) return true;
+    contaSala[it.sala] = (contaSala[it.sala] ?? 0) + 1;
+    return contaSala[it.sala] <= MAX_POR_SALA_DISCRETO;
+  });
+
+  // busca com volta atrás: por balão, tenta os melhores lugares de cada coluna (dx)
+  const colocados: Ret[] = [];
+  const escolha: (Cand | null)[] = new Array(itens.length).fill(null);
+  let melhor: (Cand | null)[] | null = null, melhorCusto = Infinity, nos = 0;
+  const busca = (i: number, custo: number) => {
+    if (custo >= melhorCusto || nos > ORCAMENTO_NOS) return;
+    if (i === itens.length) { melhor = escolha.slice(); melhorCusto = custo; return; }
+    nos++;
+    const it = itens[i];
+    const opcoes: Cand[] = [];
+    // por coluna (dx): o primeiro lugar livre e alguns degraus acima dele (10, 20, 40, 80 px)
+    const base = new Map<number, number>();
+    for (const k of grades[i]) {
+      if (!livre(it, k.dx, k.dy, colocados, true)) continue;
+      const b0 = base.get(k.dx);
+      if (b0 === undefined) { base.set(k.dx, k.dy); opcoes.push(k); continue; }
+      const sobe = b0 - k.dy;
+      if (sobe === 10 || sobe === 20 || sobe === 40 || sobe === 80) opcoes.push(k);
+    }
+    opcoes.sort((p, q) => p.c - q.c);
+    for (const k of opcoes) {
+      const { bal, talo } = monta(it, k.dx, k.dy);
+      const sobe = k.dy < -2;
+      colocados.push(bal); if (sobe) colocados.push(talo);
+      escolha[i] = k;
+      busca(i + 1, custo + k.c);
+      colocados.pop(); if (sobe) colocados.pop();
+      escolha[i] = null;
+      if (nos > ORCAMENTO_NOS) return;
+    }
+    if (it.discreto) { escolha[i] = null; busca(i + 1, custo + 400); }
+    else if (it.prio === 2 && !opcoes.length) { escolha[i] = null; busca(i + 1, custo + 2500); } // balão de tarefa some em vez de tapar alguém (o agente continua aceso e clicável)
+    if (!it.discreto && !opcoes.length && it.prio !== 2) { // sem lugar: relaxa (ignora rostos), último recurso
+      const k = grades[i].find((c) => livre(it, c.dx, c.dy, colocados, false)) ?? { dx: 0, dy: 0, c: 0 };
+      const { bal } = monta(it, k.dx, k.dy);
+      colocados.push(bal); escolha[i] = k;
+      busca(i + 1, custo + 3000 + k.c);
+      colocados.pop(); escolha[i] = null;
+    }
+  };
+  // balões que não podem aparecer (limite por sala) saem da busca como "ocultos"
+  const ativos = itens.map((_, i) => podeDiscreto[i]);
+  const idx = itens.map((_, i) => i).filter((i) => ativos[i]);
+  if (idx.length !== itens.length) {
+    // refaz listas só com os ativos, mantendo a ordem
+    const sub = idx.map((i) => itens[i]); const subG = idx.map((i) => grades[i]);
+    itens.length = 0; itens.push(...sub); grades.length = 0; grades.push(...subG);
+    escolha.length = itens.length;
+  }
+  busca(0, 0);
+  if (!aplicar) return melhorCusto;
+  const final = (melhor ?? escolha) as (Cand | null)[];
+
+  const visiveis = new Set<HTMLElement>();
+  itens.forEach((it, i) => {
+    const esc = final[i];
+    const st = it.el.style;
+    if (!esc) return;
+    visiveis.add(it.el);
+    it.el.dataset.oculto = "";
+    delete it.el.dataset.oculto;
+    st.visibility = "";
+    st.setProperty("--dx", `${esc.dx.toFixed(1)}px`);
+    st.setProperty("--dy", `${esc.dy.toFixed(1)}px`);
+    st.setProperty("--stem", `${(-esc.dy).toFixed(1)}px`);
+    st.setProperty("--tx", `${(it.bw / 2 - esc.dx).toFixed(1)}px`);
+    it.el.classList.toggle("desl", esc.dy < -2 || Math.abs(esc.dx) > 2);
+  });
+  palco.querySelectorAll<HTMLElement>(".esc-fala").forEach((el) => {
+    if (visiveis.has(el)) return;
+    el.style.visibility = "hidden";
+    el.dataset.oculto = "1";
+  });
+  return melhorCusto;
+}

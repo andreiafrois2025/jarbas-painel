@@ -10,13 +10,13 @@
 // No modo Só Igam: tarefas pessoais viram "ocupado" e Louis, Lara e Nara saem.
 // Modo aula: usa SÓ um roteiro de exemplo, nunca dado real.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Mascote from "./Mascote";
 import { usePainel } from "@/lib/painel-context";
 import { ehColaboradorOculto, ehPessoal } from "@/lib/modo";
 import {
-  AGENTES, ALTURA, CAFE, CP_DURACAO, CP_ESPERA, POS_ANDREIA, LARGURA, ROTEIROS, SALAS, SOFA,
+  AGENTES, ALTURA, arrumaBaloes, CAFE, CP_DURACAO, CP_ESPERA, POS_ANDREIA, LARGURA, ROTEIROS, SALAS, SOFA,
   buscaEscritorio, liberaSom, perfil, somDoisTons, somPlim, somTecla,
   type AgenteVivo, type DadosEscritorio, type EventoMural, type PerfilAgente,
 } from "@/lib/escritorio";
@@ -66,6 +66,7 @@ export default function EscritorioPage() {
   const [ocioVis, setOcioVis] = useState<Record<string, number>>({});
   const [entregaBal, setEntregaBal] = useState<Record<string, { texto: string; ate: number }>>({});
   const raiz = useRef<HTMLDivElement>(null);
+  const palco = useRef<HTMLDivElement>(null);
 
   // ── agentes que aparecem ──────────────────────────────────────────────
   const visiveis = useMemo<PerfilAgente[]>(
@@ -89,8 +90,9 @@ export default function EscritorioPage() {
   const somRef = useRef(som);
   useEffect(() => { somRef.current = som; }, [som]);
 
-  const darEntrega = useCallback((id: string, texto: string) => {
-    setEntregaBal((b) => (b[id] && b[id].ate > Date.now() ? b : { ...b, [id]: { texto, ate: Date.now() + 7000 } }));
+  const darEntrega = useCallback((id: string, texto: string, ms = 7000) => {
+    // a entrega mais nova substitui a anterior (nunca dois balões do mesmo agente)
+    setEntregaBal((b) => ({ ...b, [id]: { texto, ate: Date.now() + ms } }));
     if (somRef.current) somPlim();
   }, []);
 
@@ -142,7 +144,7 @@ export default function EscritorioPage() {
       const s = ((Date.now() - ini) / 1000) % roteiro.duracao;
       const prev = aulaPrev.current;
       const cruza = (x: number) => (s >= prev ? prev < x && x <= s : x > prev || x <= s);
-      for (const tr of roteiro.trechos) if (cruza(tr.ate)) darEntrega(tr.agente, "✅ " + tr.entrega);
+      for (const tr of roteiro.trechos) if (cruza(tr.ate)) darEntrega(tr.agente, "✅ " + tr.entrega, 5000);
       for (const cp of roteiro.checkpoints) if (!cp.pedido && cruza(cp.de + CP_ESPERA) && somRef.current) somDoisTons();
       aulaPrev.current = s;
       setAulaT(s);
@@ -220,6 +222,16 @@ export default function EscritorioPage() {
     }, 3000);
     return () => clearInterval(t);
   }, [visiveis, aula]);
+
+  // ── balões sem sobreposição: mede e reposiciona a cada desenho da tela ──
+  useLayoutEffect(() => { if (palco.current) arrumaBaloes(palco.current); });
+  useEffect(() => {
+    const el = palco.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => arrumaBaloes(el));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [aula, roteiroId]);
 
   // ── som de digitação enquanto alguém trabalha ─────────────────────────
   const nTrabalhando = visiveis.filter((a) => vivos[a.id]?.estado === "trabalhando").length;
@@ -357,7 +369,7 @@ export default function EscritorioPage() {
           <div className={`overflow-x-auto max-md:-mx-3 max-md:px-3 [touch-action:pan-x_pan-y_pinch-zoom] overscroll-x-contain ${aula && !roteiro ? "hidden" : ""}`}>
             <div className="max-md:min-w-[780px] mx-auto"
               style={{ width: `min(100%, calc((100dvh - ${aula ? 120 : 215}px) * 1.7769))` }}>
-              <div className="esc-palco" style={{ aspectRatio: "1672 / 941" }} onClick={() => setSel(null)}>
+              <div ref={palco} className="esc-palco" style={{ aspectRatio: "1672 / 941" }} onClick={() => setSel(null)}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/escritorio/sede.webp" alt="Prédio do escritório visto de cima, com seis salas" draggable={false}
                   className="absolute inset-0 w-full h-full" />
@@ -370,11 +382,11 @@ export default function EscritorioPage() {
                   if (dt < 0 || dt >= duracao) return null;
                   const aprovado = !cp.pedido && dt >= CP_ESPERA;
                   return (
-                    <div key={cp.de} className="esc-ag trab" style={{ left: `${(POS_ANDREIA.x / LARGURA) * 100}%`, top: `${(POS_ANDREIA.y / ALTURA) * 100}%`, zIndex: 1500, ["--w" as string]: `${(56 / LARGURA) * 100}cqw`, cursor: "default" }}>
+                    <div key={cp.de} data-id="andreia" data-sala="comando" data-x={POS_ANDREIA.x} data-y={POS_ANDREIA.y} className="esc-ag trab" style={{ left: `${(POS_ANDREIA.x / LARGURA) * 100}%`, top: `${(POS_ANDREIA.y / ALTURA) * 100}%`, zIndex: 1500, ["--w" as string]: `${(56 / LARGURA) * 100}cqw`, cursor: "default" }}>
                       <span className="esc-luz" />
                       <span className="esc-af">AF</span>
                       <span className="esc-nome">Andréia</span>
-                      <span className={`esc-fala ${aprovado ? "ok" : ""}`}>{aprovado ? cp.ok : cp.espera}</span>
+                      <span key={aprovado ? "ok" : "pede"} data-prio={0} className={`esc-fala ${aprovado ? "ok" : ""}`}>{aprovado ? cp.ok : cp.espera}</span>
                     </div>
                   );
                 })}
@@ -387,7 +399,7 @@ export default function EscritorioPage() {
                   const verOcio = p.modo === "livre" && ocioVis[a.id] > Date.now();
                   const temBalao = verEntrega || trab || verOcio || p.modo === "cafe" || p.modo === "sofa";
                   return (
-                    <button key={a.id} type="button"
+                    <button key={a.id} type="button" data-id={a.id} data-sala={a.sala} data-x={p.x} data-y={p.y}
                       className={`esc-ag ${trab ? "trab" : "livre"} ${sel === a.id ? "sel" : ""}`}
                       style={{ left: `${(p.x / LARGURA) * 100}%`, top: `${(p.y / ALTURA) * 100}%`, ["--w" as string]: `${(a.tam / LARGURA) * 100}cqw`, zIndex: Math.round(p.y) + (temBalao ? 700 : 0) }}
                       aria-label={`${a.nome}, ${a.cargo}: ${trab ? (v?.tarefaTxt ?? "trabalhando") : "livre"}`}
@@ -397,19 +409,19 @@ export default function EscritorioPage() {
                       <img src={`/mascotes/${a.id}-${a.id === "jarbas" ? 512 : 256}.webp`} alt="" draggable={false} />
                       <span className="esc-nome">{a.nome}</span>
                       {verEntrega ? (
-                        <span className="esc-fala ok">{ent.texto}</span>
+                        <span key="ent" data-prio={1} className="esc-fala ok">{ent.texto}</span>
                       ) : trab ? (
-                        <span className="esc-fala">
+                        <span key="trab" data-prio={2} className="esc-fala">
                           {v?.tarefaTxt ?? "Trabalhando"}
                           {!!v?.mais && v.mais > 0 && <b className="ml-1 opacity-80">+{v.mais}</b>}
                           {typeof v?.progresso === "number" && <span className="esc-barra block"><i style={{ width: `${Math.round(v.progresso * 100)}%` }} /></span>}
                         </span>
                       ) : p.modo === "cafe" ? (
-                        <span className="esc-fala ocio">☕ pausa pro café</span>
+                        <span key="cafe" data-prio={3} className="esc-fala ocio">☕ pausa pro café</span>
                       ) : p.modo === "sofa" ? (
-                        <span className="esc-fala ocio">💤 zzz</span>
+                        <span key="sofa" data-prio={3} className="esc-fala ocio">💤 zzz</span>
                       ) : verOcio ? (
-                        <span className="esc-fala ocio">{a.ocio}</span>
+                        <span key="ocio" data-prio={4} className="esc-fala ocio">{a.ocio}</span>
                       ) : null}
                     </button>
                   );
