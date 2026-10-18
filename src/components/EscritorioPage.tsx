@@ -336,6 +336,7 @@ export default function EscritorioPage() {
   const selPerfil = sel ? perfil(sel) : undefined;
 
   // ── modo arrumar: abrir, arrastar, salvar ─────────────────────────────
+  const [avisoSalvo, setAvisoSalvo] = useState<Alvo | null>(null);
   const abrirArrumar = () => {
     const r: PosicoesRel = {};
     for (const a of AGENTES) r[a.id] = { trab: efetivaRel(a, "trab", pos), livre: efetivaRel(a, "livre", pos) };
@@ -359,7 +360,9 @@ export default function EscritorioPage() {
       if (item.trab || item.livre) fora[a.id] = item;
     }
     setSalvando(true); setErroPos("");
-    try { setPos(await salvaPosicoes(fora)); fecharArrumar(); }
+    // 18/10: ao salvar, cada um volta ao estado AO VIVO (quase todos livres), e a Andréia achou
+    // que "eles mudaram". O aviso explica e oferece arrumar a outra posição.
+    try { setPos(await salvaPosicoes(fora)); fecharArrumar(); setAvisoSalvo(alvo); setTimeout(() => setAvisoSalvo(null), 15000); }
     catch { setErroPos("Não consegui salvar agora. As posições continuam como você deixou aqui; tente de novo."); }
     finally { setSalvando(false); }
   };
@@ -402,6 +405,13 @@ export default function EscritorioPage() {
       <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
         {/* Coluna do prédio */}
         <div className="flex-1 min-w-0 md:min-h-0 md:overflow-y-auto p-3 md:p-4 flex flex-col gap-3">
+          {!aula && !arrumar && avisoSalvo && (
+            <div role="status" className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 text-sm">
+              <span className="mr-auto">✔ Posições salvas. Agora cada um aparece onde está <b>de verdade</b>: quem está livre vai para o lugar de <b>livre</b>{avisoSalvo === "trab" ? " (e só vai para a mesa quando pegar uma tarefa)" : ""}.</span>
+              <button onClick={() => { abrirArrumar(); setAlvo(avisoSalvo === "trab" ? "livre" : "trab"); setAvisoSalvo(null); }} className="text-sm font-bold rounded-full border border-[var(--accent)] bg-[var(--accent)] text-white px-3.5 py-1 cursor-pointer">Arrumar {avisoSalvo === "trab" ? "o lugar de livre" : "as mesas"}</button>
+              <button onClick={() => setAvisoSalvo(null)} className="text-sm font-semibold rounded-full border border-[var(--border-light)] px-3 py-1 cursor-pointer">Ok</button>
+            </div>
+          )}
           {!aula && arrumar && (
             <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] p-3">
               <div className="flex flex-wrap items-center gap-2">
