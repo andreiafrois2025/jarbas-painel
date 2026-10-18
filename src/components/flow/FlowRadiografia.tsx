@@ -9,7 +9,7 @@ import {
   descricaoLimpa, avaliaSaude, SELO_SAUDE, tempoDesde, primeiraFrase,
   type Nivel, type Peca, type Desenho,
 } from "@/lib/radiografia";
-import { layoutVertical, layoutHorizontal, pontasHorizontal, verticaliza, horizontaliza } from "@/lib/flow/layout";
+import { layoutVertical, layoutHorizontal, pontasHorizontal, verticaliza, horizontaliza, temSobreposicao } from "@/lib/flow/layout";
 import { medePeca, type Medida } from "@/lib/flow/medida";
 import { aplicaLeigo, leigoDoFluxo, quemNoBalao } from "@/lib/flow/leigo";
 import { nomeDoFluxo } from "@/lib/flow/macro-fluxos";
@@ -17,6 +17,7 @@ import FlowViewer, { type Selecao, type NoVis, type SetaVis } from "./FlowViewer
 import FlowCanvas from "./FlowCanvas";
 import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha } from "./PaginaPartes";
 import { toMermaid, toPrompt, copy, download } from "./FlowExport";
+import CodigoReal, { nomeCurto } from "./CodigoReal";
 import { TYPE_LABEL, STROKE_BY_TYPE } from "./RoughNode";
 
 // =============================================
@@ -95,6 +96,10 @@ export default function FlowRadiografia({
     const frase = nivel === 1
       ? peca.membros.map((m) => primeiraFrase(m.data.details)).filter(Boolean).join(" ")
       : primeiraFrase(peca.membros[0].data.details);
+    const cod = peca.membros[0].data.codigo;
+    if (nivel === 3 && cod) {
+      return { id: p.id, titulo: p.t, frase: cod.explicacao_tecnica || frase, codigo: `${nomeCurto(cod.arquivo)}:${cod.linhas}` };
+    }
     return { id: p.id, titulo: p.t, frase, codigo: nivel === 3 ? arquivoDe(peca) || undefined : undefined };
   });
 
@@ -105,6 +110,8 @@ export default function FlowRadiografia({
   const { txt, medidas, rotulos } = useMemo(() => {
     const rotulo3 = (tipo: FlowDocNode["type"], id: string) => {
       const pe = d2.pecas.find((p) => p.id === id);
+      const cod = pe?.membros[0].data.codigo;
+      if (cod) return `${nomeCurto(cod.arquivo)}:${cod.linhas}`;
       const s = pe ? arquivoDe(pe) : "";
       return tipo === "start" ? (automacao?.script ? automacao.script.split("/").pop() : s) : (s.split("/").pop() || s || undefined);
     };
@@ -119,17 +126,26 @@ export default function FlowRadiografia({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowTxt, nivel, d2, automacao, fv]);
 
-  const flowV = useMemo(() => verticaliza(flow, medidas), [flow, medidas]);
   const auto2V = useMemo(
     () => verticaliza({ nodes: flow.nodes.map((n) => ({ ...n, data: { ...n.data, layoutV: undefined } })), edges: flow.edges.map((e) => ({ ...e, sourceHandle: undefined, targetHandle: undefined })) }, medidas),
     [flow, medidas],
   );
-  const flowParaEditar = useMemo<FlowDoc>(() => ({ ...flow, nodes: flowV.nodes, edges: flowV.edges }), [flow, flowV]);
-  const hSalvo = useMemo(() => (area.w ? horizontaliza(flow, larguraMax, medidas, rotulos) : null), [flow, larguraMax, area.w, medidas, rotulos]);
+  // posições salvas que fazem peças se cobrirem (arrasto antigo, desenho velho) não valem: usa a arrumação automática
+  const flowV = useMemo(() => {
+    const v = verticaliza(flow, medidas);
+    return v.salvo && temSobreposicao(v.nodes, medidas) ? auto2V : v;
+  }, [flow, medidas, auto2V]);
   const hAuto = useMemo(
     () => (area.w ? horizontaliza({ nodes: flow.nodes.map((n) => ({ ...n, data: { ...n.data, posH: undefined } })), edges: flow.edges.map((e) => ({ ...e, sourceHandleH: undefined, targetHandleH: undefined })) }, larguraMax, medidas, rotulos) : null),
     [flow, larguraMax, area.w, medidas, rotulos],
   );
+  const hSalvo = useMemo(() => {
+    if (!area.w) return null;
+    const h = horizontaliza(flow, larguraMax, medidas, rotulos);
+    return h.salvo && hAuto && temSobreposicao(h.nodes, medidas) ? hAuto : h;
+  }, [flow, larguraMax, area.w, medidas, rotulos, hAuto]);
+  const flowParaEditarH = useMemo<FlowDoc | null>(() => (hSalvo ? { ...flow, nodes: hSalvo.nodes, edges: hSalvo.edges } : null), [flow, hSalvo]);
+  const flowParaEditar = useMemo<FlowDoc>(() => ({ ...flow, nodes: flowV.nodes, edges: flowV.edges }), [flow, flowV]);
 
   const vista = useMemo(() => {
     if (!area.w) return null;
@@ -189,6 +205,20 @@ export default function FlowRadiografia({
     const edges: FlowDocEdge[] = ss.map((s) => {
       const velha = flow.edges.find((e) => e.id === s.id);
       return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: velha ? velha.label : s.label, isReturn: velha ? velha.isReturn : s.isReturn, sourceHandleH: s.sourceHandle, targetHandleH: s.targetHandle };
+    });
+    onCanvasChange({ nodes, edges });
+  };
+
+  // o editor completo mostra o desenho deitado: o que ele devolve vai para posH / pontas H, e a vista de celular fica intacta
+  const salvarDoEditorH = (u: { nodes: FlowDoc["nodes"]; edges: FlowDoc["edges"] }) => {
+    const ymax = flow.nodes.reduce((m, n) => Math.max(m, n.position?.y ?? 0), 0);
+    const nodes: FlowDocNode[] = u.nodes.map((n) => {
+      const velho = flow.nodes.find((x) => x.id === n.id);
+      return { id: n.id, type: n.type, position: velho ? velho.position : { x: 0, y: ymax + 190 }, data: { ...n.data, posH: { x: Math.round(n.position.x), y: Math.round(n.position.y) } } };
+    });
+    const edges: FlowDocEdge[] = u.edges.map((e) => {
+      const velha = flow.edges.find((x) => x.id === e.id);
+      return { ...(velha || { sourceHandle: "bottom", targetHandle: "top" }), id: e.id, source: e.source, target: e.target, label: e.label, isReturn: e.isReturn, sourceHandleH: e.sourceHandle, targetHandleH: e.targetHandle };
     });
     onCanvasChange({ nodes, edges });
   };
@@ -330,7 +360,12 @@ export default function FlowRadiografia({
         >
           {completo ? (
             <>
-              <FlowCanvas flow={flowParaEditar} onChange={onCanvasChange} />
+              {vertical || !hSalvo ? (
+                <FlowCanvas flow={flowParaEditar} onChange={onCanvasChange} />
+              ) : (
+                // mesmo desenho deitado do modo de leitura (não pula para a vista de celular)
+                <FlowCanvas flow={flowParaEditarH!} onChange={salvarDoEditorH} horizontal />
+              )}
               <button
                 onClick={() => setCompleto(false)}
                 className="absolute top-3 right-3 z-30 text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer"
@@ -471,28 +506,28 @@ export function PainelPeca({ peca, nivel, flow, desenho, d1, automacao, cronDesc
         </div>
       )}
 
-      {/* Nível 3: o arquivo e o trecho de verdade */}
+      {/* Nível 3: o arquivo e o trecho de verdade (lido do arquivo pelo curador) */}
       {nivel === 3 && (
         <div className="mt-3 space-y-2">
-          {executores.map((ex) => {
-            const caminho = caminhoDeArquivo(ex);
-            return caminho ? <CaminhoCopiavel key={ex} valor={caminho} avisar={avisar} /> : null;
-          })}
           {m0.data.codigo ? (
-            <div>
-              <p className="text-[11px] text-[var(--text-muted)] mb-1">
-                {m0.data.codigo.arquivo || ""}{m0.data.codigo.linhas ? ` · linhas ${m0.data.codigo.linhas}` : ""}
-              </p>
-              <Codigo texto={m0.data.codigo.trecho} />
-            </div>
+            <CodigoReal codigo={m0.data.codigo} avisar={avisar} />
           ) : (
-            <div className="rounded-lg border border-dashed border-[var(--border-light)] p-3 text-xs text-[var(--text-secondary)]">
-              <p className="font-medium text-[var(--text-primary)] mb-0.5">🚧 Trecho do código: em breve</p>
-              O curador de fluxos vai gravar aqui o pedaço do script que faz esta etapa. Por enquanto, veja o script
-              principal abaixo.
-            </div>
+            <>
+              {executores.map((ex) => {
+                const caminho = caminhoDeArquivo(ex);
+                return caminho ? <CaminhoCopiavel key={ex} valor={caminho} avisar={avisar} /> : null;
+              })}
+              <div className="rounded-lg border border-dashed border-[var(--border-light)] p-3 text-xs text-[var(--text-secondary)]">
+                <p className="font-medium text-[var(--text-primary)] mb-0.5">Sem trecho de código próprio</p>
+                {m0.type === "start" || m0.type === "end"
+                  ? "Esta etapa marca o começo ou o fim do fluxo e não tem uma linha de código só dela."
+                  : executores.length
+                    ? `Esta etapa é feita por ${executores.join(", ")}, sem um trecho de script dedicado.`
+                    : "O curador não achou um trecho de código dedicado a esta etapa."}
+              </div>
+            </>
           )}
-          {m0.type === "start" || !m0.data.codigo ? <BlocoScript automacao={automacao} avisar={avisar} /> : null}
+          {m0.type === "start" ? <BlocoScript automacao={automacao} avisar={avisar} /> : null}
         </div>
       )}
 

@@ -82,7 +82,8 @@ function agrupaParaLeigo(nodes: FlowDocNode[], edges: FlowDocEdge[], limite: num
       if (a === b) continue;
       const na = grupos.get(a)!;
       const nb = grupos.get(b)!;
-      if (na[na.length - 1].type !== "action" || nb[0].type !== "action") continue;
+      // só ação com ação: decisão, início, fim e nota ficam sempre como peça própria
+      if (na.some((m) => m.type !== "action") || nb.some((m) => m.type !== "action")) continue;
       if (na.length + nb.length > 4) continue;
       // só junta se for fila indiana: a só sai pra b, b só recebe de a
       const saidasA = fwd.filter((x) => dono.get(x.source) === a && dono.get(x.target) !== a);
@@ -120,7 +121,10 @@ export function montaDesenho(flow: FlowDoc, nivel: Nivel, limiteLeigo = 7): Dese
     // Leigo: some com anotações e com as setas de retorno (só o caminho feliz)
     nodes = nodes.filter((n) => n.type !== "note");
     const ids = new Set(nodes.map((n) => n.id));
-    edges = edges.filter((e) => !e.isReturn && ids.has(e.source) && ids.has(e.target));
+    // Regra v3.2: DECISÕES NUNCA são agrupadas (só ações seguidas, sem decisão no meio) e as saídas delas
+    // ("sim"/"não") sempre aparecem, mesmo a que volta (a volta de uma decisão é o "tem ressalvas? sim, volta para ajustar").
+    const decisoes = new Set(nodes.filter((n) => n.type === "condition").map((n) => n.id));
+    edges = edges.filter((e) => (!e.isReturn || decisoes.has(e.source)) && ids.has(e.source) && ids.has(e.target));
     const { grupos, dono } = agrupaParaLeigo(nodes, edges, limiteLeigo);
     pecasBase = [...grupos.entries()].map(([id, membros]) => ({
       id,

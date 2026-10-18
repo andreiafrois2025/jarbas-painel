@@ -9,6 +9,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import RoughNode, { STROKE_BY_TYPE } from "./RoughNode";
 import { estiloSeta } from "./estilo";
+import { paraRFSetas } from "./rotas";
+import { edgeTypes } from "./SetaEdge";
 import { medePeca } from "@/lib/flow/medida";
 import type { FlowDocNode } from "@/lib/types";
 
@@ -72,19 +74,16 @@ function paraRF(nos: NoVis[]): Node[] {
     data: { label: n.label, icon: n.icon, executor: n.executor, details: n.details, _flowType: n.type, semRotuloTipo: true },
   }));
 }
-function paraRFSetas(setas: SetaVis[]): Edge[] {
-  return setas.map((s) =>
-    estiloSeta(
-      { id: s.id, source: s.source, target: s.target, sourceHandle: s.sourceHandle ?? (s.isReturn ? "right" : "bottom"), targetHandle: s.targetHandle ?? (s.isReturn ? "right" : "top") },
-      !!s.isReturn,
-      s.label,
-    ),
-  );
-}
-
 function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAuto, setasAuto, foco, semMiniMapa, extras }: Props) {
-  const [nodes, setNodes] = useState<Node[]>(() => paraRF(nos));
-  const [edges, setEdges] = useState<Edge[]>(() => paraRFSetas(setas));
+  const [edges, setEdges] = useState<Edge[]>(() => paraRFSetas(setas, nos));
+  // seta que entra pela direita de uma peça do fim da fileira sai do desenho: uma peça invisível faz o "encaixar" contá-la
+  const [nodes, setNodes] = useState<Node[]>(() => {
+    const base = paraRF(nos);
+    const preciso = edges.some((e) => e.targetHandle === "right" && (e.data as { isReturn?: boolean } | undefined)?.isReturn);
+    if (!preciso || !nos.length) return base;
+    const x2 = Math.max(...nos.map((n) => n.position.x + medePeca(n.type, n.label, n.executor, n.icon).w));
+    return [...base, { id: "__espaco", type: "default", position: { x: x2 + 120, y: nos[0].position.y }, data: {}, style: { width: 1, height: 1, opacity: 0, pointerEvents: "none" }, draggable: false, selectable: false, focusable: false }];
+  });
   const rf = useReactFlow();
   const sujo = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,7 +135,7 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
     sujo.current = false;
     const { nodes: ns, edges: es } = ultimo.current;
     onSalvar?.(
-      ns.map((n) => ({ id: n.id, x: Math.round(n.position.x), y: Math.round(n.position.y) })),
+      ns.filter((n) => n.id !== "__espaco").map((n) => ({ id: n.id, x: Math.round(n.position.x), y: Math.round(n.position.y) })),
       es.map((e) => ({
         id: e.id, source: e.source, target: e.target,
         label: typeof e.label === "string" ? e.label : undefined,
@@ -174,7 +173,7 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
 
   const reorganizar = () => {
     setNodes((ns) => ns.map((n) => (posicoesAuto[n.id] ? { ...n, position: posicoesAuto[n.id] } : n)));
-    if (setasAuto) setEdges(paraRFSetas(setasAuto));
+    if (setasAuto) setEdges(paraRFSetas(setasAuto, nos.map((n) => ({ id: n.id, position: posicoesAuto[n.id] ?? n.position }))));
     marcaSujo();
     setTimeout(encaixar, 60);
   };
@@ -183,12 +182,13 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
 
   return (
     <div className="fluxo-canvas" ref={caixa} style={{ position: "absolute", inset: 0 }}>
-      <style>{`.fluxo-canvas .react-flow__pane{cursor:grab}.fluxo-canvas .react-flow__pane.dragging{cursor:grabbing}.fluxo-canvas .react-flow__handle{opacity:0;pointer-events:none;transition:opacity .15s}.fluxo-canvas.editando .react-flow__handle{pointer-events:all}.fluxo-canvas.editando .react-flow__node:hover .react-flow__handle,.fluxo-canvas.editando .react-flow__node.selected .react-flow__handle{opacity:1}.fluxo-canvas .react-flow__node{cursor:pointer}.fluxo-canvas.editando .react-flow__node{cursor:move}`}</style>
+      <style>{`.fluxo-canvas .react-flow__pane{cursor:grab}.fluxo-canvas .react-flow__pane.dragging{cursor:grabbing}.fluxo-canvas .react-flow__handle{opacity:0;pointer-events:none;transition:opacity .15s}.fluxo-canvas.editando .react-flow__handle{pointer-events:all;opacity:.55;width:10px;height:10px;background:#2D6B6B;border:2px solid #fff}.fluxo-canvas.editando .react-flow__node:hover .react-flow__handle,.fluxo-canvas.editando .react-flow__node.selected .react-flow__handle{opacity:1}.fluxo-canvas.editando .react-flow__edge.selected .react-flow__edge-path{stroke-width:2.6}.fluxo-canvas .react-flow__node{cursor:pointer}.fluxo-canvas.editando .react-flow__node{cursor:move}`}</style>
       <ReactFlow
         className={editando ? "editando" : ""}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -218,7 +218,7 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
             position="bottom-right"
             style={{ width: 150, height: 92, bottom: 66, right: 12, margin: 0, borderRadius: 8, border: "1px solid #D9D1C4" }}
             maskColor="rgba(45,107,107,0.10)"
-            nodeColor={(n) => STROKE_BY_TYPE[((n.data as { _flowType?: FlowDocNode["type"] })._flowType) || "action"]}
+            nodeColor={(n) => n.id === "__espaco" ? "transparent" : STROKE_BY_TYPE[((n.data as { _flowType?: FlowDocNode["type"] })._flowType) || "action"]}
             ariaLabel="Mini-mapa do desenho"
           />
         )}
@@ -232,7 +232,7 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
         )}
       </div>
       <p className="absolute bottom-2 right-3 z-10 text-[11px] text-[var(--text-muted)] pointer-events-none hidden sm:block">
-        {editando ? "arraste as peças e as pontas das setas · salva sozinho" : "arraste o fundo para passear · role ou use dois dedos para o zoom"}
+        {editando ? "arraste as peças pelo corpo e as pontas das setas pelas bolinhas · salva sozinho" : "arraste o fundo para passear · role ou use dois dedos para o zoom"}
       </p>
     </div>
   );

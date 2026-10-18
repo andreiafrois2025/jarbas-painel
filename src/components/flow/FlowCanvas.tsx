@@ -20,6 +20,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import RoughNode from "./RoughNode";
 import { estiloSeta } from "./estilo";
+import { edgeTypes } from "./SetaEdge";
+import { paraRFSetas } from "./rotas";
 import FlowToolbar from "./FlowToolbar";
 import FlowLegend from "./FlowLegend";
 import NodeEditor from "./NodeEditor";
@@ -37,6 +39,8 @@ import type { FlowDoc, FlowDocNode, FlowDocEdge } from "@/lib/types";
 interface Props {
   flow: FlowDoc;
   onChange?: (updates: { nodes: FlowDocNode[]; edges: FlowDocEdge[] }) => void;
+  /** desenho deitado (computador): as peças novas entram à direita da última, não embaixo */
+  horizontal?: boolean;
 }
 
 const NEW_NODE_LABELS: Record<FlowDocNode["type"], string> = {
@@ -60,20 +64,16 @@ function toRFNodes(nodes: FlowDocNode[]): Node[] {
   }));
 }
 
-function toRFEdges(edges: FlowDocEdge[], vertical: boolean): Edge[] {
-  return edges.map((e) =>
-    styleEdge(
-      {
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        // Defaults pros seeds antigos (esquerda→direita)
-        sourceHandle: e.sourceHandle ?? (vertical ? "bottom" : "right"),
-        targetHandle: e.targetHandle ?? (vertical ? "top" : "left"),
-      },
-      !!e.isReturn,
-      e.label,
-    ),
+function toRFEdges(edges: FlowDocEdge[], vertical: boolean, nodes: FlowDocNode[]): Edge[] {
+  // mesmas rotas do modo de leitura (voltas e desvios contornam as peças, sem se sobrepor)
+  return paraRFSetas(
+    edges.map((e) => ({
+      id: e.id, source: e.source, target: e.target, label: e.label, isReturn: !!e.isReturn,
+      // Defaults pros seeds antigos (esquerda→direita)
+      sourceHandle: e.sourceHandle ?? (vertical ? "bottom" : "right"),
+      targetHandle: e.targetHandle ?? (vertical ? "top" : "left"),
+    })),
+    nodes.map((n) => ({ id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, executor: n.data.executor, position: n.position })),
   );
 }
 
@@ -102,16 +102,16 @@ function fromRFEdges(edges: Edge[]): FlowDocEdge[] {
   }));
 }
 
-function FlowCanvasInner({ flow, onChange }: Props) {
+function FlowCanvasInner({ flow, onChange, horizontal }: Props) {
   const [nodes, setNodes] = useState<Node[]>(toRFNodes(flow.nodes));
-  const [edges, setEdges] = useState<Edge[]>(toRFEdges(flow.edges, ehVertical(flow)));
+  const [edges, setEdges] = useState<Edge[]>(toRFEdges(flow.edges, !horizontal && ehVertical(flow), flow.nodes));
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => {
     setNodes(toRFNodes(flow.nodes || []));
-    setEdges(toRFEdges(flow.edges || [], ehVertical(flow)));
+    setEdges(toRFEdges(flow.edges || [], !horizontal && ehVertical(flow), flow.nodes || []));
     setSelectedNode(null);
     setSelectedEdge(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -191,19 +191,18 @@ function FlowCanvasInner({ flow, onChange }: Props) {
       const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       // entra embaixo do último passo (o desenho é de cima pra baixo)
       const abaixo = nodes.reduce((m, n) => Math.max(m, n.position.y), -160) + 190;
-      const newNode: Node = {
-        id,
-        type: "rough",
-        position: { x: 0, y: abaixo },
-        data: { _flowType: type, label: NEW_NODE_LABELS[type], layoutV: 1 },
-      };
+      const aDireita = nodes.reduce((m, n) => Math.max(m, n.position.x), -60) + 280;
+      const yMeio = nodes.length ? Math.round(nodes.reduce((s, n) => s + n.position.y, 0) / nodes.length) : 0;
+      const newNode: Node = horizontal
+        ? { id, type: "rough", position: { x: aDireita, y: yMeio }, data: { _flowType: type, label: NEW_NODE_LABELS[type] } }
+        : { id, type: "rough", position: { x: 0, y: abaixo }, data: { _flowType: type, label: NEW_NODE_LABELS[type], layoutV: 1 } };
       setNodes((ns) => {
         const next = [...ns, newNode];
         persist(next, edges);
         return next;
       });
     },
-    [edges, nodes, persist],
+    [edges, nodes, persist, horizontal],
   );
 
   const updateNodeData = useCallback(
@@ -290,6 +289,7 @@ function FlowCanvasInner({ flow, onChange }: Props) {
         onReconnect={onReconnect}
         edgesReconnectable
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
         onNodeClick={(_, node) => {
           setSelectedNode(node);

@@ -17,6 +17,8 @@ import { nomeDoFluxo, type MacroMontado } from "@/lib/flow/macro-fluxos";
 import { ligacoesDoGrupo, desenhoPodeEstarVelho, type LigacoesFluxos } from "@/lib/flow/ligacoes";
 import RoughNode from "./RoughNode";
 import { estiloSeta } from "./estilo";
+import { edgeTypes } from "./SetaEdge";
+import { paraRFSetas } from "./rotas";
 import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha } from "./PaginaPartes";
 
 // =============================================
@@ -138,7 +140,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
       if (nivel === 1) {
         const d = montaDesenho(ft, 1, 4);
         nos = d.pecas.map((p) => ({ id: p.id, type: p.type, label: p.label, icon: p.icon, details: p.membros[0]?.data.details }));
-        ligs = d.setas.map((sa) => ({ id: sa.id, source: sa.source, target: sa.target, label: sa.label }));
+        ligs = d.setas.map((sa) => ({ id: sa.id, source: sa.source, target: sa.target, label: sa.label, isReturn: sa.isReturn }));
       } else {
         const ns = ft.nodes.filter((n) => n.type !== "note");
         const ids = new Set(ns.map((n) => n.id));
@@ -154,9 +156,17 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
       for (const c of caixas) { const p = pos.get(c.id)!; w = Math.max(w, p.x + c.w); h = Math.max(h, p.y + c.h); }
       const inicio = nos.find((n) => n.type === "start") || nos[0];
       const fim = [...nos].reverse().find((n) => n.type === "end") || [...nos].sort((a, b) => (pos.get(b.id)?.camada ?? 0) - (pos.get(a.id)?.camada ?? 0))[0];
-      return { f, nos, ligs, pos, w, h, inicio, fim };
+      // setas da raia: mesmas rotas do mapa de um fluxo só (voltas e desvios contornam as peças, sem cruzar nem se sobrepor)
+      const setasRaia = ligs.map((l) => {
+        const pt = pontasHorizontal(pos.get(l.source), pos.get(l.target), l.isReturn);
+        return { id: l.id, source: l.source, target: l.target, label: l.label, isReturn: pt.volta, sourceHandle: pt.sourceHandle, targetHandle: pt.targetHandle };
+      });
+      const arestas = paraRFSetas(setasRaia, nos.map((n) => ({ id: n.id, type: n.type, label: n.label, icon: n.icon, executor: n.executor, position: pos.get(n.id)! })));
+      return { f, nos, ligs, pos, w, h, inicio, fim, arestas };
     });
-    const W = Math.max(...raias.map((r) => r.w)) + 2 * PAD;
+    // volta que entra pela direita da última peça precisa de um respiro à direita da raia
+    const folgaDireita = raias.some((r) => r.arestas.some((e) => e.targetHandle === "right")) ? 90 : 0;
+    const W = Math.max(...raias.map((r) => r.w)) + 2 * PAD + folgaDireita;
 
     // 2) empilha as raias
     const ns: Node[] = [];
@@ -181,9 +191,8 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
           data: { label: n.label, icon: n.icon, details: n.details, executor: n.executor, _flowType: n.type, semRotuloTipo: true },
         });
       }
-      for (const l of r.ligs) {
-        const pt = pontasHorizontal(r.pos.get(l.source), r.pos.get(l.target), l.isReturn);
-        es.push(estiloSeta({ id: `${r.f.id}:${l.id}`, source: `${r.f.id}:${l.source}`, target: `${r.f.id}:${l.target}`, sourceHandle: pt.sourceHandle, targetHandle: pt.targetHandle }, pt.volta, l.label));
+      for (const e of r.arestas) {
+        es.push({ ...e, id: `${r.f.id}:${e.id}`, source: `${r.f.id}:${e.source}`, target: `${r.f.id}:${e.target}` });
       }
       y += alturaR + ENTRE;
     });
@@ -249,6 +258,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
                 nodes={montagem.ns.map((n) => ({ ...n, selected: !!escolha && n.id === `${escolha.flowId}:${escolha.nodeId}` }))}
                 edges={montagem.es}
                 nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 nodesDraggable={false}
                 nodesConnectable={false}
                 connectionMode={ConnectionMode.Loose}

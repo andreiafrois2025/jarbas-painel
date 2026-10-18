@@ -244,3 +244,15 @@ export function horizontaliza(flow: Pick<FlowDoc, "nodes" | "edges">, larguraMax
   });
   return { nodes, edges, salvo, auto };
 }
+
+/** Alguma peça cobre outra? (posições salvas à mão, ou de um desenho antigo, podem se sobrepor). Margem em px entre as peças. */
+export function temSobreposicao(nos: { id: string; type: FlowDocNode["type"]; position: { x: number; y: number } }[], medidas?: Map<string, Pick<Medida, "w" | "h">>, margem = 6): boolean {
+  const caixas = nos.map((n) => ({ ...tamanhoReal(n.type, medidas?.get(n.id)), x: n.position.x, y: n.position.y }));
+  for (let i = 0; i < caixas.length; i++) {
+    for (let j = i + 1; j < caixas.length; j++) {
+      const a = caixas[i], b = caixas[j];
+      if (a.x < b.x + b.w + margem && b.x < a.x + a.w + margem && a.y < b.y + b.h + margem && b.y < a.y + a.h + margem) return true;
+    }
+  }
+  return false;
+}

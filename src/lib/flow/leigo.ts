@@ -44,7 +44,12 @@ export function aplicaLeigo(flow: FlowDoc, nivel: Nivel): FlowDoc {
         },
       };
     }),
-    edges: flow.edges.map((e) => ({ ...e, label: lf?.setas?.[e.id] ?? e.label })),
+    edges: flow.edges.map((e) => {
+      // saída de decisão que é "sim"/"não" continua dizendo "sim"/"não" (a paráfrase "se for urgente" esconde a escolha)
+      const deDecisao = flow.nodes.find((n) => n.id === e.source)?.type === "condition";
+      if (deDecisao && e.label && /^(sim|n[aã]o)\b/i.test(e.label.trim())) return { ...e, label: lf?.setas?.[e.id] && /^(sim|n[aã]o)\b/i.test(lf.setas[e.id]) ? lf.setas[e.id] : e.label };
+      return { ...e, label: lf?.setas?.[e.id] ?? e.label };
+    }),
   };
 }
 

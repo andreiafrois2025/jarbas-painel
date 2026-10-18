@@ -6,7 +6,7 @@ import type { FlowDoc, FlowGrupo } from "@/lib/types";
 import { getFlowDocs, duplicateFlowDoc, updateFlowDoc, getFlowGrupos } from "@/lib/storage";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { interpretaCron } from "@/lib/cron";
-import { semAcento, ehAposentada, avaliaSaude, type Saude } from "@/lib/radiografia";
+import { semAcento, ehAposentada, avaliaSaude, tempoDesde, type Saude } from "@/lib/radiografia";
 import FlowRadiografia from "./FlowRadiografia";
 import GrupoPagina from "./GrupoPagina";
 import RascunhoFluxo from "./RascunhoFluxo";
@@ -38,6 +38,7 @@ const COR_SAUDE: Record<Saude, string> = {
   desconhecida: "var(--text-muted)",
 };
 const PESO: Record<Saude, number> = { muda: 3, atrasada: 2, desconhecida: 0, ok: 1 };
+const NOME_SAUDE: Record<Saude, string> = { ok: "no ar", atrasada: "atrasado", muda: "parou", desconhecida: "sem relógio" };
 
 export default function FlowsPageV2() {
   const router = useRouter();
@@ -95,6 +96,20 @@ export default function FlowsPageV2() {
     const a = automacaoDe(f);
     const cron = a ? interpretaCron(a.agenda) : null;
     return a && cron ? avaliaSaude(a.ultima_execucao, cron.frequenciaMin) : null;
+  };
+
+  // frase da bolinha de cada fluxo (aparece ao passar o mouse): "rodou há 2h, tudo certo"
+  const fraseSaude = (f: FlowDoc): string => {
+    const s = saudeDe(f);
+    const a = automacaoDe(f);
+    if (!s || !a) return "Sem relógio: este fluxo roda só quando alguém (ou um evento) o chama.";
+    if (s === "desconhecida") return "Tem horário marcado, mas não dá para saber quando rodou pela última vez.";
+    const quando = tempoDesde(a.ultima_execucao);
+    const marcado = interpretaCron(a.agenda)?.descricao;
+    const horario = marcado ? ` (horário marcado: ${marcado})` : "";
+    if (s === "ok") return `Rodou ${quando}, tudo certo.`;
+    if (s === "atrasada") return `Rodou ${quando}: está atrasado${horario}.`;
+    return `Parou: o último sinal de vida foi ${quando}${horario}.`;
   };
 
   const macros = useMemo(() => montaMacros(flows, grupos), [flows, grupos]);
@@ -233,7 +248,7 @@ export default function FlowsPageV2() {
         onDragEnd={() => { setArrastando(null); setAlvoDrop(null); }}
         className={`w-full text-left flex items-center gap-2 pl-7 pr-2 py-1.5 rounded-md text-[13px] hover:bg-[var(--bg-tertiary)] ${ativo ? ativoClasse : ""} ${arrastando === f.id ? "opacity-40" : ""} ${podeArrastar ? "cursor-grab" : "cursor-pointer"}`}
       >
-        <span className="w-2 h-2 rounded-full shrink-0" style={s ? { background: COR_SAUDE[s] } : { border: "1.5px solid var(--text-muted)" }} aria-label={s ? `saúde: ${s}` : "sem horário fixo"} />
+        <span className="w-2.5 h-2.5 rounded-full shrink-0" title={fraseSaude(f)} style={s ? { background: COR_SAUDE[s] } : { border: "1.5px solid var(--text-muted)" }} aria-label={fraseSaude(f)} />
         <span className="truncate">{nomeDoFluxo(f)}</span>
       </button>
     );
@@ -279,8 +294,10 @@ export default function FlowsPageV2() {
                   <span className="shrink-0">{m.def.icone}</span>
                   <span className="truncate font-medium">{m.def.titulo}</span>
                   <span className="ml-auto flex items-center gap-1.5 shrink-0">
-                    {pior && pior !== "ok" && <span className="w-2 h-2 rounded-full" style={{ background: COR_SAUDE[pior] }} aria-label={`pior saúde do grupo: ${pior}`} />}
-                    <span className="text-[11px] text-[var(--text-muted)]">{vivos.length}</span>
+                    {pior && pior !== "desconhecida" && (
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: COR_SAUDE[pior] }} title={`Pior situação entre os fluxos do grupo: ${NOME_SAUDE[pior]}.`} aria-label={`Pior situação entre os fluxos do grupo: ${NOME_SAUDE[pior]}`} />
+                    )}
+                    <span className="text-[11px] text-[var(--text-muted)] whitespace-nowrap">{vivos.length} {vivos.length === 1 ? "fluxo" : "fluxos"}</span>
                   </span>
                 </button>
               </div>
@@ -315,6 +332,15 @@ export default function FlowsPageV2() {
             ))}
           </div>
         )}
+      </div>
+      <div className="shrink-0 border-t border-[var(--border)] px-3 py-2 text-[11px] leading-snug text-[var(--text-secondary)]" aria-label="Legenda das bolinhas">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {(["ok", "atrasada", "muda"] as Saude[]).map((k) => (
+            <span key={k} className="inline-flex items-center gap-1 whitespace-nowrap"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: COR_SAUDE[k] }} />{NOME_SAUDE[k]}</span>
+          ))}
+          <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ border: "1.5px solid var(--text-muted)" }} />sem relógio (roda quando chamado)</span>
+        </p>
+        <p className="mt-1 text-[10px] text-[var(--text-muted)]">Passe o mouse na bolinha para ver quando rodou.</p>
       </div>
     </nav>
   );
