@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useUI, Botao, Cartao, Vazio } from "./ui";
+import { useUI, Botao, Cartao, Janela, Vazio } from "./ui";
 import MarkdownLeve from "./MarkdownLeve";
 import {
   ARQUIVO_EXEMPLO, NOME_ARQUIVO_EXEMPLO, SQUADS_LICITACAO, STATUS_JOB,
-  arquivosDoJob, backendDemo, backendReal, dataHora, estadoDasEtapas, nomeAgente,
-  rotuloEtapa, secaoDoCaso, tamanho,
+  arquivosDoJob, atribuicaoAproximada, backendDemo, backendReal, dataHoraCurta, estadoDasEtapas,
+  nomeAgente, nomeSquad, numeroProcesso, rotuloEtapa, secaoDoCaso, tamanho,
   type ArquivoLic, type Backend, type EstadoEtapa, type EtapaLic, type JobLic,
   type ParadaLic, type SquadId,
 } from "@/lib/licitacao";
@@ -138,15 +138,7 @@ function CartaoParada({ backend, job, parada, arquivos, onDecidir, onParar, ocup
   );
 }
 
-// ── Linha do tempo ──────────────────────────────────────────────────────
-const MARCA: Record<EstadoEtapa, { icone: string; cls: string }> = {
-  feita: { icone: "✅", cls: "text-[var(--text-secondary)]" },
-  agora: { icone: "⏳", cls: "text-[var(--text-primary)] font-semibold" },
-  espera: { icone: "⏸️", cls: "text-[var(--text-primary)] font-semibold" },
-  fila: { icone: "◻️", cls: "text-[var(--text-muted)]" },
-  parou: { icone: "🛑", cls: "text-red-500 font-semibold" },
-};
-
+// ── Linha do tempo: "onde ESTE processo está agora" ─────────────────────
 function LinhaDoTempo({ etapas, estados }: { etapas: EtapaLic[]; estados: EstadoEtapa[] }) {
   const refAtual = useRef<HTMLLIElement>(null);
   const idxAtual = estados.findIndex((e) => e === "agora" || e === "espera" || e === "parou");
@@ -156,22 +148,192 @@ function LinhaDoTempo({ etapas, estados }: { etapas: EtapaLic[]; estados: Estado
 
   if (etapas.length === 0) return <p className="text-sm text-[var(--text-muted)]">Etapas indisponíveis agora.</p>;
   return (
-    <ol className="space-y-1 max-h-[26rem] overflow-y-auto pr-1">
+    <ol className="space-y-1.5 max-h-[26rem] overflow-y-auto pr-1">
       {etapas.map((e, i) => {
-        const m = MARCA[estados[i]];
+        const est = estados[i];
+        const quem = nomeAgente(e.agent);
+        const m = {
+          feita: { ic: "✓", cls: "text-[var(--text-secondary)]", nota: "" },
+          agora: { ic: "⏳", cls: "text-[var(--text-primary)] font-semibold", nota: quem ? `${quem} está trabalhando agora` : "trabalhando agora" },
+          espera: { ic: "⏸", cls: "text-[var(--text-primary)] font-semibold", nota: "parada esperando você" },
+          parou: { ic: "🛑", cls: "text-red-500 font-semibold", nota: "parou aqui" },
+          fila: { ic: "○", cls: "text-[var(--text-muted)]", nota: "" },
+        }[est];
         return (
           <li key={String(e.id)} ref={i === idxAtual ? refAtual : undefined} className={`flex gap-2 text-sm items-start ${m.cls}`}>
-            <span className="shrink-0" aria-label={estados[i]}>{m.icone}</span>
+            <span className="shrink-0 w-5 text-center" aria-label={est}>{m.ic}</span>
             <span className="min-w-0">
               {rotuloEtapa(e)}
-              {e.agent && <span className="text-[11px] text-[var(--text-muted)]"> · {nomeAgente(e.agent)}</span>}
-              {estados[i] === "espera" && <span className="text-[11px] text-[#A0583C]"> · espera você</span>}
-              {estados[i] === "agora" && <span className="text-[11px] text-[var(--accent)]"> · trabalhando</span>}
+              {e.agent && est !== "agora" && <span className="text-[11px] text-[var(--text-muted)] font-normal"> · {quem}</span>}
+              {m.nota && <span className={`block text-[11px] font-normal ${est === "espera" ? "text-[#A0583C]" : est === "parou" ? "text-red-500" : "text-[var(--accent)]"}`}>{m.nota}</span>}
             </span>
           </li>
         );
       })}
     </ol>
+  );
+}
+
+const Legenda = () => (
+  <p className="text-[11px] text-[var(--text-muted)] mt-3 pt-2 border-t border-[var(--border)]">
+    ✓ feita · ⏳ trabalhando agora · ⏸ parada esperando você · ○ a seguir
+  </p>
+);
+
+// ── Lista de documentos de um processo (Ler / Baixar / Drive) ───────────
+function ListaDocumentos({ backend, job, docs, aprox, onDrive }: {
+  backend: Backend; job: JobLic; docs: ArquivoLic[]; aprox: boolean; onDrive: () => void;
+}) {
+  const { avisar } = useUI();
+  const [lendo, setLendo] = useState<string | null>(null);
+
+  if (docs.length === 0) {
+    return <p className="text-sm text-[var(--text-muted)] italic">Este processo ainda não gerou documentos.</p>;
+  }
+  return (
+    <div>
+      <ul className="space-y-1">
+        {docs.map((d) => (
+          <li key={d.name} className="flex flex-wrap items-center gap-2 text-sm bg-[var(--bg-tertiary)] rounded px-2 py-1.5">
+            <span className="flex-1 min-w-[10rem] truncate" title={d.name}>📄 {d.name}</span>
+            <span className="text-[11px] text-[var(--text-muted)]">{tamanho(d.size)}</span>
+            <button
+              onClick={() => setLendo(lendo === d.name ? null : d.name)}
+              className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer"
+            >{lendo === d.name ? "Fechar" : "Ler"}</button>
+            <button
+              onClick={() => backend.baixarArquivo(job.jobId, d.name).then((b) => salvarBlob(b, d.name)).catch((e) => avisar(msgErro(e)))}
+              className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer"
+            >⬇️ Baixar</button>
+          </li>
+        ))}
+      </ul>
+      {lendo && docs.some((d) => d.name === lendo) && (
+        <div className="mt-2">
+          <VisorDocumento backend={backend} jobId={job.jobId} arquivos={docs.filter((d) => d.name === lendo)} compacto />
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <button onClick={onDrive} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer">☁️ Salvar no Drive</button>
+        {job.driveFolder && <span className="text-[11px] text-[var(--text-muted)]">já salvo: {job.driveFolder}</span>}
+      </div>
+      {aprox && (
+        <p className="text-[11px] text-[#A0583C] mt-2">
+          Atribuição aproximada: a pasta de saída desta squad é compartilhada, então os documentos são separados pelo horário de início e fim do processo.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Card de processo (uma execução) ─────────────────────────────────────
+function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSelecionar, onAbrir, onDrive }: {
+  backend: Backend; job: JobLic; docs: ArquivoLic[]; aprox: boolean; espera: boolean; selecionado: boolean;
+  onSelecionar: () => void; onAbrir: () => void; onDrive: () => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const st = STATUS_JOB[job.status] || STATUS_JOB.cancelled;
+  return (
+    <li className={`rounded-lg border transition-colors ${selecionado ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]"}`}>
+      <button onClick={onSelecionar} aria-current={selecionado ? "true" : undefined} className="w-full text-left p-2.5 cursor-pointer">
+        <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+          <span className="font-semibold text-[var(--text-primary)]">Processo {numeroProcesso(job)}</span>
+          <span>· {nomeSquad(job.squad)}</span>
+          <span className="ml-auto">{dataHoraCurta(job.startedAt)}</span>
+        </div>
+        <div className="text-sm line-clamp-2 mt-0.5">{job.topic}</div>
+        <div className="mt-1 flex flex-wrap gap-1.5 items-center">
+          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${st.cor}`}>{st.rotulo}</span>
+          {espera && <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#C4A460] bg-[#C4A460]/20">⏸ espera você</span>}
+          <span className="text-[10px] text-[var(--text-secondary)]">📄 {docs.length} {docs.length === 1 ? "documento" : "documentos"}{aprox ? " (aprox.)" : ""}</span>
+        </div>
+      </button>
+      <div className="flex gap-2 px-2.5 pb-2.5">
+        <button onClick={() => setAberto(!aberto)} aria-expanded={aberto} className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer">
+          {aberto ? "▾ Esconder documentos" : "▸ Documentos"}
+        </button>
+        <button onClick={onAbrir} className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer">🗂️ Abrir processo</button>
+      </div>
+      {aberto && (
+        <div className="px-2.5 pb-2.5 border-t border-[var(--border)] pt-2">
+          <ListaDocumentos backend={backend} job={job} docs={docs} aprox={aprox} onDrive={onDrive} />
+        </div>
+      )}
+    </li>
+  );
+}
+
+// ── Visão completa de um processo (painel à direita e janela grande) ────
+function DetalheProcesso({ backend, job, etapas, estados, paradas, docs, aprox, aoVivo, ocupado, onDecidir, onParar, onDrive }: {
+  backend: Backend; job: JobLic; etapas: EtapaLic[]; estados: EstadoEtapa[]; paradas: ParadaLic[];
+  docs: ArquivoLic[]; aprox: boolean; aoVivo: string; ocupado: string | null;
+  onDecidir: (p: ParadaLic, aprovado: boolean, comentario: string) => void; onParar: () => void; onDrive: () => void;
+}) {
+  const st = STATUS_JOB[job.status] || STATUS_JOB.cancelled;
+  return (
+    <>
+      <Cartao className="mb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="font-semibold">Processo {numeroProcesso(job)} · {nomeSquad(job.squad)}</h2>
+          <span className={`text-[11px] px-2 py-0.5 rounded border ${st.cor}`}>{st.rotulo}</span>
+          <span className="text-xs text-[var(--text-muted)]">iniciado {dataHoraCurta(job.startedAt)}</span>
+          <div className="flex-1" />
+          {job.status === "running" && paradas.length === 0 && <Botao tipo="perigo" onClick={onParar}>⏹️ Parar</Botao>}
+        </div>
+        <p className="text-sm text-[var(--text-secondary)] mt-2 whitespace-pre-wrap break-words max-h-32 overflow-auto">{job.topic}</p>
+        {job.error?.message && (
+          <p className="text-xs text-red-500 bg-red-500/10 border border-red-500/30 rounded p-2 mt-2">
+            {job.error.message}
+            {!backend.demo && <span className="block text-[var(--text-secondary)] mt-1">Para retomar de onde parou, use a barra de execuções no topo do painel.</span>}
+          </p>
+        )}
+      </Cartao>
+
+      {paradas.map((p) => (
+        <CartaoParada
+          key={`${p.jobId}:${p.stepId}`}
+          backend={backend}
+          job={job}
+          parada={p}
+          arquivos={docs.length > 0 ? docs : p.producedFiles.map((f) => ({ ...f, mtime: p.createdAt })).reverse()}
+          ocupado={ocupado === `${p.jobId}:${p.stepId}`}
+          onDecidir={(aprovado, comentario) => onDecidir(p, aprovado, comentario)}
+          onParar={onParar}
+        />
+      ))}
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(16rem,20rem)_1fr] items-start">
+        <Cartao>
+          <h2 className="font-semibold">Onde este processo está agora</h2>
+          <p className="text-[11px] text-[var(--text-secondary)] mb-2">
+            Processo {numeroProcesso(job)} · {nomeSquad(job.squad)} · iniciado {dataHoraCurta(job.startedAt)}
+          </p>
+          <LinhaDoTempo etapas={etapas} estados={estados} />
+          <Legenda />
+        </Cartao>
+
+        <div className="space-y-4 min-w-0">
+          <Cartao>
+            <h2 className="font-semibold mb-2">Documentos deste processo ({docs.length})</h2>
+            {docs.length > 0 && <VisorDocumento backend={backend} jobId={job.jobId} arquivos={docs} />}
+            <div className="mt-3">
+              <ListaDocumentos backend={backend} job={job} docs={docs} aprox={aprox} onDrive={onDrive} />
+            </div>
+          </Cartao>
+
+          {job.status === "running" && (
+            <Cartao>
+              <details>
+                <summary className="cursor-pointer text-sm font-semibold">O que está acontecendo (ao vivo)</summary>
+                <pre className="mt-2 text-[11px] whitespace-pre-wrap break-words max-h-64 overflow-auto bg-[var(--bg-tertiary)] rounded p-2">
+                  {aoVivo || "aguardando as primeiras linhas…"}
+                </pre>
+              </details>
+            </Cartao>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -185,11 +347,14 @@ export default function LicitacaoPage() {
   const [paradas, setParadas] = useState<Record<string, ParadaLic[]>>({});
   const [etapasPorSquad, setEtapasPorSquad] = useState<Record<string, EtapaLic[]>>({});
   const [selecionado, setSelecionado] = useState<string | null>(null);
-  const [arquivos, setArquivos] = useState<ArquivoLic[]>([]);
+  const [janela, setJanela] = useState(false);
+  // arquivos da pasta de saída: por squad (compartilhada) ou, na demonstração, por processo
+  const [arquivosGrupo, setArquivosGrupo] = useState<Record<string, ArquivoLic[]>>({});
   const [semResposta, setSemResposta] = useState(false);
   const [carregou, setCarregou] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aoVivo, setAoVivo] = useState("");
+  const [verEtapas, setVerEtapas] = useState(false);
 
   // formulário
   const [squad, setSquad] = useState<SquadId>("apoio-licitacao-outro-setor");
@@ -201,6 +366,7 @@ export default function LicitacaoPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const job = jobs.find((j) => j.jobId === selecionado) || null;
+  const grupoDe = useCallback((j: JobLic) => (demo ? j.jobId : j.squad), [demo]);
 
   // ── atualização periódica ─────────────────────────────────────────────
   const atualizar = useCallback(async () => {
@@ -216,6 +382,14 @@ export default function LicitacaoPage() {
         } catch { /* falha pontual: tenta de novo no próximo ciclo */ }
       }));
       setParadas(mapa);
+      // um pedido de arquivos por grupo (basta um processo de cada squad: a pasta é a mesma)
+      const grupos = new Map<string, string>();
+      lista.forEach((j) => { const g = backend.demo ? j.jobId : j.squad; if (!grupos.has(g)) grupos.set(g, j.jobId); });
+      const novos: Record<string, ArquivoLic[]> = {};
+      await Promise.all([...grupos].map(async ([g, jobId]) => {
+        try { novos[g] = await backend.arquivos(jobId); } catch { /* mantém o que já havia */ }
+      }));
+      setArquivosGrupo((a) => ({ ...a, ...novos }));
     } catch (e) {
       console.warn("Licitação: a squad-api não respondeu", e);
       setSemResposta(true);
@@ -232,37 +406,26 @@ export default function LicitacaoPage() {
 
   // trocar entre real e demonstração zera a seleção
   useEffect(() => {
-    setJobs([]); setParadas({}); setSelecionado(null); setArquivos([]); setCarregou(false); setAoVivo("");
+    setJobs([]); setParadas({}); setSelecionado(null); setArquivosGrupo({}); setCarregou(false); setAoVivo(""); setJanela(false);
   }, [demo]);
 
-  // sem nada escolhido: vai direto para o que está esperando por ela, ou para a mais recente
+  // só a Licitação com parada esperando seleciona sozinha; fora isso ela escolhe
   useEffect(() => {
-    if (selecionado || jobs.length === 0) return;
+    if (selecionado) return;
     const esperando = jobs.find((j) => paradas[j.jobId]);
-    setSelecionado((esperando || jobs[0]).jobId);
+    if (esperando) setSelecionado(esperando.jobId);
   }, [jobs, paradas, selecionado]);
 
-  // etapas do pipeline da squad escolhida (uma vez por squad)
-  const squadSel = job?.squad;
+  // etapas do pipeline: da squad do processo escolhido, ou da squad do formulário ao "ver as etapas"
+  const squadEtapas = job?.squad || (verEtapas ? squad : undefined);
   useEffect(() => {
-    if (!squadSel || etapasPorSquad[squadSel]) return;
-    backend.etapas(squadSel).then((e) => setEtapasPorSquad((p) => ({ ...p, [squadSel]: e }))).catch(() => {});
-  }, [backend, squadSel, etapasPorSquad]);
+    if (!squadEtapas || etapasPorSquad[squadEtapas]) return;
+    backend.etapas(squadEtapas).then((e) => setEtapasPorSquad((p) => ({ ...p, [squadEtapas]: e }))).catch(() => {});
+  }, [backend, squadEtapas, etapasPorSquad]);
 
-  // arquivos do job escolhido: a cada ciclo enquanto roda, uma vez nos demais
+  // acompanhamento ao vivo do processo escolhido
   const statusSel = job?.status;
   const jobSel = job?.jobId;
-  useEffect(() => {
-    if (!jobSel) { setArquivos([]); return; }
-    let vivo = true;
-    const buscar = () => backend.arquivos(jobSel).then((a) => { if (vivo) setArquivos(a); }).catch(() => {});
-    buscar();
-    if (statusSel !== "running") return () => { vivo = false; };
-    const id = setInterval(buscar, INTERVALO_MS);
-    return () => { vivo = false; clearInterval(id); };
-  }, [backend, jobSel, statusSel]);
-
-  // acompanhamento ao vivo
   useEffect(() => {
     setAoVivo("");
     if (!jobSel || statusSel !== "running") return;
@@ -270,11 +433,15 @@ export default function LicitacaoPage() {
     return fechar;
   }, [backend, jobSel, statusSel]);
 
-  const docsDoJob = useMemo(() => (job ? arquivosDoJob(arquivos, job) : []), [arquivos, job]);
+  const docsDe = useCallback(
+    (j: JobLic) => arquivosDoJob(arquivosGrupo[grupoDe(j)] || [], j),
+    [arquivosGrupo, grupoDe],
+  );
   const etapas = job ? etapasPorSquad[job.squad] || [] : [];
   const paradasDoJob = job ? paradas[job.jobId] || [] : [];
   const estados = job ? estadoDasEtapas(etapas, job, paradasDoJob) : [];
   const totalParadas = Object.values(paradas).reduce((n, p) => n + p.length, 0);
+  const fecharJanela = useCallback(() => setJanela(false), []);
 
   // ── formulário ────────────────────────────────────────────────────────
   function adicionarArquivos(lista: FileList | File[]) {
@@ -307,7 +474,7 @@ export default function LicitacaoPage() {
     try {
       const id = await backend.iniciar(squad, topic, anexos);
       setTopic(""); setAnexos([]); setExemploCarregado(false);
-      setSelecionado(id);
+      setSelecionado(id); setVerEtapas(false);
       await atualizar();
     } catch (e) {
       avisar(msgErro(e));
@@ -316,7 +483,7 @@ export default function LicitacaoPage() {
     }
   }
 
-  // ── ações sobre a execução escolhida ──────────────────────────────────
+  // ── ações sobre um processo ───────────────────────────────────────────
   async function decidir(p: ParadaLic, aprovado: boolean, comentario: string) {
     setOcupado(`${p.jobId}:${p.stepId}`);
     try {
@@ -342,7 +509,22 @@ export default function LicitacaoPage() {
     try { await backend.salvarNoDrive(j.jobId); avisar(demo ? "Na demonstração não há Drive." : "Enviando ao Drive. Confira em cerca de 30 segundos."); } catch (e) { avisar(msgErro(e)); }
   }
 
-  const squadDe = (id: string) => SQUADS_LICITACAO.find((s) => s.id === id);
+  const detalhe = job && (
+    <DetalheProcesso
+      backend={backend}
+      job={job}
+      etapas={etapas}
+      estados={estados}
+      paradas={paradasDoJob}
+      docs={docsDe(job)}
+      aprox={atribuicaoAproximada(job, jobs) && !demo}
+      aoVivo={aoVivo}
+      ocupado={ocupado}
+      onDecidir={decidir}
+      onParar={() => parar(job)}
+      onDrive={() => salvarNoDrive(job)}
+    />
+  );
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -355,7 +537,7 @@ export default function LicitacaoPage() {
       {semResposta && !demo && (
         <div className="px-3 md:px-5 py-2 border-b border-[var(--border)] bg-[var(--bg-secondary)] text-xs flex items-center gap-2" role="status">
           <span>🟡</span>
-          <span className="text-[var(--text-secondary)]">Não consegui falar com a VPS agora, então <b>não sei dizer</b> o andamento das execuções.</span>
+          <span className="text-[var(--text-secondary)]">Não consegui falar com a VPS agora, então <b>não sei dizer</b> o andamento dos processos.</span>
         </div>
       )}
       {totalParadas > 0 && (
@@ -363,16 +545,16 @@ export default function LicitacaoPage() {
           onClick={() => setSelecionado(Object.keys(paradas)[0])}
           className="w-full text-left px-3 md:px-5 py-2 bg-[#C4A460]/20 border-b border-[#C4A460] text-sm cursor-pointer"
         >
-          ⏸️ <b>{totalParadas} {totalParadas === 1 ? "parada esperando" : "paradas esperando"} você.</b> Clique para ver.
+          ⏸ <b>{totalParadas} {totalParadas === 1 ? "parada esperando" : "paradas esperando"} você.</b> Clique para ver.
         </button>
       )}
 
       <div className="p-3 md:p-5 grid gap-4 lg:grid-cols-[minmax(20rem,26rem)_1fr] items-start">
-        {/* ── coluna da esquerda: nova execução + histórico ── */}
+        {/* ── coluna da esquerda: nova execução + processos ── */}
         <div className="space-y-4 min-w-0">
           <Cartao>
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-semibold">Nova execução</h2>
+              <h2 className="font-semibold">Novo processo</h2>
               <label className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} />
                 demonstração simulada
@@ -449,131 +631,85 @@ export default function LicitacaoPage() {
           </Cartao>
 
           <Cartao>
-            <h2 className="font-semibold mb-2">Execuções recentes</h2>
+            <h2 className="font-semibold mb-1">Processos</h2>
+            <p className="text-[11px] text-[var(--text-secondary)] mb-2">Cada card é um processo (uma execução da squad) com os documentos que ele gerou.</p>
             {!carregou ? (
               <p className="text-sm text-[var(--text-muted)]">carregando…</p>
             ) : jobs.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">Nenhuma execução ainda.</p>
+              <p className="text-sm text-[var(--text-muted)]">Nenhum processo ainda.</p>
             ) : (
-              <ul className="space-y-1.5">
-                {jobs.map((j) => {
-                  const st = STATUS_JOB[j.status] || STATUS_JOB.cancelled;
-                  const espera = !!paradas[j.jobId];
-                  return (
-                    <li key={j.jobId}>
-                      <button
-                        onClick={() => setSelecionado(j.jobId)}
-                        aria-current={selecionado === j.jobId ? "true" : undefined}
-                        className={`w-full text-left rounded-lg border p-2.5 cursor-pointer transition-colors ${selecionado === j.jobId ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)] hover:border-[var(--accent)]"}`}
-                      >
-                        <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
-                          <span>{squadDe(j.squad)?.icone} {squadDe(j.squad)?.nome}</span>
-                          <span className="ml-auto">{dataHora(j.startedAt)}</span>
-                        </div>
-                        <div className="text-sm line-clamp-2 mt-0.5">{j.topic}</div>
-                        <div className="mt-1 flex gap-1.5">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${st.cor}`}>{st.rotulo}</span>
-                          {espera && <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#C4A460] bg-[#C4A460]/20">⏸️ espera você</span>}
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
+              <ul className="space-y-2">
+                {jobs.map((j) => (
+                  <CardProcesso
+                    key={j.jobId}
+                    backend={backend}
+                    job={j}
+                    docs={docsDe(j)}
+                    aprox={!demo && atribuicaoAproximada(j, jobs)}
+                    espera={!!paradas[j.jobId]}
+                    selecionado={selecionado === j.jobId}
+                    onSelecionar={() => { setSelecionado(j.jobId); setVerEtapas(false); }}
+                    onAbrir={() => { setSelecionado(j.jobId); setJanela(true); }}
+                    onDrive={() => salvarNoDrive(j)}
+                  />
+                ))}
               </ul>
             )}
-            <p className="text-[10px] text-[var(--text-muted)] mt-2">Mostra as últimas 20 execuções da squad-api.</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-2">Mostra os últimos 20 processos registrados na squad-api.</p>
           </Cartao>
         </div>
 
-        {/* ── coluna da direita: a execução escolhida ── */}
+        {/* ── coluna da direita: o processo escolhido ── */}
         <div className="min-w-0">
           {!job ? (
             <Cartao>
               <Vazio
-                icone="⚖️"
-                titulo="Escolha uma execução ou inicie uma nova"
-                descricao="Aqui você acompanha as etapas, aprova as paradas e lê os documentos que a squad vai gerando."
+                icone="🗂️"
+                titulo="Escolha um processo à esquerda ou inicie um novo"
+                descricao="Ao escolher um processo, você vê aqui onde ele está agora, as paradas que esperam você e os documentos dele."
+                acao={
+                  <button
+                    onClick={() => setVerEtapas(!verEtapas)}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer mt-1"
+                  >{verEtapas ? "Esconder as etapas" : `Ver as etapas da squad ${nomeSquad(squad)}`}</button>
+                }
               />
+              {verEtapas && (
+                <div className="border-t border-[var(--border)] pt-3 mt-2">
+                  <h3 className="font-semibold text-sm">Como esta squad trabalha</h3>
+                  <p className="text-[11px] text-[var(--text-secondary)] mb-2">
+                    {nomeSquad(squad)}: a sequência de etapas que ela segue em todo processo. Não é o andamento de nenhum processo específico.
+                  </p>
+                  <LinhaDoTempo
+                    etapas={etapasPorSquad[squad] || []}
+                    estados={(etapasPorSquad[squad] || []).map(() => "fila" as EstadoEtapa)}
+                  />
+                </div>
+              )}
+            </Cartao>
+          ) : janela ? (
+            <Cartao>
+              <p className="text-sm text-[var(--text-secondary)]">
+                O processo {numeroProcesso(job)} está aberto na janela em destaque.{" "}
+                <button onClick={fecharJanela} className="underline cursor-pointer">Fechar a janela</button>
+              </p>
             </Cartao>
           ) : (
-            <>
-              <Cartao className="mb-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-semibold">{squadDe(job.squad)?.icone} {squadDe(job.squad)?.nome}</h2>
-                  <span className={`text-[11px] px-2 py-0.5 rounded border ${(STATUS_JOB[job.status] || STATUS_JOB.cancelled).cor}`}>
-                    {(STATUS_JOB[job.status] || STATUS_JOB.cancelled).rotulo}
-                  </span>
-                  <span className="text-xs text-[var(--text-muted)]">início {dataHora(job.startedAt)}</span>
-                  <div className="flex-1" />
-                  {job.status === "running" && paradasDoJob.length === 0 && (
-                    <Botao tipo="perigo" onClick={() => parar(job)}>⏹️ Parar</Botao>
-                  )}
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] mt-2 whitespace-pre-wrap break-words max-h-32 overflow-auto">{job.topic}</p>
-                {job.error?.message && (
-                  <p className="text-xs text-red-500 bg-red-500/10 border border-red-500/30 rounded p-2 mt-2">
-                    {job.error.message}
-                    {!demo && <span className="block text-[var(--text-secondary)] mt-1">Para retomar de onde parou, use a barra de execuções no topo do painel.</span>}
-                  </p>
-                )}
-              </Cartao>
-
-              {paradasDoJob.map((p) => (
-                <CartaoParada
-                  key={`${p.jobId}:${p.stepId}`}
-                  backend={backend}
-                  job={job}
-                  parada={p}
-                  arquivos={docsDoJob.length > 0 ? docsDoJob : p.producedFiles.map((f) => ({ ...f, mtime: p.createdAt })).reverse()}
-                  ocupado={ocupado === `${p.jobId}:${p.stepId}`}
-                  onDecidir={(aprovado, comentario) => decidir(p, aprovado, comentario)}
-                  onParar={() => parar(job)}
-                />
-              ))}
-
-              <div className="grid gap-4 xl:grid-cols-[minmax(16rem,20rem)_1fr] items-start">
-                <Cartao>
-                  <h2 className="font-semibold mb-2">Etapas</h2>
-                  <LinhaDoTempo etapas={etapas} estados={estados} />
-                </Cartao>
-
-                <div className="space-y-4 min-w-0">
-                  <Cartao>
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <h2 className="font-semibold">Documentos gerados ({docsDoJob.length})</h2>
-                      <div className="flex-1" />
-                      {docsDoJob.length > 0 && (
-                        <button
-                          onClick={() => salvarNoDrive(job)}
-                          className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer"
-                        >☁️ Salvar no Drive</button>
-                      )}
-                    </div>
-                    {job.driveFolder && <p className="text-[11px] text-[var(--text-muted)] mb-2">Já salvo no Drive: {job.driveFolder}</p>}
-                    <VisorDocumento backend={backend} jobId={job.jobId} arquivos={docsDoJob} />
-                    {job.squad === "licitacao-igam" && !demo && (
-                      <p className="text-[10px] text-[var(--text-muted)] mt-2">
-                        Esta squad grava numa pasta única. A lista mostra só o que foi alterado durante esta execução.
-                      </p>
-                    )}
-                  </Cartao>
-
-                  {job.status === "running" && (
-                    <Cartao>
-                      <details>
-                        <summary className="cursor-pointer text-sm font-semibold">O que está acontecendo (ao vivo)</summary>
-                        <pre className="mt-2 text-[11px] whitespace-pre-wrap break-words max-h-64 overflow-auto bg-[var(--bg-tertiary)] rounded p-2">
-                          {aoVivo || "aguardando as primeiras linhas…"}
-                        </pre>
-                      </details>
-                    </Cartao>
-                  )}
-                </div>
-              </div>
-            </>
+            detalhe
           )}
         </div>
       </div>
+
+      {janela && job && (
+        <Janela
+          titulo={`Processo ${numeroProcesso(job)} · ${nomeSquad(job.squad)}`}
+          subtitulo={`iniciado ${dataHoraCurta(job.startedAt)}`}
+          onFechar={fecharJanela}
+          largura="larga"
+        >
+          {detalhe}
+        </Janela>
+      )}
     </div>
   );
 }

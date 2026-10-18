@@ -14,7 +14,7 @@ export const SQUADS_LICITACAO: {
   {
     id: "licitacao-igam",
     icone: "⚖️",
-    nome: "Licitação Igam",
+    nome: "Licitação Geirh",
     resumo: "Processo completo da Geirh: do DFD à entrega do pacote para o SEI, com paradas para você aprovar cada peça.",
     secaoExemplo: "Pedido (licitacao-igam)",
   },
@@ -427,6 +427,40 @@ export function dataHora(iso?: string): string {
   if (!iso) return "";
   return new Date(iso).toLocaleString("pt-BR", {
     timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+/** "17/10 23h40" (horário de Brasília). */
+export function dataHoraCurta(iso?: string): string {
+  if (!iso) return "";
+  const p = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date(iso));
+  const g = (t: string) => p.find((x) => x.type === t)?.value || "";
+  return `${g("day")}/${g("month")} ${g("hour")}h${g("minute")}`;
+}
+
+/** Número curto e estável do processo (o motor não numera as execuções). */
+export function numeroProcesso(job: JobLic): string {
+  return "#" + job.jobId.replace(/^demo-/, "").slice(0, 4).toUpperCase();
+}
+
+export function nomeSquad(id: string): string {
+  return SQUADS_LICITACAO.find((s) => s.id === id)?.nome || id;
+}
+
+/** A pasta de saída é uma só por squad: a atribuição por horário é aproximada
+ *  quando outra execução da mesma squad se sobrepõe, ou na Licitação Geirh
+ *  (que já guarda arquivos do processo real). */
+export function atribuicaoAproximada(job: JobLic, todos: JobLic[]): boolean {
+  if (job.squad === "licitacao-igam") return true;
+  const ini = new Date(job.startedAt).getTime();
+  const fim = job.completedAt ? new Date(job.completedAt).getTime() : Date.now();
+  return todos.some((o) => {
+    if (o.jobId === job.jobId || o.squad !== job.squad) return false;
+    const oi = new Date(o.startedAt).getTime();
+    const of = o.completedAt ? new Date(o.completedAt).getTime() : Date.now();
+    return oi <= fim + 60000 && of >= ini - 5000;
   });
 }
 
