@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 import { GraficoLinha, GraficoBarras, GraficoPizza } from "./charts";
 import { usePainel } from "@/lib/painel-context";
-import { ehPessoal, ehColaboradorOculto } from "@/lib/modo";
+import { ehPessoal, ehColaboradorOculto, limpaTexto, pareceComando } from "@/lib/modo";
 import {
   useMetricsHistory, semanasOrdenadas, tempoRelativo,
 } from "@/lib/metrics";
@@ -20,7 +20,15 @@ function EquipeGrid() {
   const { servidora } = usePainel();
   const [equipeTodos, setEquipe] = useState<AgentePublico[]>(fallbackPublico());
   // Modo Servidora: Lara e Dra. Nara não aparecem na grade nem no popover
-  const equipe = servidora ? equipeTodos.filter((a) => !ehColaboradorOculto(a.nome)) : equipeTodos;
+  const equipe = servidora
+    ? equipeTodos.filter((a) => !ehColaboradorOculto(a.nome)).map((a) => ({
+        ...a,
+        bio: limpaTexto(a.bio),
+        personalidade: limpaTexto(a.personalidade),
+        skills: (a.skills || []).filter((x) => limpaTexto(x)),
+        funcoes: (a.funcoes || []).filter((f) => limpaTexto(f.nome) && limpaTexto(f.descricao)),
+      }))
+    : equipeTodos;
   const [sel, setSel] = useState<AgentePublico | null>(null);
 
   useEffect(() => {
@@ -245,7 +253,7 @@ function SecaoIAConstroi() {
   // Modo Servidora: automações pessoais saem da lista e da contagem
   const r = r0 && servidora
     ? (() => {
-        const itens = r0.itens.filter((a) => !ehPessoal(a.nome, a.categoria));
+        const itens = r0.itens.filter((a) => !ehPessoal(a.nome, a.categoria) && !pareceComando(a.nome));
         const com_ia = itens.filter((a) => a.usa_ia).length;
         return { ...r0, itens, total: itens.length, com_ia, sem_ia: itens.length - com_ia };
       })()
@@ -341,7 +349,7 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
   const porCategoria = (() => {
     if (!r?.itens) return [];
     const m = new Map<string, number>();
-    for (const i of r.itens) if (!(servidora && ehPessoal(i.nome, i.categoria))) m.set(i.categoria || "outros", (m.get(i.categoria || "outros") ?? 0) + 1);
+    for (const i of r.itens) if (!(servidora && (ehPessoal(i.nome, i.categoria) || pareceComando(i.nome)))) m.set(i.categoria || "outros", (m.get(i.categoria || "outros") ?? 0) + 1);
     return [...m.entries()].map(([rotulo, valor]) => ({ rotulo, valor })).sort((a, b) => b.valor - a.valor);
   })();
 

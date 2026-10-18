@@ -7,7 +7,7 @@ import { getFlowDocs, addFlowDoc } from "@/lib/storage";
 import type { FlowDoc, FlowCategory } from "@/lib/types";
 import { interpretaCron, formataProxima, type CronInfo } from "@/lib/cron";
 import { usePainel } from "@/lib/painel-context";
-import { ehPessoal, nomeNeutro, ROTULO_OCULTO } from "@/lib/modo";
+import { ehPessoal, nomeNeutro, CATEGORIA_OCULTA, ROTULO_OCULTO } from "@/lib/modo";
 import { PERCURSOS, ROTULO_TIPO, type Percurso, type PassoPercurso } from "@/lib/percursos";
 
 
@@ -329,15 +329,17 @@ export default function AutomacoesPage() {
     if (servidora) {
       return lista.map((i) => {
         if (!ehPessoal(i.nome, i.descricao, i.cron?.comando, i.cron?.script, i.fluxo?.title)) return i;
+        const neutro = nomeNeutro(i.nome, i.descricao, i.cron?.comando, i.fluxo?.title);
         return {
           ...i,
-          nome: nomeNeutro(i.nome),
+          nome: neutro,
+          categoria: CATEGORIA_OCULTA,
           descricao: ROTULO_OCULTO,
           fluxo: null,
           oculto: true,
           custo: i.usaIA ? "consome IA" : "zero",
           cron: i.cron
-            ? { ...i.cron, nome: nomeNeutro(i.cron.nome), descricao: "", comando: "", script: null, log: null, flow: null }
+            ? { ...i.cron, nome: neutro, categoria: CATEGORIA_OCULTA, descricao: "", comando: "", script: null, log: null, flow: null }
             : null,
         };
       });

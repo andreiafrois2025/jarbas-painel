@@ -17,7 +17,7 @@ import { PainelContext } from "@/lib/painel-context";
 import { ProvedorUI } from "./ui";
 import {
   type Modo, lerModoGuardado, guardarModo,
-  ehColaboradorOculto, ehContextoPessoal, ehPessoal,
+  ehColaboradorOculto, ehContextoPessoal, ehPessoal, limpaColaborador,
 } from "@/lib/modo";
 import type { Session } from "@supabase/supabase-js";
 
@@ -122,7 +122,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
     if (!servidora) return { collaborators, assignments, categories, quickLinks };
     const cats = categories.filter((c) => !ehContextoPessoal(c.context));
     const catIds = new Set(cats.map((c) => c.id));
-    const collabs = collaborators.filter((c) => !ehColaboradorOculto(c.name));
+    const collabs = collaborators.filter((c) => !ehColaboradorOculto(c.name)).map(limpaColaborador);
     const collabIds = new Set(collabs.map((c) => c.id));
     return {
       collaborators: collabs,

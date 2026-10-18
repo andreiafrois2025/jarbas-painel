@@ -5,7 +5,7 @@ import { useUI } from "./ui";
 import type { Collaborator, Assignment, Category, QuickLink, SubLink } from "@/lib/types";
 import { CONTEXTS as CONTEXTS_TODOS } from "@/lib/types";
 import { usePainel } from "@/lib/painel-context";
-import { ehColaboradorOculto, ehContextoPessoal, ehPessoal } from "@/lib/modo";
+import { ehColaboradorOculto, ehContextoPessoal, ehPessoal, limpaColaborador } from "@/lib/modo";
 import {
   getCollaborators, addCollaborator, updateCollaborator, deleteCollaborator,
   getAssignments, addAssignment, updateAssignment, deleteAssignment,
@@ -122,7 +122,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
       if (servidora) {
         cat = cat0.filter((x) => !ehContextoPessoal(x.context));
         const catIds = new Set(cat.map((x) => x.id));
-        c = c0.filter((x) => !ehColaboradorOculto(x.name));
+        c = c0.filter((x) => !ehColaboradorOculto(x.name)).map(limpaColaborador);
         const collabIds = new Set(c.map((x) => x.id));
         a = a0.filter((x) => catIds.has(x.category_id) && collabIds.has(x.collaborator_id) && !ehPessoal(x.tool_name, x.description));
         ql = ql0.filter((x) => !ehPessoal(x.label));

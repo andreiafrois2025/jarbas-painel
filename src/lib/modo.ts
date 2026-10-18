@@ -25,7 +25,8 @@ export const COLABORADORES_OCULTOS = ["lara", "dra. nara", "nara"];
 const PADROES_PESSOAIS = [
   "luiz", "escola", "escolar", "financ", "fatura", "cartao", "cartoes", "pluggy",
   "louis", "cardapio", "nutri", "marmita", "psicolog", "livro e compra",
-  "despejo", "familia", "pessoal", "viagens",
+  "despejo", "familia", "pessoal", "viagens", "lembretes", "vencimento", "gastos",
+  "pediatr", "terapia", "hwaendrix",
 ];
 
 function semAcento(t: string): string {
@@ -49,11 +50,54 @@ export function ehContextoPessoal(ctx: string | null | undefined): boolean {
   return CONTEXTOS_PESSOAIS.includes(ctx || "");
 }
 
-/** Nome neutro para uma automação pessoal (não mostra "Luiz" na projeção). */
-export function nomeNeutro(nome: string): string {
-  return nome
-    .replace(/Escola do Luiz/gi, "Agenda escolar")
-    .replace(/\bLuiz( Fernando)?\b/gi, "(oculto)");
+/** Nome neutro para uma automação pessoal (nada de Luiz, Pluggy ou caminho de script na projeção). */
+export function nomeNeutro(nome: string, ...contexto: (string | null | undefined)[]): string {
+  const t = semAcento([nome, ...contexto].filter(Boolean).join(" "));
+  if (/luiz|escola/.test(t)) return "Agenda escolar (automação)";
+  if (/financ|pluggy|fatura|saldo|vencimento|cartao|gasto/.test(t)) return "Finanças (automação)";
+  if (/lembrete/.test(t)) return "Lembretes (automação)";
+  return "Automação de uso pessoal";
+}
+
+/** Categoria neutra para o agrupamento das automações ocultas. */
+export const CATEGORIA_OCULTA = "🔒 Uso pessoal";
+
+/** O nome parece um comando de terminal (a lista de métricas corta em 50 letras e esconde o resto). */
+export function pareceComando(nome: string): boolean {
+  return /^(\/|docker |python|bash |sh |node )/.test(nome.trim());
+}
+
+// Padrões usados para limpar TEXTO LIVRE (bio, habilidades, personalidade).
+// Mais estreito que PADROES_PESSOAIS de propósito: aqui não entra "financ" nem
+// "louis", senão Louis (que continua visível) ficaria sem descrição.
+const PADROES_TEXTO = [
+  "luiz", "filho", "filha", "famil", "escola", "escolar", "marmita", "cardapio",
+  "nutri", "pessoal", "cartao", "fatura", "hwaendrix", "companheiro", "terapia",
+  "psicolog", "saude mental", "pediatr", "casa",
+];
+
+/**
+ * Tira de um texto livre as frases (ou itens de lista) que citam assunto
+ * pessoal. Ex.: "Cordial. Apoio na rotina familiar/Luiz." vira "Cordial.".
+ */
+export function limpaTexto(texto: string | null | undefined): string {
+  if (!texto) return "";
+  // com parênteses de captura, o split devolve [trecho, separador, trecho, ...]
+  const partes = texto.split(/((?<=[.!?;])\s+|\n+|,\s*(?![^()]*\)))/);
+  let saida = "";
+  for (let i = 0; i < partes.length; i += 2) {
+    const trecho = partes[i];
+    const sep = partes[i + 1] ?? "";
+    const t = semAcento(trecho);
+    const pessoal = PADROES_TEXTO.some((x) => t.includes(x)) || /\b(nara|lara)\b/.test(t);
+    if (!pessoal) saida += trecho + sep;
+  }
+  return saida.replace(/[,;\s]+$/, "").trim();
+}
+
+/** Colaborador sem os trechos pessoais dos textos de perfil. */
+export function limpaColaborador<T extends { bio?: string; specialization?: string; skills?: string; personality?: string }>(c: T): T {
+  return { ...c, bio: limpaTexto(c.bio), specialization: limpaTexto(c.specialization), skills: limpaTexto(c.skills), personality: limpaTexto(c.personality) };
 }
 
 /** Áreas do grafo cujo rótulo não denuncia que são pessoais (por id). */
