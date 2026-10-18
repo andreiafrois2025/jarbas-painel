@@ -50,6 +50,10 @@ export interface FlowDocNode {
     executor?: string;
     /** Tags livres (Notion, WhatsApp, cron, etc.) */
     tags?: string[];
+    /** Trecho real do script (gravado pelo curador). Opcional: sem ele a aba Código mostra "em breve". */
+    codigo?: { arquivo?: string; linhas?: string; linguagem?: string; trecho: string };
+    /** Termos técnicos desta peça, com definição (opcional; complementa o dicionário embutido) */
+    glossario?: { termo: string; definicao: string }[];
   };
 }
 

@@ -84,7 +84,7 @@ export default function ProducaoPage({ sub }: Props) {
         )}
         {sub === "fluxos" && (
           <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
-            mesa de desenho — chega-se aqui por um card de Automações
+            cada fluxo em 3 níveis: leigo, intermediário e código
           </span>
         )}
         {sub === "estudio" && (

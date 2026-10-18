@@ -21,7 +21,7 @@ const SHAPE_BY_TYPE: Record<FlowDocNode["type"], NodeShape> = {
   end: "endCircle",
 };
 
-const FILL_BY_TYPE: Record<FlowDocNode["type"], string> = {
+export const FILL_BY_TYPE: Record<FlowDocNode["type"], string> = {
   start: "#D4E8E8",
   action: "#FFFFFF",
   condition: "#F5E6C8",
@@ -29,7 +29,7 @@ const FILL_BY_TYPE: Record<FlowDocNode["type"], string> = {
   end: "#F0D4C4",
 };
 
-const STROKE_BY_TYPE: Record<FlowDocNode["type"], string> = {
+export const STROKE_BY_TYPE: Record<FlowDocNode["type"], string> = {
   start: "#2D6B6B",
   action: "#5A6B6B",
   condition: "#C4A460",
@@ -37,7 +37,7 @@ const STROKE_BY_TYPE: Record<FlowDocNode["type"], string> = {
   end: "#A0583C",
 };
 
-const TYPE_LABEL: Record<FlowDocNode["type"], string> = {
+export const TYPE_LABEL: Record<FlowDocNode["type"], string> = {
   start: "início",
   action: "ação",
   condition: "decisão",
