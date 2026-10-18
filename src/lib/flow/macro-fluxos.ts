@@ -9,7 +9,7 @@
 // Para ela aprovar: /root/docs/fluxos-agrupamento-proposta.md
 // =============================================================
 
-import type { FlowDoc } from "../types";
+import type { FlowDoc, FlowGrupo } from "../types";
 import { leigoDoFluxo } from "./leigo";
 
 export interface MembroMacro {
@@ -159,8 +159,28 @@ export interface MacroMontado {
   fluxos: FlowDoc[];
 }
 
-/** Casa a configuração com os fluxos reais; o que sobrar vai pra "Outros". */
-export function montaMacros(flows: FlowDoc[]): MacroMontado[] {
+const OUTROS: MacroDef = {
+  slug: "outros", icone: "🗂️", titulo: "Outros", resumo: "Fluxos que ainda não entraram em nenhum grupo.", porque: "Novos ou ainda não classificados.", membros: [], ligacoes: [],
+};
+
+/** A migração 006 está aplicada? (a coluna `grupo` veio nas linhas de flows_doc) */
+export function temGruposNoBanco(flows: FlowDoc[], grupos: FlowGrupo[] | null | undefined): boolean {
+  return !!grupos?.length && flows.some((f) => "grupo" in f);
+}
+
+/** Grupo padrão de um fluxo segundo o macro-fluxos.ts (pelos 8 primeiros caracteres do id). */
+function slugDeclarado(f: FlowDoc): string | null {
+  return MACROS.find((m) => m.membros.some((x) => f.id.startsWith(x.id)))?.slug ?? null;
+}
+
+/**
+ * Casa a configuração com os fluxos reais; o que sobrar vai pra "Outros".
+ * Com a migração 006 (grupos no banco): o grupo de cada fluxo vem da coluna `grupo` (senão, do padrão
+ * do macro-fluxos.ts), o nome/emoji/ordem dos grupos vêm da tabela e dá pra arrastar fluxo entre grupos.
+ * Sem a migração: igual a antes, só pelo macro-fluxos.ts.
+ */
+export function montaMacros(flows: FlowDoc[], grupos?: FlowGrupo[] | null): MacroMontado[] {
+  if (temGruposNoBanco(flows, grupos)) return montaDoBanco(flows, grupos!);
   const usados = new Set<string>();
   const out: MacroMontado[] = MACROS.map((def) => {
     const fluxos = def.membros
@@ -171,10 +191,37 @@ export function montaMacros(flows: FlowDoc[]): MacroMontado[] {
   }).filter((m) => m.fluxos.length > 0);
   const sobras = flows.filter((f) => !usados.has(f.id));
   if (sobras.length) {
-    out.push({
-      def: { slug: "outros", icone: "🗂️", titulo: "Outros", resumo: "Fluxos que ainda não entraram em nenhum grupo.", porque: "Novos ou ainda não classificados.", membros: sobras.map((f) => ({ id: f.id.slice(0, 8) })), ligacoes: [] },
-      fluxos: sobras,
-    });
+    out.push({ def: { ...OUTROS, membros: sobras.map((f) => ({ id: f.id.slice(0, 8) })) }, fluxos: sobras });
   }
+  return out;
+}
+
+function montaDoBanco(flows: FlowDoc[], grupos: FlowGrupo[]): MacroMontado[] {
+  const porSlug = new Map<string, FlowDoc[]>();
+  for (const f of flows) {
+    const slug = f.grupo || slugDeclarado(f) || "outros";
+    const alvo = grupos.some((g) => g.slug === slug) ? slug : (slugDeclarado(f) && grupos.some((g) => g.slug === slugDeclarado(f)) ? slugDeclarado(f)! : "outros");
+    porSlug.set(alvo, [...(porSlug.get(alvo) || []), f]);
+  }
+  const posicao = (f: FlowDoc, slug: string) => {
+    if (f.ordem != null) return f.ordem;
+    const i = MACROS.find((m) => m.slug === slug)?.membros.findIndex((x) => f.id.startsWith(x.id)) ?? -1;
+    return i >= 0 ? i + 1 : 10_000;
+  };
+  const monta = (def: MacroDef, slug: string): MacroMontado | null => {
+    const fluxos = (porSlug.get(slug) || []).slice().sort((a, b) => posicao(a, slug) - posicao(b, slug) || a.title.localeCompare(b.title));
+    return fluxos.length ? { def: { ...def, membros: fluxos.map((f) => ({ id: f.id.slice(0, 8) })) }, fluxos } : null;
+  };
+  const out: MacroMontado[] = [];
+  for (const g of [...grupos].sort((a, b) => a.ordem - b.ordem)) {
+    const base = MACROS.find((m) => m.slug === g.slug);
+    const def: MacroDef = base
+      ? { ...base, titulo: g.nome || base.titulo, icone: g.emoji || base.icone }
+      : { slug: g.slug, icone: g.emoji, titulo: g.nome, resumo: "Grupo criado por você.", porque: "Montado por você na lista do Mapa.", membros: [], ligacoes: [] };
+    const m = monta(def, g.slug);
+    if (m) out.push(m);
+  }
+  const o = monta(OUTROS, "outros");
+  if (o) out.push(o);
   return out;
 }

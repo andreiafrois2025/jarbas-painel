@@ -14,6 +14,7 @@ import { layoutHorizontal, pontasHorizontal } from "@/lib/flow/layout";
 import { medePeca, larguraRotuloSeta } from "@/lib/flow/medida";
 import { aplicaLeigo, leigoDoFluxo, quemNoBalao } from "@/lib/flow/leigo";
 import { nomeDoFluxo, type MacroMontado } from "@/lib/flow/macro-fluxos";
+import { ligacoesDoGrupo, desenhoPodeEstarVelho, type LigacoesFluxos } from "@/lib/flow/ligacoes";
 import RoughNode from "./RoughNode";
 import { estiloSeta } from "./estilo";
 import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha } from "./PaginaPartes";
@@ -41,6 +42,8 @@ interface DadosFaixa extends Record<string, unknown> {
   cor?: string;
   saude?: string;
   aposentada: boolean;
+  /** só no nível Código: o script mudou depois do desenho */
+  velho?: boolean;
   largura: number;
   altura: number;
   onAbrir: (id: string) => void;
@@ -62,6 +65,7 @@ function Faixa({ data, selected }: { data: DadosFaixa; selected?: boolean }) {
         <span className="text-[14px] font-semibold truncate" style={{ color: "#2D3B3B" }}>{data.nome}</span>
         {data.cor && <span title={data.saude} className="text-xs">{data.cor}</span>}
         <span className="text-[11px] opacity-70 truncate hidden sm:inline" style={{ color: "#2D3B3B" }}>{data.aposentada ? "⛔ não roda mais" : data.horario}</span>
+        {data.velho && <span className="text-[11px] truncate" style={{ color: "#B7791F" }} title="O código desta rotina mudou depois que o desenho foi feito">✏️ desenho pode estar velho</span>}
         <span className="flex-1" />
         <button
           className="nodrag nopan text-[11px] px-2.5 py-1 rounded-full border cursor-pointer whitespace-nowrap hover:bg-[#D4E8E8]"
@@ -83,22 +87,26 @@ interface Props {
   nivel: Nivel;
   onNivel: (n: Nivel) => void;
   onAbrirFluxo: (f: FlowDoc) => void;
+  /** ligações descobertas sozinhas pelo curador (opcional) */
+  ligacoesAuto?: LigacoesFluxos | null;
 }
 
 type Escolha = { flowId: string; nodeId: string } | null;
 
-function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
+function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAuto = null }: Props) {
   const [areaRef, area] = useMedida<HTMLDivElement>();
   const [escolha, setEscolha] = useState<Escolha>(null);
   const fv = useFontes();
 
   const fluxos = useMemo(() => macro.fluxos.filter((f) => !ehAposentada(f)), [macro]);
   const porId = useMemo(() => new Map(fluxos.map((f) => [f.id, f])), [fluxos]);
+  // setas entre rotinas: as declaradas em macro-fluxos.ts + as que o curador descobriu lendo o código
+  const ligs = useMemo(() => ligacoesDoGrupo({ ...macro, fluxos }, ligacoesAuto), [macro, fluxos, ligacoesAuto]);
 
   // ordem das raias: segue as ligações (quem alimenta vem antes), senão a ordem do grupo
   const ordenados = useMemo(() => {
     const pref = (p: string) => fluxos.find((f) => f.id.startsWith(p))?.id;
-    const lig = macro.def.ligacoes.map(([a, b]) => [pref(a), pref(b)] as const).filter((x): x is readonly [string, string] => !!x[0] && !!x[1]);
+    const lig = ligs.map(([a, b]) => [pref(a), pref(b)] as const).filter((x): x is readonly [string, string] => !!x[0] && !!x[1]);
     const ent = new Map(fluxos.map((f) => [f.id, 0]));
     lig.forEach(([, b]) => ent.set(b, (ent.get(b) || 0) + 1));
     const feitos: string[] = [];
@@ -110,14 +118,14 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
       lig.filter(([a]) => a === id).forEach(([, b]) => ent.set(b, (ent.get(b) || 0) - 1));
     }
     return feitos.map((id) => porId.get(id)!);
-  }, [fluxos, macro, porId]);
+  }, [fluxos, ligs, porId]);
 
   // o corredor das setas entre raias cresce conforme o maior rótulo (senão ele sai cortado à esquerda)
   const MARGEM = useMemo(() => {
-    const folga = macro.def.ligacoes.map(([, , rot], k) => OFFSET_SETA + PASSO_SETA * k + (rot ? larguraRotuloSeta(rot) / 2 : 0) + 14);
+    const folga = ligs.map(([, , rot], k) => OFFSET_SETA + PASSO_SETA * k + (rot ? larguraRotuloSeta(rot) / 2 : 0) + 14);
     return Math.max(MARGEM_MIN, Math.round(Math.max(0, ...folga)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [macro, fv]);
+  }, [ligs, fv]);
   const larguraFaixa = Math.max(520, area.w / 0.82 - 2 * PAD - MARGEM - 30);
 
   const montagem = useMemo(() => {
@@ -162,7 +170,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
       const dados: DadosFaixa = {
         flowId: r.f.id, num: i + 1, nome: nomeDoFluxo(r.f), icone: r.f.nodes.find((n) => n.type === "start")?.data.icon || "🗺️",
         horario: cron ? `⏰ ${cron.descricao}` : undefined, saude: saude ? SELO_SAUDE[saude].texto : undefined, cor: saude ? SELO_SAUDE[saude].bolinha : undefined,
-        aposentada: false, largura: W, altura: alturaR, onAbrir: (id) => onAbrirFluxo(porId.get(id)!),
+        aposentada: false, velho: nivel === 3 && !!desenhoPodeEstarVelho(r.f, ligacoesAuto), largura: W, altura: alturaR, onAbrir: (id) => onAbrirFluxo(porId.get(id)!),
       };
       ns.push({ id: `lane:${r.f.id}`, type: "faixa", position: { x: MARGEM, y }, data: dados, style: { width: W, height: alturaR }, draggable: false, zIndex: 0 });
       for (const n of r.nos) {
@@ -180,21 +188,21 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
       y += alturaR + ENTRE;
     });
     // 3) setas entre raias (de macro-fluxos.ts)
-    macro.def.ligacoes.forEach(([de, para, rot], k) => {
+    ligs.forEach(([de, para, rot, auto], k) => {
       const A = raias.find((r) => r.f.id.startsWith(de));
       const B = raias.find((r) => r.f.id.startsWith(para));
       if (!A || !B) return;
       const e = estiloSeta({ id: `liga-${k}`, source: `lane:${A.f.id}`, target: `lane:${B.f.id}`, sourceHandle: "left", targetHandle: "left" }, false, rot);
       e.zIndex = 5;
       (e as Edge & { pathOptions?: { offset: number } }).pathOptions = { offset: OFFSET_SETA + PASSO_SETA * k };
-      e.style = { ...e.style, stroke: "#2D6B6B", strokeWidth: 2.2 };
+      e.style = { ...e.style, stroke: "#2D6B6B", strokeWidth: 2.2, ...(auto ? { strokeDasharray: "7 5" } : {}) };
       es.push(e);
     });
     // peça invisível na ponta esquerda: o "encaixar na tela" conta ela e o corredor das setas (com os rótulos) fica à vista
     ns.push({ id: "margem", type: "default", position: { x: 0, y: 0 }, data: {}, style: { width: 1, height: 1, opacity: 0, pointerEvents: "none" }, draggable: false, selectable: false, focusable: false });
     return { ns, es, W: W + MARGEM, H: y - ENTRE, raias };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordenados, nivel, larguraFaixa, area.w, macro, MARGEM, fv]);
+  }, [ordenados, nivel, larguraFaixa, area.w, macro, ligs, ligacoesAuto, MARGEM, fv]);
 
   // altura do quadro: o desenho cabe em zoom legível e a página rola (não o desenho)
   const zoomAlvo = montagem ? Math.min(1, Math.max(0.45, area.w / (montagem.W + 40))) : 1;
@@ -265,7 +273,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
                 <Background gap={22} color="#E2DAD0" />
                 <Controls showInteractive={false} showFitView position="bottom-left" />
               </ReactFlow>
-              <p className="absolute bottom-2 right-3 z-10 text-[11px] text-[var(--text-muted)] pointer-events-none hidden sm:block">arraste o fundo para passear · Ctrl + rolar para o zoom</p>
+              <p className="absolute bottom-2 right-3 z-10 text-[11px] text-[var(--text-muted)] pointer-events-none hidden sm:block">arraste o fundo para passear · Ctrl + rolar para o zoom{ligs.some((l) => l[3]) ? " · seta tracejada = achada sozinha no código" : ""}</p>
               {etapa && fEtapa && (
                 <aside className="absolute z-20 bg-[var(--bg-secondary)] shadow-2xl overflow-y-auto p-4 pb-20 border-[var(--border)] inset-x-0 bottom-0 max-h-[62%] border-t rounded-t-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[360px] sm:max-h-none sm:border-t-0 sm:border-l sm:rounded-none">
                   <button onClick={() => setEscolha(null)} aria-label="Fechar" className="float-right text-lg leading-none text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">×</button>

@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { FlowDoc } from "@/lib/types";
-import { getFlowDocs, duplicateFlowDoc, updateFlowDoc } from "@/lib/storage";
+import type { FlowDoc, FlowGrupo } from "@/lib/types";
+import { getFlowDocs, duplicateFlowDoc, updateFlowDoc, getFlowGrupos } from "@/lib/storage";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { interpretaCron } from "@/lib/cron";
 import { semAcento, ehAposentada, avaliaSaude, type Saude } from "@/lib/radiografia";
@@ -12,7 +12,8 @@ import GrupoPagina from "./GrupoPagina";
 import RascunhoFluxo from "./RascunhoFluxo";
 import VozNovoFluxo from "./VozNovoFluxo";
 import { rascunhosApi, type RascunhoResumo } from "@/lib/flow/rascunhos";
-import { montaMacros, nomeDoFluxo } from "@/lib/flow/macro-fluxos";
+import { montaMacros, nomeDoFluxo, temGruposNoBanco } from "@/lib/flow/macro-fluxos";
+import { useLigacoesAuto, desenhoPodeEstarVelho } from "@/lib/flow/ligacoes";
 import { leigoDoFluxo } from "@/lib/flow/leigo";
 import { useNivel, lerUltimaVista, guardarUltimaVista } from "@/lib/flow/nivel";
 import { useUI } from "../ui";
@@ -55,6 +56,10 @@ export default function FlowsPageV2() {
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [aposentadasAbertas, setAposentadasAbertas] = useState(false);
   const [busca, setBusca] = useState("");
+  const [grupos, setGrupos] = useState<FlowGrupo[] | null>(null); // null = migração 006 ainda não aplicada
+  const [arrastando, setArrastando] = useState<string | null>(null);
+  const [alvoDrop, setAlvoDrop] = useState<string | null>(null);
+  const ligacoesAuto = useLigacoesAuto();
 
   const idPedido = params.get("fluxo");
   const macroPedido = params.get("macro");
@@ -71,6 +76,7 @@ export default function FlowsPageV2() {
       setRelogioMudouEm(c?.crontab_modificado_em ?? null);
     });
     carregaRascunhos();
+    getFlowGrupos().then(setGrupos).catch(() => setGrupos(null));
     getFlowDocs()
       // Modo Servidora: fluxos pessoais nem entram na lista
       .then((todos) => setFlows(servidora ? todos.filter((f) => !ehPessoal(f.title, f.description)) : todos))
@@ -91,7 +97,8 @@ export default function FlowsPageV2() {
     return a && cron ? avaliaSaude(a.ultima_execucao, cron.frequenciaMin) : null;
   };
 
-  const macros = useMemo(() => montaMacros(flows), [flows]);
+  const macros = useMemo(() => montaMacros(flows, grupos), [flows, grupos]);
+  const podeArrastar = temGruposNoBanco(flows, grupos); // só com a migração 006 aplicada
   const macro = macroPedido ? macros.find((m) => m.def.slug === macroPedido) || null : null;
   const grupoDoSelecionado = selected ? macros.find((m) => m.fluxos.some((f) => f.id === selected.id)) || null : null;
   const aposentadas = useMemo(() => flows.filter((f) => ehAposentada(f)), [flows]);
@@ -143,6 +150,27 @@ export default function FlowsPageV2() {
     }
   };
 
+  // Arrastar um fluxo da lista para outro grupo (só com a migração 006). Salva na hora; se falhar, desfaz.
+  const moverFluxo = async (idFluxo: string, slug: string) => {
+    const f = flows.find((x) => x.id === idFluxo);
+    const atual = macros.find((m) => m.fluxos.some((x) => x.id === idFluxo))?.def.slug;
+    if (!f || !atual || atual === slug) return;
+    const alvo = macros.find((m) => m.def.slug === slug);
+    const ordem = Math.max(0, ...(alvo?.fluxos || []).map((x) => x.ordem ?? 0)) + 1;
+    const antes = flows;
+    setFlows((fs) => fs.map((x) => (x.id === idFluxo ? { ...x, grupo: slug, ordem } : x)));
+    setExpandidos((s) => new Set(s).add(slug));
+    try {
+      await updateFlowDoc(idFluxo, { grupo: slug, ordem });
+      const nomeGrupo = grupos?.find((g) => g.slug === slug)?.nome || "Outros";
+      avisar(`«${nomeDoFluxo(f)}» agora está em «${nomeGrupo}».`);
+    } catch (e) {
+      console.error("Erro ao mover o fluxo de grupo:", e);
+      setFlows(antes);
+      avisar("Não consegui mover o fluxo. Tente de novo.");
+    }
+  };
+
   const alterna = (slug: string) => setExpandidos((s) => { const n = new Set(s); if (n.has(slug)) n.delete(slug); else n.add(slug); return n; });
   const filtra = (f: FlowDoc) => !busca || semAcento(`${nomeDoFluxo(f)} ${f.description || ""}`).includes(semAcento(busca));
 
@@ -163,6 +191,7 @@ export default function FlowsPageV2() {
         onNivel={setNivel}
         editorInicial={nivelParam === "editar"}
         saveState={saveState}
+        scriptMudou={desenhoPodeEstarVelho(selected, ligacoesAuto)}
         grupo={grupoDoSelecionado ? { slug: grupoDoSelecionado.def.slug, titulo: grupoDoSelecionado.def.titulo, icone: grupoDoSelecionado.def.icone } : null}
         onAbrirGrupo={() => grupoDoSelecionado && abrirGrupo(grupoDoSelecionado.def.slug)}
         onDuplicate={() => handleDuplicate(selected.id)}
@@ -179,6 +208,7 @@ export default function FlowsPageV2() {
         nivel={nivel}
         onNivel={setNivel}
         onAbrirFluxo={abrirFluxo}
+        ligacoesAuto={ligacoesAuto}
       />
     );
   } else {
@@ -198,7 +228,10 @@ export default function FlowsPageV2() {
         key={f.id}
         onClick={() => abrirFluxo(f)}
         title={leigoDoFluxo(f)?.frase || nomeDoFluxo(f)}
-        className={`w-full text-left flex items-center gap-2 pl-7 pr-2 py-1.5 rounded-md text-[13px] cursor-pointer hover:bg-[var(--bg-tertiary)] ${ativo ? ativoClasse : ""}`}
+        draggable={podeArrastar}
+        onDragStart={(e) => { e.dataTransfer.setData("text/plain", f.id); e.dataTransfer.effectAllowed = "move"; setArrastando(f.id); }}
+        onDragEnd={() => { setArrastando(null); setAlvoDrop(null); }}
+        className={`w-full text-left flex items-center gap-2 pl-7 pr-2 py-1.5 rounded-md text-[13px] hover:bg-[var(--bg-tertiary)] ${ativo ? ativoClasse : ""} ${arrastando === f.id ? "opacity-40" : ""} ${podeArrastar ? "cursor-grab" : "cursor-pointer"}`}
       >
         <span className="w-2 h-2 rounded-full shrink-0" style={s ? { background: COR_SAUDE[s] } : { border: "1.5px solid var(--text-muted)" }} aria-label={s ? `saúde: ${s}` : "sem horário fixo"} />
         <span className="truncate">{nomeDoFluxo(f)}</span>
@@ -222,6 +255,7 @@ export default function FlowsPageV2() {
         <button onClick={() => setLista(false)} aria-label="Recolher a lista" title="Recolher a lista" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] px-1.5 cursor-pointer">«</button>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        {podeArrastar && <p className="px-2 pb-1 text-[11px] text-[var(--text-muted)]">Arraste um fluxo para outro grupo para mudá-lo de lugar.</p>}
         {loading && <p className="text-xs text-[var(--text-muted)] animate-pulse p-2">carregando…</p>}
         {macros.map((m) => {
           const vivos = m.fluxos.filter((f) => !ehAposentada(f));
@@ -232,7 +266,13 @@ export default function FlowsPageV2() {
           const aberto = busca ? true : expandidos.has(m.def.slug);
           const ativo = macro?.def.slug === m.def.slug && !selected;
           return (
-            <div key={m.def.slug}>
+            <div
+              key={m.def.slug}
+              onDragOver={podeArrastar && arrastando ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; if (alvoDrop !== m.def.slug) setAlvoDrop(m.def.slug); } : undefined}
+              onDragLeave={podeArrastar ? (e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setAlvoDrop((a) => (a === m.def.slug ? null : a)); } : undefined}
+              onDrop={podeArrastar ? (e) => { e.preventDefault(); const id = e.dataTransfer.getData("text/plain") || arrastando; setAlvoDrop(null); setArrastando(null); if (id) moverFluxo(id, m.def.slug); } : undefined}
+              className={alvoDrop === m.def.slug ? "rounded-md outline outline-2 outline-[var(--accent,#2D6B6B)] bg-[var(--accent-soft,rgba(45,107,107,0.12))]" : ""}
+            >
               <div className={`flex items-center rounded-md hover:bg-[var(--bg-tertiary)] ${ativo ? ativoClasse : ""}`}>
                 <button onClick={() => alterna(m.def.slug)} aria-expanded={aberto} aria-label={aberto ? "Recolher o grupo" : "Expandir o grupo"} className="w-7 h-8 text-[11px] text-[var(--text-muted)] cursor-pointer shrink-0">{aberto ? "▾" : "▸"}</button>
                 <button onClick={() => abrirGrupo(m.def.slug)} title={m.def.resumo} className="flex-1 min-w-0 flex items-center gap-2 py-1.5 pr-2 text-left text-sm cursor-pointer">

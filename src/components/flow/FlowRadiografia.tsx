@@ -45,10 +45,12 @@ interface Props {
   onDuplicate: () => void;
   onCanvasChange: (u: { nodes: FlowDoc["nodes"]; edges: FlowDoc["edges"] }) => void;
   avisar: (msg: string) => void;
+  /** o script desta rotina mudou depois do desenho (descoberto pelo curador) */
+  scriptMudou?: { script_mudou_em: string; desenho_em: string } | null;
 }
 
 export default function FlowRadiografia({
-  flow, automacao, relogioMudouEm, nivel, onNivel, editorInicial, saveState, grupo, onAbrirGrupo, onDuplicate, onCanvasChange, avisar,
+  flow, automacao, relogioMudouEm, nivel, onNivel, editorInicial, saveState, grupo, onAbrirGrupo, onDuplicate, onCanvasChange, avisar, scriptMudou,
 }: Props) {
   const [sel, setSel] = useState<Selecao>(null);
   const [foco, setFoco] = useState<{ id: string; n: number } | null>(null);
@@ -270,6 +272,7 @@ export default function FlowRadiografia({
                 {flow.title !== titulo && <span className="font-mono break-all">{flow.title}</span>}
                 {automacao && <span>última execução: {tempoDesde(automacao.ultima_execucao)}</span>}
                 {desatualizado && !aposentada && <span style={{ color: "var(--warning)" }} title="O relógio da VPS mudou depois da última vez que este desenho foi mexido">✏️ desenho pode estar atrasado</span>}
+                {scriptMudou && !aposentada && <span style={{ color: "var(--warning)" }} title={`O código mudou em ${new Date(scriptMudou.script_mudou_em).toLocaleDateString("pt-BR")}, depois do desenho`}>✏️ desenho pode estar velho: o código mudou depois dele</span>}
               </p>
             )}
           </div>

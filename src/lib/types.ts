@@ -96,9 +96,23 @@ export interface FlowDoc {
   kanban_column?: string | null;
   /** Ordem dentro da coluna */
   kanban_order?: number;
+  /** Migração 006 (opcional): nome da rotina do relógio da VPS a que este desenho pertence */
+  automacao_id?: string | null;
+  /** Migração 006 (opcional): slug do grupo do Mapa; null = usa o padrão do macro-fluxos.ts */
+  grupo?: string | null;
+  /** Migração 006 (opcional): posição dentro do grupo */
+  ordem?: number | null;
   user_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Grupo do Mapa de fluxos (tabela flow_grupos, migração 006) */
+export interface FlowGrupo {
+  slug: string;
+  nome: string;
+  emoji: string;
+  ordem: number;
 }
 
 /** Coluna do kanban interno de fluxos — gerenciada pelo usuário */
