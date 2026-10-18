@@ -336,14 +336,28 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
   const totalHoje = Object.values(hojePorAgente).reduce((a, b) => a + b, 0);
   const totalMes = Object.values(mesPorAgente).reduce((a, b) => a + b, 0);
 
-  // Horas: o snapshot guarda o acumulado do dia, então o total é o último valor
-  // e a evolução é a diferença pro começo da janela.
+  // Horas: o snapshot guarda o ACUMULADO do dia. "Esta semana" = acumulado de
+  // hoje menos o do último dia ANTES da segunda-feira; "este mês" = menos o do
+  // último dia antes do dia 1. Sem snapshot antes do começo do período, não
+  // inventa: mostra "medindo desde DD/MM".
   const horasHoje = hoje?.horas_economizadas ?? 0;
-  const horas30 = (() => {
-    const janela = ultimos(30);
-    if (janela.length < 2) return null;
-    return Math.max(0, (janela[janela.length - 1]?.horas_economizadas ?? 0) - (janela[0]?.horas_economizadas ?? 0));
-  })();
+  const brData = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  const horasNoPeriodo = (inicioIso: string): { valor: number | null; desde: string | null } => {
+    const antes = dias.filter((d) => d.date < inicioIso && d.horas_economizadas != null);
+    if (!antes.length) {
+      const primeiro = dias.find((d) => d.horas_economizadas != null);
+      return { valor: null, desde: primeiro ? brData(primeiro.date) : null };
+    }
+    return { valor: Math.max(0, horasHoje - antes[antes.length - 1].horas_economizadas), desde: null };
+  };
+  const hojeIso = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10); // data em Brasília
+  const dSemana = new Date(hojeIso + "T12:00:00Z");
+  dSemana.setUTCDate(dSemana.getUTCDate() - ((dSemana.getUTCDay() + 6) % 7)); // volta até a segunda
+  const inicioSemana = dSemana.toISOString().slice(0, 10);
+  const inicioMes = hojeIso.slice(0, 8) + "01";
+  const horasSemana = horasNoPeriodo(inicioSemana);
+  const horasMes = horasNoPeriodo(inicioMes);
+  const fmtHoras = (v: number) => `${(Math.round(v * 10) / 10).toString().replace(".", ",")}h`;
 
   const r = hoje?.resumo_automacoes;
   const porCategoria = (() => {
@@ -357,8 +371,6 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
     Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([label, valor]) => ({ label, valor }));
 
   const cards: [string | number, string, string?][] = [
-    [`${Math.round(horasHoje)}h`, "horas economizadas no total", "desde que começamos a medir"],
-    [horas30 == null ? "—" : `${Math.round(horas30)}h`, "nos últimos 30 dias", horas30 == null ? "precisa de mais dias de histórico" : undefined],
     [collaborators.length, "agentes na equipe"],
     [assignments.length, "assistentes em uso"],
     [totalMes || "—", "atividades nos últimos 30 dias", "feitas pelos agentes, sozinhos"],
@@ -371,7 +383,32 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
         <p className="text-xs uppercase tracking-[0.3em] mb-4" style={{ color: "#A0583C" }}>
           Meu ecossistema
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          {([
+            ["horas economizadas esta semana", horasSemana,
+              "posts do grupo enviados e carrosséis concluídos desde segunda-feira"],
+            ["horas economizadas este mês", horasMes,
+              "posts do grupo enviados e carrosséis concluídos desde o dia 1"],
+          ] as const).map(([rot, h, fonte]) => (
+            <div key={rot} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
+              <div className="text-4xl font-bold leading-none" style={{ color: "#2D6B6B" }}>
+                {h.valor == null ? "—" : fmtHoras(h.valor)}
+              </div>
+              <div className="mt-1.5 text-sm text-[var(--text-secondary)]">{rot}</div>
+              <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                {h.valor == null ? `medindo desde ${h.desde ?? "hoje"}` : fonte}
+              </div>
+            </div>
+          ))}
+          <div className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
+            <div className="text-xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{fmtHoras(horasHoje)}</div>
+            <div className="mt-1.5 text-xs text-[var(--text-secondary)]">no total acumulado</div>
+            <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+              25 min por post do grupo + 2h por carrossel, desde {dias[0]?.date ? brData(dias[0].date) : "o início"}
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {cards.map(([v, r1, sub]) => (
             <div key={String(r1)} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
               <div className="text-3xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{v}</div>
