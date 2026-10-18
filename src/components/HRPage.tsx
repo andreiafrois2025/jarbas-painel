@@ -3,7 +3,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useUI } from "./ui";
 import type { Collaborator, Assignment, Category, QuickLink, SubLink } from "@/lib/types";
-import { CONTEXTS } from "@/lib/types";
+import { CONTEXTS as CONTEXTS_TODOS } from "@/lib/types";
+import { usePainel } from "@/lib/painel-context";
+import { ehColaboradorOculto, ehContextoPessoal, ehPessoal, limpaColaborador } from "@/lib/modo";
 import {
   getCollaborators, addCollaborator, updateCollaborator, deleteCollaborator,
   getAssignments, addAssignment, updateAssignment, deleteAssignment,
@@ -102,12 +104,29 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   const [qlUrl, setQlUrl] = useState("");
   const [qlIcon, setQlIcon] = useState("🔗");
 
+  // Modo Servidora (Fase 5-A): Pessoal e Família saem das áreas, Lara e Dra. Nara
+  // saem da equipe, e o que estava atribuído nelas some junto.
+  const { servidora } = usePainel();
+  const CONTEXTS = useMemo(
+    () => CONTEXTS_TODOS.filter((ctx) => !(servidora && ehContextoPessoal(ctx))),
+    [servidora],
+  );
+
   // ---- Load data ----
   const loadData = useCallback(async () => {
     try {
-      const [c, a, cat, ql] = await Promise.all([
+      const [c0, a0, cat0, ql0] = await Promise.all([
         getCollaborators(), getAssignments(), getCategories(), getQuickLinks()
       ]);
+      let c = c0, a = a0, cat = cat0, ql = ql0;
+      if (servidora) {
+        cat = cat0.filter((x) => !ehContextoPessoal(x.context));
+        const catIds = new Set(cat.map((x) => x.id));
+        c = c0.filter((x) => !ehColaboradorOculto(x.name)).map(limpaColaborador);
+        const collabIds = new Set(c.map((x) => x.id));
+        a = a0.filter((x) => catIds.has(x.category_id) && collabIds.has(x.collaborator_id) && !ehPessoal(x.tool_name, x.description));
+        ql = ql0.filter((x) => !ehPessoal(x.label));
+      }
       setCollaborators(c);
       setAssignments(a);
       setCategories(cat);
@@ -117,7 +136,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [servidora]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

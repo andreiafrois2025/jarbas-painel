@@ -15,6 +15,8 @@ import { rascunhosApi, type RascunhoResumo } from "@/lib/flow/rascunhos";
 import { montaMacros, nomeDoFluxo } from "@/lib/flow/macro-fluxos";
 import { useNivel, lerUltimaVista, guardarUltimaVista } from "@/lib/flow/nivel";
 import { useUI } from "../ui";
+import { usePainel } from "@/lib/painel-context";
+import { ehPessoal } from "@/lib/modo";
 
 // =============================================
 // Mapa dos Fluxos (v3, 18/10/2026): UMA tela.
@@ -40,6 +42,7 @@ export default function FlowsPageV2() {
   const base = usePathname() || "/producao/fluxos";
   const params = useSearchParams();
   const { avisar } = useUI();
+  const { servidora } = usePainel();
   const [flows, setFlows] = useState<FlowDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -63,12 +66,13 @@ export default function FlowsPageV2() {
 
   useEffect(() => {
     fetchCatalogo().then((c) => {
-      setAutomacoes(c?.automacoes || []);
+      setAutomacoes((c?.automacoes || []).filter((a) => !(servidora && ehPessoal(a.nome, a.descricao, a.comando))));
       setRelogioMudouEm(c?.crontab_modificado_em ?? null);
     });
     carregaRascunhos();
     getFlowDocs()
-      .then(setFlows)
+      // Modo Servidora: fluxos pessoais nem entram na lista
+      .then((todos) => setFlows(servidora ? todos.filter((f) => !ehPessoal(f.title, f.description)) : todos))
       .catch((e) => console.error("Erro ao carregar fluxos:", e))
       .finally(() => setLoading(false));
   }, []);

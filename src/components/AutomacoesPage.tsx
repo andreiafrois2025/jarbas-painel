@@ -6,6 +6,8 @@ import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { getFlowDocs, addFlowDoc } from "@/lib/storage";
 import type { FlowDoc, FlowCategory } from "@/lib/types";
 import { interpretaCron, formataProxima, type CronInfo } from "@/lib/cron";
+import { usePainel } from "@/lib/painel-context";
+import { ehPessoal, nomeNeutro, CATEGORIA_OCULTA, ROTULO_OCULTO } from "@/lib/modo";
 import { PERCURSOS, ROTULO_TIPO, type Percurso, type PassoPercurso } from "@/lib/percursos";
 
 
@@ -151,6 +153,8 @@ interface ItemUnificado {
   /** O relógio mudou depois da última vez que o desenho foi mexido. Não prova
    *  que o desenho está errado — só que pode ter ficado pra trás. */
   desenhoAtrasado: boolean;
+  /** Modo Servidora: automação pessoal. Mostra nome neutro e horário, nada além. */
+  oculto?: boolean;
 }
 
 function normaliza(t: string) {
@@ -159,6 +163,7 @@ function normaliza(t: string) {
 
 export default function AutomacoesPage() {
   const router = useRouter();
+  const { servidora } = usePainel();
   const [crons, setCrons] = useState<AutomacaoApiItem[]>([]);
   const [fluxos, setFluxos] = useState<FlowDoc[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -317,8 +322,41 @@ export default function AutomacoesPage() {
         desenhoAtrasado: false,
       });
     }
+
+    // Modo Servidora (Fase 5-A): as automações de agenda/finanças/escola
+    // CONTINUAM na lista (com nome neutro e horário), mas sem descrição, sem
+    // comando, sem caminho de log e sem desenho: só a etiqueta "dados ocultos".
+    if (servidora) {
+      return lista.map((i) => {
+        if (!ehPessoal(i.nome, i.descricao, i.cron?.comando, i.cron?.script, i.fluxo?.title)) return i;
+        const neutro = nomeNeutro(i.nome, i.descricao, i.cron?.comando, i.fluxo?.title);
+        return {
+          ...i,
+          nome: neutro,
+          categoria: CATEGORIA_OCULTA,
+          descricao: ROTULO_OCULTO,
+          fluxo: null,
+          oculto: true,
+          custo: i.usaIA ? "consome IA" : "zero",
+          cron: i.cron
+            ? { ...i.cron, nome: neutro, categoria: CATEGORIA_OCULTA, descricao: "", comando: "", script: null, log: null, flow: null }
+            : null,
+        };
+      });
+    }
     return lista;
-  }, [crons, fluxos, relogioMudouEm]);
+  }, [crons, fluxos, relogioMudouEm, servidora]);
+
+  // Percursos: em Servidora saem os passos que citam assunto pessoal.
+  const percursosVisiveis = useMemo<Percurso[]>(() => {
+    if (!servidora) return PERCURSOS;
+    return PERCURSOS
+      .filter((p) => !ehPessoal(p.titulo))
+      .map((p) => ({
+        ...p,
+        passos: p.passos.filter((x) => !ehPessoal(x.titulo, x.detalhe, x.fluxo, x.automacao, x.onde)),
+      }));
+  }, [servidora]);
 
   const filtrados = useMemo(() => {
     const q = normaliza(busca);
@@ -491,7 +529,7 @@ export default function AutomacoesPage() {
           <p className="text-sm text-[var(--text-muted)]">carregando…</p>
         ) : visao === "percurso" ? (
           <div className="grid gap-4 2xl:grid-cols-2">
-            {PERCURSOS.map((p) => (
+            {percursosVisiveis.map((p) => (
               <CartaoPercurso key={p.id} percurso={p} itens={itens} onIr={abrirPorNome} />
             ))}
           </div>
@@ -557,7 +595,9 @@ export default function AutomacoesPage() {
 
             <div className="p-4 space-y-4">
               {aberto.descricao && (
-                <p className="text-sm text-[var(--text-primary)]">{aberto.descricao}</p>
+                <p className="text-sm text-[var(--text-primary)]">
+                  {aberto.oculto ? `🔒 ${aberto.descricao}` : aberto.descricao}
+                </p>
               )}
 
               {aberto.cronInfo && aberto.cron && (
@@ -596,6 +636,7 @@ export default function AutomacoesPage() {
                     </div>
                   </div>
 
+                  {!aberto.oculto && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
@@ -613,6 +654,7 @@ export default function AutomacoesPage() {
                       {aberto.cron.comando}
                     </pre>
                   </div>
+                  )}
                 </>
               )}
 
@@ -623,8 +665,9 @@ export default function AutomacoesPage() {
                   Como funciona por dentro
                 </p>
                 <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-lg p-3 border border-[var(--border)]">
-                  Essa automação ainda não tem fluxo desenhado, então não há o que mostrar aqui.
-                  Peça pro Claude desenhar — ou desenhe você mesma pelo botão ＋ Novo fluxo.
+                  {aberto.oculto
+                    ? `🔒 ${ROTULO_OCULTO}.`
+                    : "Essa automação ainda não tem fluxo desenhado, então não há o que mostrar aqui. Peça pro Claude desenhar — ou desenhe você mesma pelo botão ＋ Novo fluxo."}
                 </p>
               </div>
             </div>
@@ -667,7 +710,7 @@ function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }
           {i.usaIA ? "🤖 usa IA" : "🐍 sem IA"}
         </span>
       </div>
-      {i.descricao && <p className="text-xs text-[var(--text-secondary)] mt-1">{i.descricao}</p>}
+      {i.descricao && !i.oculto && <p className="text-xs text-[var(--text-secondary)] mt-1">{i.descricao}</p>}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-[var(--text-muted)]">
         {i.cronInfo ? (
           <>
@@ -677,9 +720,13 @@ function Card({ item: i, onAbrir }: { item: ItemUnificado; onAbrir: () => void }
         ) : (
           <span>{i.gatilho === "pedido" ? "👋 sob demanda" : "🔔 por evento"}</span>
         )}
-        <span className={i.fluxo ? "text-[var(--accent,#2D6B6B)]" : "text-[var(--text-muted)]"}>
-          {i.fluxo ? "🗺️ tem fluxo" : "sem fluxo"}
-        </span>
+        {i.oculto ? (
+          <span className="text-[var(--accent,#2D6B6B)]">🔒 {ROTULO_OCULTO}</span>
+        ) : (
+          <span className={i.fluxo ? "text-[var(--accent,#2D6B6B)]" : "text-[var(--text-muted)]"}>
+            {i.fluxo ? "🗺️ tem fluxo" : "sem fluxo"}
+          </span>
+        )}
         {i.desenhoAtrasado && (
           <span
             className="text-amber-600"

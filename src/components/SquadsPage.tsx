@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Squad, SquadDocument, Collaborator, CONTEXTS } from "@/lib/types";
+import { Squad, SquadDocument, Collaborator, CONTEXTS as CONTEXTS_TODOS } from "@/lib/types";
+import { usePainel } from "@/lib/painel-context";
+import { ehPessoal, ehColaboradorOculto, ehContextoPessoal } from "@/lib/modo";
 import { getSquads, addSquad, updateSquad, deleteSquad, getCollaborators } from "@/lib/storage";
 import { useUI } from "./ui";
 import { supabase } from "@/lib/supabase";
@@ -43,6 +45,9 @@ function PipelineView({ collaboratorIds, collaborators }: { collaboratorIds: str
 
 export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   const { confirmar, avisar } = useUI();
+  const { servidora } = usePainel();
+  // Modo Servidora: sem os contextos Pessoal/Família nem squads/colaboradores pessoais
+  const CONTEXTS = CONTEXTS_TODOS.filter((c) => !(servidora && ehContextoPessoal(c)));
   const [squads, setSquads] = useState<Squad[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,8 +92,10 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   const loadData = async () => {
     try {
       const [squadsData, collabData] = await Promise.all([getSquads(), getCollaborators()]);
-      setSquads(squadsData);
-      setCollaborators(collabData.filter(c => (c.status || "active") === "active"));
+      setSquads(servidora
+        ? squadsData.filter(sq => !ehPessoal(sq.name, sq.description)).map(sq => ({ ...sq, contexts: (sq.contexts || []).filter(c => !ehContextoPessoal(c)) }))
+        : squadsData);
+      setCollaborators(collabData.filter(c => (c.status || "active") === "active" && !(servidora && ehColaboradorOculto(c.name))));
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
     } finally {

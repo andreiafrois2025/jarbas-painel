@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import RegistrarSW from "@/components/RegistrarSW";
 import { Inter, Kalam } from "next/font/google";
 import "./globals.css";
 
@@ -20,7 +21,12 @@ const kalam = Kalam({
 export const metadata: Metadata = {
   title: "Jarbas — AI Agent Orchestrator",
   description: "Centralize, execute and automate your AI agents",
+  manifest: "/manifest.json",
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Jarbas", statusBarStyle: "default" },
 };
+
+export const viewport: Viewport = { themeColor: "#2D6B6B" };
 
 export default function RootLayout({
   children,
@@ -29,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body suppressHydrationWarning className={`${inter.variable} ${kalam.variable}`}>{children}</body>
+      <body suppressHydrationWarning className={`${inter.variable} ${kalam.variable}`}>{children}<RegistrarSW /></body>
     </html>
   );
 }

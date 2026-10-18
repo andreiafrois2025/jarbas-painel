@@ -44,13 +44,15 @@ export interface TarefaNotion {
 }
 
 /** Tarefas com id, pra poder marcar como feita direto no Notion (F6.3). */
-export function useTarefas() {
+export function useTarefas(ativo = true) {
   const [tarefas, setTarefas] = useState<TarefaNotion[] | null>(null);
   // atrasadas ficam à parte: o servidor só manda hoje + 2 dias em "tarefas"
   const [atrasadas, setAtrasadas] = useState<TarefaNotion[]>([]);
   const [atrasadasTotal, setAtrasadasTotal] = useState(0);
 
   const carregar = useCallback(async () => {
+    // Modo Servidora: nem pergunta ao servidor (Fase 5-A)
+    if (!ativo) return;
     try {
       const r = await comToken("/api/hoje/tarefas");
       if (!r.ok) throw new Error(String(r.status));
@@ -62,7 +64,7 @@ export function useTarefas() {
     } catch {
       setTarefas(null); // deixa a tela cair no texto de sempre
     }
-  }, []);
+  }, [ativo]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -113,13 +115,19 @@ async function comToken(path: string, init?: RequestInit) {
   });
 }
 
-export function useHoje() {
+// `ativo=false` (modo Servidora): o hook não faz NENHUMA chamada, nem liga o
+// relógio. /api/hoje devolve agenda, tarefas e escola numa resposta só, então a
+// única forma de o dado pessoal não chegar ao navegador é não pedir.
+// `modo="servidora"` pede à squad-api só o que é do trabalho (agenda do Igam e
+// tarefas com Área da vida = Trabalho); sem ele, a resposta é a de sempre.
+export function useHoje(ativo = true, modo?: "servidora") {
   const [dados, setDados] = useState<DadosHoje | null>(null);
   const [erro, setErro] = useState(false);
 
   const carregar = useCallback(async () => {
+    if (!ativo) return;
     try {
-      const r = await comToken("/api/hoje");
+      const r = await comToken(modo === "servidora" ? "/api/hoje?modo=servidora" : "/api/hoje");
       if (!r.ok) throw new Error(String(r.status));
       setDados(await r.json());
     } catch {
@@ -128,6 +136,7 @@ export function useHoje() {
   }, []);
 
   useEffect(() => {
+    if (!ativo) { setDados(null); setErro(false); return; }
     carregar();
     // recarrega sozinho a cada 5 min — o "atualizado às HH:MM" fica honesto
     const id = setInterval(carregar, 5 * 60 * 1000);
@@ -143,17 +152,18 @@ export function useHoje() {
       document.removeEventListener("visibilitychange", aoFicarVisivel);
       window.removeEventListener("focus", aoFocar);
     };
-  }, [carregar]);
+  }, [carregar, ativo]);
   return { dados, erro, recarregar: carregar };
 }
 
 export interface ResumoFin { receitas: number; despesas: number; saldo: number; n: number }
 export interface ResumoFinancas { mes: string; pessoal: ResumoFin; empresa: ResumoFin }
 
-export function useFinancas() {
+export function useFinancas(ativo = true) {
   const [financas, setFinancas] = useState<ResumoFinancas | null>(null);
   const [erroFin, setErroFin] = useState(false);
   useEffect(() => {
+    if (!ativo) return; // modo Servidora: não pede finanças
     (async () => {
       try {
         const r = await comToken("/api/financas");
@@ -161,7 +171,7 @@ export function useFinancas() {
         setFinancas(await r.json());
       } catch { setErroFin(true); }
     })();
-  }, []);
+  }, [ativo]);
   return { financas, erroFin };
 }
 
