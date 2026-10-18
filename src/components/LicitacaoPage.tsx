@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useUI, Botao, Cartao, Janela, Vazio } from "./ui";
+import { useUI, Botao, Cartao, Vazio } from "./ui";
 import MarkdownLeve from "./MarkdownLeve";
 import {
   ARQUIVO_EXEMPLO, NOME_ARQUIVO_EXEMPLO, SQUADS_LICITACAO, STATUS_JOB,
   arquivosDoJob, atribuicaoAproximada, backendDemo, backendReal, dataHoraCurta, estadoDasEtapas,
-  nomeAgente, nomeSquad, numeroProcesso, rotuloEtapa, secaoDoCaso, tamanho,
+  nomeAgente, nomeDocx, nomeSquad, numeroProcesso, rotuloEtapa, secaoDoCaso, tamanho, temDocx,
   type ArquivoLic, type Backend, type EstadoEtapa, type EtapaLic, type JobLic,
   type ParadaLic, type SquadId,
 } from "@/lib/licitacao";
@@ -28,11 +28,35 @@ function salvarBlob(blob: Blob, nome: string) {
 
 const msgErro = (e: unknown) => (e instanceof Error ? e.message : "erro desconhecido");
 
-// ── Visor de documento (texto/Markdown) ─────────────────────────────────
-function VisorDocumento({ backend, jobId, arquivos, compacto }: {
-  backend: Backend; jobId: string; arquivos: ArquivoLic[]; compacto?: boolean;
-}) {
+// Baixar: .docx formatado (Word) para texto/Markdown + link pequeno do original
+function BaixarDoc({ backend, job, nome }: { backend: Backend; job: JobLic; nome: string }) {
   const { avisar } = useUI();
+  const [convertendo, setConvertendo] = useState(false);
+  const original = () => backend.baixarArquivo(job.jobId, nome).then((b) => salvarBlob(b, nome)).catch((e) => avisar(msgErro(e)));
+  if (!temDocx(nome)) {
+    return <button onClick={original} className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer">⬇️ Baixar</button>;
+  }
+  const docx = async () => {
+    setConvertendo(true);
+    try { salvarBlob(await backend.baixarDocx(job.squad, job.jobId, nome), nomeDocx(nome)); }
+    catch (e) { avisar(msgErro(e)); }
+    finally { setConvertendo(false); }
+  };
+  return (
+    <span className="inline-flex items-center gap-2">
+      <button onClick={docx} disabled={convertendo} className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer disabled:opacity-50">
+        {convertendo ? "Convertendo…" : "⬇️ Baixar (Word)"}
+      </button>
+      <button onClick={original} className="text-[10px] underline text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">baixar original (.md)</button>
+    </span>
+  );
+}
+
+// ── Visor de documento (texto/Markdown) ─────────────────────────────────
+function VisorDocumento({ backend, job, arquivos, compacto }: {
+  backend: Backend; job: JobLic; arquivos: ArquivoLic[]; compacto?: boolean;
+}) {
+  const jobId = job.jobId;
   const [nome, setNome] = useState<string | null>(null);
   const [texto, setTexto] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -69,10 +93,7 @@ function VisorDocumento({ backend, jobId, arquivos, compacto }: {
         >
           {arquivos.map((a) => <option key={a.name} value={a.name}>{a.name} ({tamanho(a.size)})</option>)}
         </select>
-        <button
-          onClick={() => backend.baixarArquivo(jobId, atual.name).then((b) => salvarBlob(b, atual.name)).catch((e) => avisar(msgErro(e)))}
-          className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer"
-        >⬇️ Baixar</button>
+        <BaixarDoc backend={backend} job={job} nome={atual.name} />
       </div>
       <div className={`rounded-lg border border-[var(--border)] bg-[var(--bg-primary,var(--bg-secondary))] p-4 overflow-auto ${compacto ? "max-h-[28rem]" : "max-h-[40rem]"}`}>
         {erro ? <p className="text-sm text-red-500">{erro}</p>
@@ -103,7 +124,7 @@ function CartaoParada({ backend, job, parada, arquivos, onDecidir, onParar, ocup
       <p className="text-sm mb-3">{parada.stepPrompt}</p>
 
       <p className="text-xs font-medium text-[var(--text-secondary)] mb-1">Documento para revisar</p>
-      <VisorDocumento backend={backend} jobId={job.jobId} arquivos={arquivos} compacto />
+      <VisorDocumento backend={backend} job={job} arquivos={arquivos} compacto />
 
       {pedindo ? (
         <div className="mt-3">
@@ -184,7 +205,6 @@ const Legenda = () => (
 function ListaDocumentos({ backend, job, docs, aprox, onDrive }: {
   backend: Backend; job: JobLic; docs: ArquivoLic[]; aprox: boolean; onDrive: () => void;
 }) {
-  const { avisar } = useUI();
   const [lendo, setLendo] = useState<string | null>(null);
 
   if (docs.length === 0) {
@@ -201,16 +221,13 @@ function ListaDocumentos({ backend, job, docs, aprox, onDrive }: {
               onClick={() => setLendo(lendo === d.name ? null : d.name)}
               className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer"
             >{lendo === d.name ? "Fechar" : "Ler"}</button>
-            <button
-              onClick={() => backend.baixarArquivo(job.jobId, d.name).then((b) => salvarBlob(b, d.name)).catch((e) => avisar(msgErro(e)))}
-              className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer"
-            >⬇️ Baixar</button>
+            <BaixarDoc backend={backend} job={job} nome={d.name} />
           </li>
         ))}
       </ul>
       {lendo && docs.some((d) => d.name === lendo) && (
         <div className="mt-2">
-          <VisorDocumento backend={backend} jobId={job.jobId} arquivos={docs.filter((d) => d.name === lendo)} compacto />
+          <VisorDocumento backend={backend} job={job} arquivos={docs.filter((d) => d.name === lendo)} compacto />
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -227,9 +244,9 @@ function ListaDocumentos({ backend, job, docs, aprox, onDrive }: {
 }
 
 // ── Card de processo (uma execução) ─────────────────────────────────────
-function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSelecionar, onAbrir, onDrive }: {
+function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSelecionar, onAlternar, onDrive }: {
   backend: Backend; job: JobLic; docs: ArquivoLic[]; aprox: boolean; espera: boolean; selecionado: boolean;
-  onSelecionar: () => void; onAbrir: () => void; onDrive: () => void;
+  onSelecionar: () => void; onAlternar: () => void; onDrive: () => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const st = STATUS_JOB[job.status] || STATUS_JOB.cancelled;
@@ -252,7 +269,11 @@ function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSeleci
         <button onClick={() => setAberto(!aberto)} aria-expanded={aberto} className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer">
           {aberto ? "▾ Esconder documentos" : "▸ Documentos"}
         </button>
-        <button onClick={onAbrir} className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer">🗂️ Abrir processo</button>
+        <button
+          onClick={onAlternar}
+          aria-pressed={selecionado}
+          className={`text-xs px-2 py-1 rounded border cursor-pointer ${selecionado ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] hover:border-[var(--accent)]"}`}
+        >{selecionado ? "📂 Fechar processo" : "📁 Abrir processo"}</button>
       </div>
       {aberto && (
         <div className="px-2.5 pb-2.5 border-t border-[var(--border)] pt-2">
@@ -263,7 +284,7 @@ function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSeleci
   );
 }
 
-// ── Visão completa de um processo (painel à direita e janela grande) ────
+// ── Visão completa de um processo (painel à direita) ────
 function DetalheProcesso({ backend, job, etapas, estados, paradas, docs, aprox, aoVivo, ocupado, onDecidir, onParar, onDrive }: {
   backend: Backend; job: JobLic; etapas: EtapaLic[]; estados: EstadoEtapa[]; paradas: ParadaLic[];
   docs: ArquivoLic[]; aprox: boolean; aoVivo: string; ocupado: string | null;
@@ -315,7 +336,7 @@ function DetalheProcesso({ backend, job, etapas, estados, paradas, docs, aprox, 
         <div className="space-y-4 min-w-0">
           <Cartao>
             <h2 className="font-semibold mb-2">Documentos deste processo ({docs.length})</h2>
-            {docs.length > 0 && <VisorDocumento backend={backend} jobId={job.jobId} arquivos={docs} />}
+            {docs.length > 0 && <VisorDocumento backend={backend} job={job} arquivos={docs} />}
             <div className="mt-3">
               <ListaDocumentos backend={backend} job={job} docs={docs} aprox={aprox} onDrive={onDrive} />
             </div>
@@ -347,7 +368,6 @@ export default function LicitacaoPage() {
   const [paradas, setParadas] = useState<Record<string, ParadaLic[]>>({});
   const [etapasPorSquad, setEtapasPorSquad] = useState<Record<string, EtapaLic[]>>({});
   const [selecionado, setSelecionado] = useState<string | null>(null);
-  const [janela, setJanela] = useState(false);
   // arquivos da pasta de saída: por squad (compartilhada) ou, na demonstração, por processo
   const [arquivosGrupo, setArquivosGrupo] = useState<Record<string, ArquivoLic[]>>({});
   const [semResposta, setSemResposta] = useState(false);
@@ -406,7 +426,7 @@ export default function LicitacaoPage() {
 
   // trocar entre real e demonstração zera a seleção
   useEffect(() => {
-    setJobs([]); setParadas({}); setSelecionado(null); setArquivosGrupo({}); setCarregou(false); setAoVivo(""); setJanela(false);
+    setJobs([]); setParadas({}); setSelecionado(null); setArquivosGrupo({}); setCarregou(false); setAoVivo("");
   }, [demo]);
 
   // só a Licitação com parada esperando seleciona sozinha; fora isso ela escolhe
@@ -441,7 +461,6 @@ export default function LicitacaoPage() {
   const paradasDoJob = job ? paradas[job.jobId] || [] : [];
   const estados = job ? estadoDasEtapas(etapas, job, paradasDoJob) : [];
   const totalParadas = Object.values(paradas).reduce((n, p) => n + p.length, 0);
-  const fecharJanela = useCallback(() => setJanela(false), []);
 
   // ── formulário ────────────────────────────────────────────────────────
   function adicionarArquivos(lista: FileList | File[]) {
@@ -649,7 +668,7 @@ export default function LicitacaoPage() {
                     espera={!!paradas[j.jobId]}
                     selecionado={selecionado === j.jobId}
                     onSelecionar={() => { setSelecionado(j.jobId); setVerEtapas(false); }}
-                    onAbrir={() => { setSelecionado(j.jobId); setJanela(true); }}
+                    onAlternar={() => { setSelecionado(selecionado === j.jobId ? null : j.jobId); setVerEtapas(false); }}
                     onDrive={() => salvarNoDrive(j)}
                   />
                 ))}
@@ -687,30 +706,12 @@ export default function LicitacaoPage() {
                 </div>
               )}
             </Cartao>
-          ) : janela ? (
-            <Cartao>
-              <p className="text-sm text-[var(--text-secondary)]">
-                O processo {numeroProcesso(job)} está aberto na janela em destaque.{" "}
-                <button onClick={fecharJanela} className="underline cursor-pointer">Fechar a janela</button>
-              </p>
-            </Cartao>
           ) : (
             detalhe
           )}
         </div>
       </div>
 
-      {janela && job && (
-        <Janela
-          titulo={`Processo ${numeroProcesso(job)} · ${nomeSquad(job.squad)}`}
-          subtitulo={`iniciado ${dataHoraCurta(job.startedAt)}`}
-          onFechar={fecharJanela}
-          largura="larga"
-          fecharGrande
-        >
-          {detalhe}
-        </Janela>
-      )}
     </div>
   );
 }

@@ -46,15 +46,13 @@ export function Abas<T extends string>({ titulo, valor, onMuda, opcoes, direita 
 // ── Janelinha (modal) ───────────────────────────────────────────────────
 // Uma só, com o que as 19 anteriores não tinham: fecha no Esc, prende o teclado
 // dentro dela, e trava a rolagem do fundo.
-export function Janela({ titulo, subtitulo, onFechar, largura = "media", children, rodape, fecharGrande }: {
+export function Janela({ titulo, subtitulo, onFechar, largura = "media", children, rodape }: {
   titulo: ReactNode;
   subtitulo?: ReactNode;
   onFechar: () => void;
   largura?: "estreita" | "media" | "larga";
   children: ReactNode;
   rodape?: ReactNode;
-  /** Botão "✕ Fechar" grande e com texto (para janelas longas, em que o ✕ pequeno passa despercebido). */
-  fecharGrande?: boolean;
 }) {
   const caixa = useRef<HTMLDivElement>(null);
 
@@ -103,24 +101,13 @@ export function Janela({ titulo, subtitulo, onFechar, largura = "media", childre
             <p className="font-semibold text-[var(--text-primary)]">{titulo}</p>
             {subtitulo && <p className="text-xs text-[var(--text-muted)]">{subtitulo}</p>}
           </div>
-          {fecharGrande ? (
-            <button
-              onClick={onFechar}
-              aria-label="Fechar (Esc)"
-              className="shrink-0 cursor-pointer text-sm font-semibold px-4 py-2 rounded-lg text-white hover:opacity-90"
-              style={{ background: "var(--accent, #2D6B6B)" }}
-            >
-              ✕ Fechar
-            </button>
-          ) : (
-            <button
-              onClick={onFechar}
-              aria-label="Fechar (Esc)"
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none shrink-0 cursor-pointer"
-            >
-              ✕
-            </button>
-          )}
+          <button
+            onClick={onFechar}
+            aria-label="Fechar (Esc)"
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xl leading-none shrink-0 cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
         <div className="p-4 overflow-y-auto">{children}</div>
         {rodape && <div className="p-4 border-t border-[var(--border)] shrink-0">{rodape}</div>}

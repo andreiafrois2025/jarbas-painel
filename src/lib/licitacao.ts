@@ -75,6 +75,8 @@ export interface Backend {
   arquivos(jobId: string): Promise<ArquivoLic[]>;
   lerArquivo(jobId: string, nome: string): Promise<string>;
   baixarArquivo(jobId: string, nome: string): Promise<Blob>;
+  /** Versão .docx (formatada para o Word) de um .md/.txt do processo. */
+  baixarDocx(squad: string, jobId: string, nome: string): Promise<Blob>;
   iniciar(squad: SquadId, topic: string, anexos: File[]): Promise<string>;
   decidir(jobId: string, stepId: string, aprovado: boolean, comentario: string): Promise<void>;
   parar(jobId: string): Promise<void>;
@@ -129,6 +131,12 @@ export const backendReal: Backend = {
   async baixarArquivo(jobId, nome) {
     const r = await squadFetch(`/api/jobs/${jobId}/files/${encodeURIComponent(nome)}`);
     if (!r.ok) return falhou(r, "Não consegui baixar o arquivo");
+    return r.blob();
+  },
+
+  async baixarDocx(squad, _jobId, nome) {
+    const r = await squadFetch(`/api/docx?squad=${encodeURIComponent(squad)}&arquivo=${encodeURIComponent(nome)}`);
+    if (!r.ok) return falhou(r, "Não consegui converter para Word");
     return r.blob();
   },
 
@@ -313,6 +321,9 @@ export const backendDemo: Backend = {
     return new Blob([await this.lerArquivo(jobId, nome)], { type: "text/markdown;charset=utf-8" });
   },
 
+  // na demonstração não há servidor para converter: entrega o texto original
+  async baixarDocx(_squad, jobId, nome) { return this.baixarArquivo(jobId, nome); },
+
   async iniciar(squad, topic) {
     const jobId = `demo-${Math.random().toString(36).slice(2, 10)}`;
     demoJobs.push({
@@ -479,3 +490,7 @@ export function secaoDoCaso(markdown: string, titulo: string): string {
   for (let k = i + 1; k < linhas.length && !linhas[k].startsWith("## "); k++) corpo.push(linhas[k]);
   return corpo.join("\n").trim();
 }
+
+/** Arquivos de texto que têm versão .docx. */
+export const temDocx = (nome: string) => /\.(md|txt)$/i.test(nome);
+export const nomeDocx = (nome: string) => nome.replace(/\.(md|txt)$/i, "") + ".docx";
