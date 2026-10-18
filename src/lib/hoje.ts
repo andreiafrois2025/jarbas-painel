@@ -46,6 +46,9 @@ export interface TarefaNotion {
 /** Tarefas com id, pra poder marcar como feita direto no Notion (F6.3). */
 export function useTarefas(ativo = true) {
   const [tarefas, setTarefas] = useState<TarefaNotion[] | null>(null);
+  // atrasadas ficam à parte: o servidor só manda hoje + 2 dias em "tarefas"
+  const [atrasadas, setAtrasadas] = useState<TarefaNotion[]>([]);
+  const [atrasadasTotal, setAtrasadasTotal] = useState(0);
 
   const carregar = useCallback(async () => {
     // Modo Servidora: nem pergunta ao servidor (Fase 5-A)
@@ -54,7 +57,10 @@ export function useTarefas(ativo = true) {
       const r = await comToken("/api/hoje/tarefas");
       if (!r.ok) throw new Error(String(r.status));
       const d = await r.json();
+      const lista: TarefaNotion[] = d.atrasadas || [];
       setTarefas(d.tarefas || []);
+      setAtrasadas(lista);
+      setAtrasadasTotal(typeof d.atrasadas_total === "number" ? d.atrasadas_total : lista.length);
     } catch {
       setTarefas(null); // deixa a tela cair no texto de sempre
     }
@@ -68,13 +74,18 @@ export function useTarefas(ativo = true) {
       const r = await comToken(`/api/hoje/tarefas/${id}/feita`, { method: "POST" });
       if (!r.ok) return false;
       setTarefas((t) => (t || []).filter((x) => x.id !== id));
+      // se era atrasada, tira da lista e baixa o contador
+      setAtrasadas((a) => {
+        if (a.some((x) => x.id === id)) setAtrasadasTotal((n) => Math.max(0, n - 1));
+        return a.filter((x) => x.id !== id);
+      });
       return true;
     } catch {
       return false;
     }
   }, []);
 
-  return { tarefas, marcarFeita, recarregar: carregar };
+  return { tarefas, atrasadas, atrasadasTotal, marcarFeita, recarregar: carregar };
 }
 
 export interface DadosHoje {
@@ -83,6 +94,9 @@ export interface DadosHoje {
   tarefas: string;
   agenda_semana?: string;
   tarefas_semana?: string;
+  tarefas_atrasadas?: TarefaNotion[];
+  tarefas_atrasadas_total?: number;
+  tarefas_janela_dias?: number;
   caixa: CardCaixa[];
   escola: ItemEscola[];
   atividades: Atividade[];
