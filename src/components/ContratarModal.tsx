@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Collaborator, Assignment, Category, SubLink, CONTEXTS } from "@/lib/types";
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import Mascote from "./Mascote";
 import SortableItem from "./SortableItem";
 
 interface ContratarModalProps {
@@ -199,7 +200,7 @@ export default function ContratarModal({
                     {collaborators.map(c => (
                       <button key={c.id} type="button" onClick={() => handleSelectCollab(c)}
                         className="flex flex-col items-center gap-1 p-3 rounded-lg cursor-pointer transition-all bg-[var(--bg-primary)] border border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]">
-                        <span className="text-2xl">{c.icon}</span>
+                        <Mascote nome={c.name} emoji={c.icon} tamanho={40} />
                         <span className="text-xs font-medium truncate w-full text-center">{c.name}</span>
                         <span className="text-[10px] text-[var(--text-muted)]">{c.gender === "female" ? "👩" : "👨"}</span>
                       </button>
@@ -308,7 +309,7 @@ export default function ContratarModal({
             <div className="space-y-4">
               {/* Colaborador selecionado */}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)]">
-                <span className="text-2xl">{selectedCollab.icon}</span>
+                <Mascote nome={selectedCollab.name} emoji={selectedCollab.icon} tamanho={44} />
                 <div className="flex-1">
                   <div className="font-medium">{selectedCollab.name}</div>
                   <div className="text-xs text-[var(--text-muted)]">{selectedCollab.gender === "female" ? "👩 Feminino" : "👨 Masculino"}</div>

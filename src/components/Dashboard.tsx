@@ -36,7 +36,7 @@ const NAV_ITEMS: { path: string; icon: string; nome: string; title: string; matc
   { path: "/equipe", icon: "👥", nome: "Equipe", title: "Equipe — colaboradores, setores e assistentes", match: "/equipe" },
   { path: "/producao/automacoes", icon: "🚀", nome: "Produção", title: "Produção — squads, automações, fluxos e estúdio", match: "/producao" },
   { path: "/saude", icon: "🩺", nome: "Saúde", title: "Saúde — do sistema e das integrações", match: "/saude" },
-  { path: "/pessoal", icon: "🤎", nome: "Pessoal", title: "Pessoal — escola do Luiz e finanças", match: "/pessoal", pessoal: true },
+  { path: "/pessoal", icon: "🏡", nome: "Casa", title: "Casa — finanças, Luiz e rotina", match: "/pessoal", pessoal: true },
   { path: "/metricas", icon: "📊", nome: "Métricas", title: "Métricas — números e diário de bordo", match: "/metricas" },
   { path: "/biblioteca", icon: "📚", nome: "Biblioteca", title: "Biblioteca — criações, skills, prompts e grafo", match: "/biblioteca" },
   { path: "/config", icon: "⚙️", nome: "Config", title: "Config — sua conta", match: "/config" },

@@ -1,5 +1,6 @@
 "use client";
 
+import Mascote from "./Mascote";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Squad, SquadDocument, Collaborator, CONTEXTS as CONTEXTS_TODOS } from "@/lib/types";
 import { usePainel } from "@/lib/painel-context";
@@ -31,7 +32,7 @@ function PipelineView({ collaboratorIds, collaborators }: { collaboratorIds: str
       {members.map((c, i) => (
         <div key={c.id} className="flex items-center gap-1">
           <div className="flex flex-col items-center">
-            <span className="text-base">{c.icon}</span>
+            <Mascote nome={c.name} emoji={c.icon} tamanho={28} />
             <span className="text-[9px] text-[var(--text-secondary)] max-w-[48px] truncate text-center">{c.name}</span>
           </div>
           {i < members.length - 1 && (
@@ -529,7 +530,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                         return (
                           <div key={id} className="flex items-center gap-1">
                             <div className="flex flex-col items-center">
-                              <span className="text-lg">{c.icon}</span>
+                              <Mascote nome={c.name} emoji={c.icon} tamanho={32} />
                               <span className="text-[9px] text-[var(--text-muted)]">{c.name}</span>
                             </div>
                             <div className="flex flex-col gap-0.5 ml-0.5">
@@ -557,7 +558,7 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                               ? "border-[var(--accent)] bg-[var(--accent-soft)]"
                               : "border-[var(--border)] hover:border-[var(--accent)] bg-[var(--bg-primary)]"
                           }`}>
-                          <span className="text-lg">{c.icon}</span>
+                          <Mascote nome={c.name} emoji={c.icon} tamanho={36} />
                           <span className="text-[10px] truncate w-full">{c.name}</span>
                           {selected && <span className="text-green-400 text-[9px]">✓</span>}
                         </button>
