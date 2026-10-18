@@ -5,9 +5,9 @@ import { useUI, Botao, Cartao, Vazio } from "./ui";
 import MarkdownLeve from "./MarkdownLeve";
 import {
   ARQUIVO_EXEMPLO, NOME_ARQUIVO_EXEMPLO, SQUADS_LICITACAO, STATUS_JOB,
-  arquivosDoJob, atribuicaoAproximada, backendDemo, backendReal, dataHoraCurta, estadoDasEtapas,
-  nomeAgente, nomeDocx, nomeSquad, numeroProcesso, rotuloEtapa, secaoDoCaso, tamanho, temDocx,
-  type ArquivoLic, type Backend, type EstadoEtapa, type EtapaLic, type JobLic,
+  areaDoProcesso, arquivosDoJob, atribuicaoAproximada, backendDemo, backendReal, dataHoraCurta, estadoDasEtapas,
+  nomeAgente, nomeDocx, nomeSquad, numeroProcesso, rotuloArea, rotuloEtapa, secaoDoCaso, tamanho, temDocx,
+  type AreaProc, type AreaTipo, type ArquivoLic, type Backend, type EstadoEtapa, type EtapaLic, type JobLic,
   type ParadaLic, type SquadId,
 } from "@/lib/licitacao";
 
@@ -244,11 +244,15 @@ function ListaDocumentos({ backend, job, docs, aprox, onDrive }: {
 }
 
 // ── Card de processo (uma execução) ─────────────────────────────────────
-function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSelecionar, onAlternar, onDrive }: {
-  backend: Backend; job: JobLic; docs: ArquivoLic[]; aprox: boolean; espera: boolean; selecionado: boolean;
+function CardProcesso({ backend, job, area, onArea, docs, aprox, espera, selecionado, onSelecionar, onAlternar, onDrive }: {
+  backend: Backend; job: JobLic; area: AreaProc; onArea: (a: AreaTipo, setor: string) => Promise<void>; docs: ArquivoLic[]; aprox: boolean; espera: boolean; selecionado: boolean;
   onSelecionar: () => void; onAlternar: () => void; onDrive: () => void;
 }) {
   const [aberto, setAberto] = useState(false);
+  const [editandoArea, setEditandoArea] = useState(false);
+  const [areaTmp, setAreaTmp] = useState<AreaTipo>(area.area);
+  const [setorTmp, setSetorTmp] = useState(area.setor);
+  const [gravando, setGravando] = useState(false);
   const st = STATUS_JOB[job.status] || STATUS_JOB.cancelled;
   return (
     <li className={`rounded-lg border transition-colors ${selecionado ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]"}`}>
@@ -261,6 +265,7 @@ function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSeleci
         <div className="text-sm line-clamp-2 mt-0.5">{job.topic}</div>
         <div className="mt-1 flex flex-wrap gap-1.5 items-center">
           <span className={`text-[10px] px-1.5 py-0.5 rounded border ${st.cor}`}>{st.rotulo}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${area.area === "geirh" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[#A0583C] text-[#A0583C]"}`}>{rotuloArea(area)}</span>
           {espera && <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#C4A460] bg-[#C4A460]/20">⏸ espera você</span>}
           <span className="text-[10px] text-[var(--text-secondary)]">📄 {docs.length} {docs.length === 1 ? "documento" : "documentos"}{aprox ? " (aprox.)" : ""}</span>
         </div>
@@ -270,11 +275,37 @@ function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSeleci
           {aberto ? "▾ Esconder documentos" : "▸ Documentos"}
         </button>
         <button
+          onClick={() => { setAreaTmp(area.area); setSetorTmp(area.setor); setEditandoArea(!editandoArea); }}
+          aria-expanded={editandoArea}
+          className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer"
+        >🏷️ Área</button>
+        <button
           onClick={onAlternar}
           aria-pressed={selecionado}
           className={`text-xs px-2 py-1 rounded border cursor-pointer ${selecionado ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] hover:border-[var(--accent)]"}`}
         >{selecionado ? "📂 Fechar processo" : "📁 Abrir processo"}</button>
       </div>
+      {editandoArea && (
+        <div className="px-2.5 pb-2.5 border-t border-[var(--border)] pt-2 flex flex-wrap items-end gap-2">
+          <label className="text-xs">
+            <span className="block text-[var(--text-secondary)] mb-0.5">De quem é este processo?</span>
+            <select value={areaTmp} onChange={(e) => setAreaTmp(e.target.value as AreaTipo)} className="text-sm px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)]">
+              <option value="geirh">Geirh</option>
+              <option value="outras">Outras áreas</option>
+            </select>
+          </label>
+          {areaTmp === "outras" && (
+            <label className="text-xs">
+              <span className="block text-[var(--text-secondary)] mb-0.5">Setor (opcional)</span>
+              <input value={setorTmp} onChange={(e) => setSetorTmp(e.target.value)} maxLength={60} placeholder="ex.: GERUR" className="text-sm px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] w-32" />
+            </label>
+          )}
+          <Botao
+            disabled={gravando}
+            onClick={async () => { setGravando(true); try { await onArea(areaTmp, setorTmp); setEditandoArea(false); } finally { setGravando(false); } }}
+          >{gravando ? "Gravando…" : "Salvar"}</Botao>
+        </div>
+      )}
       {aberto && (
         <div className="px-2.5 pb-2.5 border-t border-[var(--border)] pt-2">
           <ListaDocumentos backend={backend} job={job} docs={docs} aprox={aprox} onDrive={onDrive} />
@@ -285,8 +316,8 @@ function CardProcesso({ backend, job, docs, aprox, espera, selecionado, onSeleci
 }
 
 // ── Visão completa de um processo (painel à direita) ────
-function DetalheProcesso({ backend, job, etapas, estados, paradas, docs, aprox, aoVivo, ocupado, onDecidir, onParar, onDrive }: {
-  backend: Backend; job: JobLic; etapas: EtapaLic[]; estados: EstadoEtapa[]; paradas: ParadaLic[];
+function DetalheProcesso({ backend, job, area, etapas, estados, paradas, docs, aprox, aoVivo, ocupado, onDecidir, onParar, onDrive }: {
+  backend: Backend; job: JobLic; area: AreaProc; etapas: EtapaLic[]; estados: EstadoEtapa[]; paradas: ParadaLic[];
   docs: ArquivoLic[]; aprox: boolean; aoVivo: string; ocupado: string | null;
   onDecidir: (p: ParadaLic, aprovado: boolean, comentario: string) => void; onParar: () => void; onDrive: () => void;
 }) {
@@ -297,6 +328,7 @@ function DetalheProcesso({ backend, job, etapas, estados, paradas, docs, aprox, 
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-semibold">Processo {numeroProcesso(job)} · {nomeSquad(job.squad)}</h2>
           <span className={`text-[11px] px-2 py-0.5 rounded border ${st.cor}`}>{st.rotulo}</span>
+          <span className={`text-[11px] px-2 py-0.5 rounded border ${area.area === "geirh" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[#A0583C] text-[#A0583C]"}`}>{rotuloArea(area)}</span>
           <span className="text-xs text-[var(--text-muted)]">iniciado {dataHoraCurta(job.startedAt)}</span>
           <div className="flex-1" />
           {job.status === "running" && paradas.length === 0 && <Botao tipo="perigo" onClick={onParar}>⏹️ Parar</Botao>}
@@ -375,6 +407,8 @@ export default function LicitacaoPage() {
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aoVivo, setAoVivo] = useState("");
   const [verEtapas, setVerEtapas] = useState(false);
+  const [areas, setAreas] = useState<Record<string, AreaProc>>({});
+  const [filtroArea, setFiltroArea] = useState<"todas" | AreaTipo>("todas");
 
   // formulário
   const [squad, setSquad] = useState<SquadId>("apoio-licitacao-outro-setor");
@@ -402,6 +436,7 @@ export default function LicitacaoPage() {
         } catch { /* falha pontual: tenta de novo no próximo ciclo */ }
       }));
       setParadas(mapa);
+      backend.areas().then(setAreas).catch(() => {});
       // um pedido de arquivos por grupo (basta um processo de cada squad: a pasta é a mesma)
       const grupos = new Map<string, string>();
       lista.forEach((j) => { const g = backend.demo ? j.jobId : j.squad; if (!grupos.has(g)) grupos.set(g, j.jobId); });
@@ -426,7 +461,7 @@ export default function LicitacaoPage() {
 
   // trocar entre real e demonstração zera a seleção
   useEffect(() => {
-    setJobs([]); setParadas({}); setSelecionado(null); setArquivosGrupo({}); setCarregou(false); setAoVivo("");
+    setJobs([]); setParadas({}); setSelecionado(null); setArquivosGrupo({}); setAreas({}); setCarregou(false); setAoVivo("");
   }, [demo]);
 
   // só a Licitação com parada esperando seleciona sozinha; fora isso ela escolhe
@@ -502,6 +537,19 @@ export default function LicitacaoPage() {
     }
   }
 
+  const areaDe = (j: JobLic) => areaDoProcesso(j, areas);
+  const jobsFiltrados = filtroArea === "todas" ? jobs : jobs.filter((j) => areaDe(j).area === filtroArea);
+
+  async function definirArea(j: JobLic, area: AreaTipo, setor: string) {
+    try {
+      await backend.definirArea(j.jobId, area, setor);
+      setAreas((a) => ({ ...a, [j.jobId]: { area, setor: area === "outras" ? setor.trim() : "" } }));
+    } catch (e) {
+      avisar(msgErro(e));
+      throw e;
+    }
+  }
+
   // ── ações sobre um processo ───────────────────────────────────────────
   async function decidir(p: ParadaLic, aprovado: boolean, comentario: string) {
     setOcupado(`${p.jobId}:${p.stepId}`);
@@ -532,6 +580,7 @@ export default function LicitacaoPage() {
     <DetalheProcesso
       backend={backend}
       job={job}
+      area={areaDe(job)}
       etapas={etapas}
       estados={estados}
       paradas={paradasDoJob}
@@ -657,12 +706,26 @@ export default function LicitacaoPage() {
             ) : jobs.length === 0 ? (
               <p className="text-sm text-[var(--text-muted)]">Nenhum processo ainda.</p>
             ) : (
+              <>
+              <div className="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Filtrar por área">
+                {([["todas", "Todas"], ["geirh", "Geirh"], ["outras", "Outras áreas"]] as const).map(([v, r]) => (
+                  <button
+                    key={v}
+                    onClick={() => setFiltroArea(v)}
+                    aria-pressed={filtroArea === v}
+                    className={`text-xs px-3 py-1 rounded-full border cursor-pointer ${filtroArea === v ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "border-[var(--border)] hover:border-[var(--accent)]"}`}
+                  >{r}</button>
+                ))}
+              </div>
+              {jobsFiltrados.length === 0 && <p className="text-sm text-[var(--text-muted)]">Nenhum processo nesta área.</p>}
               <ul className="space-y-2">
-                {jobs.map((j) => (
+                {jobsFiltrados.map((j) => (
                   <CardProcesso
                     key={j.jobId}
                     backend={backend}
                     job={j}
+                    area={areaDe(j)}
+                    onArea={(a, st) => definirArea(j, a, st)}
                     docs={docsDe(j)}
                     aprox={!demo && atribuicaoAproximada(j, jobs)}
                     espera={!!paradas[j.jobId]}
@@ -673,6 +736,7 @@ export default function LicitacaoPage() {
                   />
                 ))}
               </ul>
+              </>
             )}
             <p className="text-[10px] text-[var(--text-muted)] mt-2">Mostra os últimos 20 processos registrados na squad-api.</p>
           </Cartao>

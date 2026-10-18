@@ -67,8 +67,20 @@ export interface ArquivoLic {
   mtime: string;
 }
 
+export type AreaTipo = "geirh" | "outras";
+export interface AreaProc { area: AreaTipo; setor: string }
+
+/** Sem etiqueta gravada, vale o padrão da squad. */
+export function areaDoProcesso(job: JobLic, gravadas: Record<string, AreaProc>): AreaProc {
+  return gravadas[job.jobId] || { area: job.squad === "apoio-licitacao-outro-setor" ? "outras" : "geirh", setor: "" };
+}
+
+export const rotuloArea = (a: AreaProc) => (a.area === "geirh" ? "Geirh" : a.setor ? `Outras áreas · ${a.setor}` : "Outras áreas");
+
 export interface Backend {
   demo: boolean;
+  areas(): Promise<Record<string, AreaProc>>;
+  definirArea(jobId: string, area: AreaTipo, setor: string): Promise<void>;
   listarJobs(): Promise<JobLic[]>;
   etapas(squad: string): Promise<EtapaLic[]>;
   paradas(jobId: string): Promise<ParadaLic[]>;
@@ -93,6 +105,21 @@ async function falhou(r: Response, prefixo: string): Promise<never> {
 // ── Backend real ────────────────────────────────────────────────────────
 export const backendReal: Backend = {
   demo: false,
+
+  async areas() {
+    const r = await squadFetch("/api/processo/areas");
+    if (!r.ok) return {};
+    return r.json();
+  },
+
+  async definirArea(jobId, area, setor) {
+    const r = await squadFetch(`/api/processo/${jobId}/area`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ area, setor }),
+    });
+    if (!r.ok) return falhou(r, "Não consegui gravar a área");
+  },
 
   async listarJobs() {
     const r = await squadFetch("/api/jobs");
@@ -285,8 +312,13 @@ function achaDemo(jobId: string): JobDemo {
 
 const soJob = ({ idx: _i, desde: _d, esperando: _e, arquivos: _a, ajustes: _aj, log: _l, ...job }: JobDemo): JobLic => job;
 
+const areasDemo: Record<string, AreaProc> = {};
+
 export const backendDemo: Backend = {
   demo: true,
+
+  async areas() { return { ...areasDemo }; },
+  async definirArea(jobId, area, setor) { areasDemo[jobId] = { area, setor: area === "outras" ? setor.trim() : "" }; },
 
   async listarJobs() {
     demoJobs.forEach(avancarDemo);
