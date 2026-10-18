@@ -30,6 +30,62 @@ function Avatar({ a, tamanho = 36 }: { a?: Agente; tamanho?: number }) {
   return <Mascote nome={a?.nome} emoji={a?.emoji} tamanho={tamanho} />;
 }
 
+interface Previa { texto: string; ts: string }
+
+const TZ = "America/Sao_Paulo";
+const diaBR = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: TZ }).format(d); // AAAA-MM-DD
+
+// Horário estilo WhatsApp: hoje = hora, ontem = "ontem", antes = dd/mm.
+function horaLista(iso: string): string {
+  const d = new Date(iso); if (isNaN(d.getTime())) return "";
+  const agora = new Date();
+  if (diaBR(d) === diaBR(agora)) return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(d);
+  if (diaBR(d) === diaBR(new Date(agora.getTime() - 864e5))) return "ontem";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TZ }).format(d);
+}
+
+function ListaAgentes({ agentes, ativo, previas, recolhida, onAlternar, aoEscolher, cabecalho, className = "" }: {
+  agentes: Agente[]; ativo: string; previas: Record<string, Previa>; recolhida: boolean;
+  onAlternar: () => void; aoEscolher: (id: string) => void; cabecalho?: React.ReactNode; className?: string;
+}) {
+  // Entre 768 e 1024px (telas médias) a lista fica sempre recolhida para sobrar largura ao chat.
+  const fina = recolhida ? "md:w-[76px]" : "md:w-[260px] md:max-lg:w-[76px]";
+  const esconde = recolhida ? "md:hidden" : "md:max-lg:hidden";
+  return (
+    <aside aria-label="Agentes" className={`${fina} max-md:flex-1 shrink-0 min-h-0 flex flex-col border-b md:border-b-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)] ${className}`}>
+      {cabecalho && <div className="md:hidden shrink-0">{cabecalho}</div>}
+      <div className="hidden md:flex lg:flex items-center justify-between px-3 pt-3 pb-1 shrink-0">
+        <span className={`${esconde} text-xs font-bold uppercase tracking-[0.09em] text-[var(--text-secondary)]`}>Conversas</span>
+        <button onClick={onAlternar} aria-label={recolhida ? "Mostrar nomes dos agentes" : "Recolher a lista de agentes"} title={recolhida ? "Mostrar nomes" : "Recolher"}
+          className="max-lg:hidden mx-auto lg:mx-0 h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={recolhida ? "rotate-180" : ""}><path d="M12 5l-5 5 5 5" /></svg>
+        </button>
+      </div>
+      <ul className="flex-1 min-h-0 overflow-y-auto p-2 space-y-0.5 m-0 list-none" aria-label="Pessoas da equipe">
+        {agentes.map((a) => {
+          const pv = previas[a.id]; const on = a.id === ativo;
+          return (
+            <li key={a.id}>
+              <button onClick={() => aoEscolher(a.id)} aria-current={on ? "true" : undefined} title={a.nome}
+                className={`w-full text-left rounded-xl p-2 flex items-center gap-3 cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-[var(--accent)] ${recolhida ? "md:justify-center" : "md:max-lg:justify-center"} ${on ? "bg-[var(--accent-soft)] md:ring-1 md:ring-[var(--ac)]/40" : "hover:bg-[var(--bg-tertiary)]"}`}>
+                <Mascote nome={a.nome} emoji={a.emoji} tamanho={44} />
+                <span className={`${esconde} min-w-0 flex-1`}>
+                  <span className="flex items-baseline gap-2">
+                    <span className="flex-1 min-w-0 truncate text-sm font-bold text-[var(--text-primary)]">{a.nome}</span>
+                    {pv && <span className="shrink-0 text-[11px] text-[var(--text-secondary)] tabular-nums">{horaLista(pv.ts)}</span>}
+                  </span>
+                  <span className="block truncate text-[12.5px] text-[var(--text-secondary)]">{pv?.texto || a.cargo}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+        {!agentes.length && <li className="p-3 text-sm text-[var(--text-muted)]">Carregando equipe…</li>}
+      </ul>
+    </aside>
+  );
+}
+
 function Chevron({ aberto }: { aberto: boolean }) {
   return (
     <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
@@ -48,7 +104,7 @@ function DescricaoRH({ c, fallback }: { c?: Collaborator; fallback: string }) {
 // (a escolha vira um seletor no topo), caixa de texto grande embaixo.
 // `servidora` (modo Só Igam): sem agentes pessoais e sem abrir conversa antiga,
 // porque o histórico pode citar assunto de casa.
-export default function ChatPage({ compacto = false, servidora = false }: { compacto?: boolean; servidora?: boolean }) {
+export default function ChatPage({ compacto = false, servidora = false, cabecalho }: { compacto?: boolean; servidora?: boolean; cabecalho?: React.ReactNode }) {
   const { collaborators } = usePainel();
   const perfilDe = useCallback((a?: Agente) => (a ? collaborators.find((c) => c.name.trim().toLowerCase() === a.nome.toLowerCase()) : undefined), [collaborators]);
   const [abertos, setAbertos] = useState<Set<string>>(new Set()); // itens da lista com a descrição aberta
@@ -74,6 +130,11 @@ export default function ChatPage({ compacto = false, servidora = false }: { comp
   const [transcrevendo, setTranscrevendo] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [listaAberta, setListaAberta] = useState(false);
+  // Lista lateral de agentes (modo compacto): recolhida mostra só as fotos; no celular
+  // a lista é a primeira tela e o chat abre ao tocar num agente.
+  const [recolhida, setRecolhida] = useState(false);
+  const [telaCelular, setTelaCelular] = useState<"lista" | "chat">("lista");
+  const [previas, setPrevias] = useState<Record<string, Previa>>({});
   const fim = useRef<HTMLDivElement>(null);
   const ctl = useRef<AbortController | null>(null);
   const rec = useRef<MediaRecorder | null>(null);
@@ -88,6 +149,19 @@ export default function ChatPage({ compacto = false, servidora = false }: { comp
     if (resto.length) gs.splice(gs.length - 1, 0, { rotulo: "Outros", itens: resto }); // antes do último grupo
     return gs.filter((g) => g.itens.length);
   }, [agentes]);
+  const ordem = useMemo(() => grupos.flatMap((g) => g.itens), [grupos]); // Jarbas primeiro, depois por afinidade
+  useEffect(() => { try { setRecolhida(window.localStorage.getItem("chatListaRecolhida") === "1"); } catch { /* sem storage */ } }, []);
+  const alternarLista = () => setRecolhida((v) => { try { window.localStorage.setItem("chatListaRecolhida", v ? "0" : "1"); } catch { /* sem storage */ } return !v; });
+  // Prévia = título e hora da conversa mais recente de cada agente. No modo Só Igam não
+  // lê histórico (pode citar assunto de casa), então a lista fica só com nome e foto.
+  useEffect(() => {
+    if (!compacto || servidora || !agentes.length) return;
+    let vivo = true;
+    agentes.forEach((a) => chatApi.conversas(a.id).then((cs) => {
+      if (vivo && cs[0]) setPrevias((p) => ({ ...p, [a.id]: { texto: cs[0].titulo, ts: cs[0].atualizada } }));
+    }).catch(() => {}));
+    return () => { vivo = false; };
+  }, [compacto, servidora, agentes]);
   const [dicaAberta, setDicaAberta] = useState(true);
   useEffect(() => { try { setDicaAberta(window.localStorage.getItem("chatDica") !== "0"); } catch { /* sem storage */ } }, []);
   const alternarDica = () => setDicaAberta((v) => { try { window.localStorage.setItem("chatDica", v ? "0" : "1"); } catch { /* sem storage */ } return !v; });
@@ -247,22 +321,29 @@ export default function ChatPage({ compacto = false, servidora = false }: { comp
         </div>
       </aside>}
 
+      {/* ===== LISTA DE AGENTES (estilo WhatsApp) ===== */}
+      {compacto && (
+        <ListaAgentes agentes={ordem} ativo={agenteId} previas={previas} recolhida={recolhida} onAlternar={alternarLista}
+          aoEscolher={(id) => { setAgenteId(id); setTelaCelular("chat"); }} cabecalho={cabecalho}
+          className={telaCelular === "chat" ? "max-md:hidden" : ""} />
+      )}
+
       {/* ===== CONVERSA ===== */}
-      <section className="flex-1 min-w-0 min-h-0 flex flex-col">
-        <header className={`flex items-center gap-3 flex-wrap ${compacto ? "px-4 md:px-10 py-1.5" : "px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]"}`}>
+      <section className={`flex-1 min-w-0 min-h-0 flex flex-col ${compacto && telaCelular === "lista" ? "max-md:hidden" : ""}`}>
+        {compacto && cabecalho && <div className="max-md:hidden shrink-0">{cabecalho}</div>}
+        <header className={`flex items-center gap-3 flex-wrap ${compacto ? "px-4 md:px-6 2xl:px-10 py-1.5" : "px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]"}`}>
           {compacto ? (
-            <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] flex-1 basis-40 min-w-0">
-              <Avatar a={agente} tamanho={24} />
-              <span className="sr-only md:not-sr-only">Falando com</span>
-              <select value={agenteId} onChange={(e) => setAgenteId(e.target.value)} aria-label="Com quem você quer falar"
-                className="min-w-0 max-w-full rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1.5 text-xs font-semibold text-[var(--text-primary)] cursor-pointer">
-                {grupos.map((g, gi) => (
-                  <optgroup key={gi} label={g.rotulo || "Orquestrador"}>
-                    {g.itens.map((a) => <option key={a.id} value={a.id}>{a.nome}{perfilDe(a)?.specialization ? ` · ${perfilDe(a)!.specialization!.slice(0, 28)}` : ""}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
+            <div className="flex items-center gap-2 flex-1 basis-40 min-w-0">
+              <button onClick={() => setTelaCelular("lista")} aria-label="Voltar para a lista de agentes"
+                className="md:hidden h-10 w-10 -ml-2 shrink-0 inline-flex items-center justify-center rounded-full text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
+              </button>
+              <span className="md:hidden"><Avatar a={agente} tamanho={32} /></span>
+              <div className="min-w-0">
+                <p className="m-0 text-sm font-bold text-[var(--text-primary)] leading-tight truncate">{agente?.nome ?? "Chat"}</p>
+                <p className="m-0 text-xs text-[var(--text-secondary)] truncate">{perfilDe(agente)?.specialization || agente?.cargo}</p>
+              </div>
+            </div>
           ) : <>
           <Avatar a={agente} tamanho={40} />
           <div className="min-w-0 flex-1 basis-48">
@@ -322,7 +403,7 @@ export default function ChatPage({ compacto = false, servidora = false }: { comp
         {agente?.assuntosAuto && painelAssuntos && (
           <PainelAssuntos assuntos={assuntos} msgs={msgs} fixado={fixarAssunto} onFixar={setFixarAssunto} onArquivar={arquivarAssunto} />
         )}
-        <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-10" : "px-4"}`} aria-live="polite">
+        <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-6 2xl:px-10" : "px-4"}`} aria-live="polite">
           {!msgs.length && !ocupado && agente && (
             compacto ? (
               <p className="text-sm text-[var(--text-secondary)] mt-2">Fale ou escreva abaixo. {agente.nome} responde aqui, e o que precisar da sua aprovação aparece como cartão.</p>
@@ -338,7 +419,6 @@ export default function ChatPage({ compacto = false, servidora = false }: { comp
           ))}
           {(ocupado || fluxo) && (
             <div className="flex gap-2 items-start">
-              <span className="mt-1"><Avatar a={agente} tamanho={32} /></span>
               <div className="max-w-[min(48rem,100%)] rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
                 {fluxo ? <Resposta texto={fluxo} andamento onEscolha={(t) => enviar(t)} desativado /> : <p className="text-sm text-[var(--text-muted)] animate-pulse">{status || "pensando…"}</p>}
                 {fluxo && status && <p className="text-xs text-[var(--text-muted)] mt-1 animate-pulse">{status}</p>}
@@ -351,7 +431,7 @@ export default function ChatPage({ compacto = false, servidora = false }: { comp
         </div>
 
         {/* ===== CAIXA DE ENVIO ===== */}
-        <footer className={compacto ? "px-4 md:px-10 pt-2 pb-4 md:pb-5" : "border-t border-[var(--border)] bg-[var(--bg-secondary)] p-3"}>
+        <footer className={compacto ? "px-4 md:px-6 2xl:px-10 pt-2 pb-4 md:pb-5" : "border-t border-[var(--border)] bg-[var(--bg-secondary)] p-3"}>
           {fixarAssunto && (
             <p className="text-xs mb-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent-hover)]">📁 A próxima mensagem vai para: {assuntos.find((a) => a.id === fixarAssunto)?.titulo}
               <button onClick={() => setFixarAssunto(null)} aria-label="Tirar a fixação do assunto" className="cursor-pointer">×</button></p>
@@ -435,7 +515,6 @@ function Balao({ m, agente, ocupado, onEscolha, onAcao, assuntos, onMover }: {
   const assunto = assuntos?.find((a) => a.id === m.assuntoId);
   return (
     <div className="flex gap-2 items-start">
-      <span className="mt-1"><Avatar a={agente} tamanho={32} /></span>
       <div className="max-w-[min(48rem,100%)] min-w-0">
         <p className="text-[11.5px] font-bold text-[var(--text-secondary)] mb-0.5">{agente?.nome}</p>
         {assunto && m.respostaDe && <EtiquetaAssunto atual={assunto} assuntos={assuntos!} onMover={(id, t) => onMover(m.respostaDe!, id, t)} />}

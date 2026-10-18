@@ -174,19 +174,20 @@ export default function ConversaPage() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row">
       {/* ===== CENTRO: saudação + chat ===== */}
-      <div className="flex flex-col min-w-0 lg:flex-1 lg:min-h-0 h-[calc(100dvh-8.5rem)] min-h-[460px] lg:h-auto shrink-0 lg:shrink">
-        <div className="flex items-center gap-3.5 px-4 md:px-10 pt-4 md:pt-[22px] pb-1 shrink-0">
+      <div className="flex flex-col min-w-0 lg:flex-1 lg:min-h-0 h-[calc(100dvh-10rem)] min-h-[460px] lg:h-auto shrink-0 lg:shrink">
+        <ChatPage compacto servidora={servidora} cabecalho={(
+          <div className="flex items-center gap-3.5 px-4 md:px-6 2xl:px-10 pt-4 md:pt-[22px] pb-1 shrink-0">
           <Mascote nome="jarbas" emoji="⚡" tamanho={64} className="max-md:!w-10 max-md:!h-10" />
           <div className="min-w-0">
             <h1 className="fonte-maquina m-0 text-[22px] md:text-[28px] leading-tight text-[var(--text-primary)]">{saudacao()}, Andréia</h1>
             <p className="m-0 mt-0.5 text-sm text-[var(--text-secondary)]">{dataPorExtenso()}{espera}</p>
           </div>
         </div>
-        <ChatPage compacto servidora={servidora} />
+        )} />
       </div>
 
       {/* ===== COLUNA DIREITA: o dia dela ===== */}
-      <aside aria-label="O dia" className="lg:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] bg-[var(--bg-secondary)] px-[18px] py-5 flex flex-col gap-5 lg:overflow-y-auto">
+      <aside aria-label="O dia" className="lg:w-[300px] 2xl:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] bg-[var(--bg-secondary)] px-[18px] py-5 flex flex-col gap-5 lg:overflow-y-auto">
         <BlocoHoje dados={dados} erro={erro} />
         <BlocoEsperando caixa={caixa} carregado={!!dados} />
         <BlocoNoticias dados={dados} caixa={caixa} erro={erro} />
