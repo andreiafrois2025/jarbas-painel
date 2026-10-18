@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react";
 import type { Collaborator, Assignment, QuickLink, Category as CategoryType } from "@/lib/types";
+import type { Modo } from "@/lib/modo";
 
 // Dados compartilhados entre o shell do painel (layout) e as páginas.
 // O shell carrega uma vez; as páginas consomem via usePainel().
@@ -10,6 +11,10 @@ export interface PainelData {
   assignments: Assignment[];
   categories: CategoryType[];
   quickLinks: QuickLink[];
+  /** "tudo" ou "servidora" (Fase 5-A). Em servidora os dados pessoais nem são pedidos. */
+  modo: Modo;
+  servidora: boolean;
+  setModo: (m: Modo) => void;
   reload: () => Promise<void>;
 }
 

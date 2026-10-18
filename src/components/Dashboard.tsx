@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Collaborator, Assignment, QuickLink } from "@/lib/types";
 import {
@@ -15,6 +15,10 @@ import type { Category as CategoryType } from "@/lib/types";
 import JobsMonitor from "./JobsMonitor";
 import { PainelContext } from "@/lib/painel-context";
 import { ProvedorUI } from "./ui";
+import {
+  type Modo, lerModoGuardado, guardarModo,
+  ehColaboradorOculto, ehContextoPessoal, ehPessoal,
+} from "@/lib/modo";
 import type { Session } from "@supabase/supabase-js";
 
 interface DashboardProps {
@@ -26,12 +30,12 @@ interface DashboardProps {
 // nome só aparecia parando o mouse em cima por um segundo — o que no celular,
 // onde a barra vai pra baixo, é impossível. Funcionava pra ela porque ela
 // construiu; não funcionaria pra mais ninguém, nem pra ela daqui a 3 meses.
-const NAV_ITEMS: { path: string; icon: string; nome: string; title: string; match: string }[] = [
+const NAV_ITEMS: { path: string; icon: string; nome: string; title: string; match: string; pessoal?: boolean }[] = [
   { path: "/inicio", icon: "🏠", nome: "Hoje", title: "Hoje — agenda, tarefas e a caixa de aprovação", match: "/inicio" },
   { path: "/equipe", icon: "👥", nome: "Equipe", title: "Equipe — colaboradores, setores e assistentes", match: "/equipe" },
   { path: "/producao/automacoes", icon: "🚀", nome: "Produção", title: "Produção — squads, automações, fluxos e estúdio", match: "/producao" },
   { path: "/saude", icon: "🩺", nome: "Saúde", title: "Saúde — do sistema e das integrações", match: "/saude" },
-  { path: "/pessoal", icon: "🤎", nome: "Pessoal", title: "Pessoal — escola do Luiz e finanças", match: "/pessoal" },
+  { path: "/pessoal", icon: "🤎", nome: "Pessoal", title: "Pessoal — escola do Luiz e finanças", match: "/pessoal", pessoal: true },
   { path: "/metricas", icon: "📊", nome: "Métricas", title: "Métricas — números e diário de bordo", match: "/metricas" },
   { path: "/biblioteca", icon: "📚", nome: "Biblioteca", title: "Biblioteca — criações, skills, prompts e grafo", match: "/biblioteca" },
   { path: "/config", icon: "⚙️", nome: "Config", title: "Config — sua conta", match: "/config" },
@@ -49,6 +53,16 @@ export default function Dashboard({ session, children }: DashboardProps) {
   const [quickLinks, setQuickLinks] = useState<QuickLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [aberto, setAberto] = useState(false);
+  // Modo Servidora/Tudo (Fase 5-A). Abre sempre em "Tudo" numa aba nova; a
+  // escolha vale até fechar o navegador (sessionStorage), pra não esquecer
+  // ligada. Este componente só monta no navegador (o layout espera o login),
+  // então ler o sessionStorage no useState não causa descompasso com o servidor.
+  const [modo, setModoState] = useState<Modo>(() => lerModoGuardado());
+  const servidora = modo === "servidora";
+  const setModo = useCallback((m: Modo) => {
+    guardarModo(m);
+    setModoState(m);
+  }, []);
 
   // Lembra se ela deixou o menu aberto — é preferência, não estado de tela.
   useEffect(() => {
@@ -101,6 +115,23 @@ export default function Dashboard({ session, children }: DashboardProps) {
     window.location.href = "/";
   };
 
+  // Em servidora, o que é pessoal sai das listas ANTES de chegar às telas:
+  // colaboradores ocultos, áreas Pessoal/Família (e o que está atribuído nelas)
+  // e atalhos pessoais. Uma lista única, em src/lib/modo.ts.
+  const visivel = useMemo(() => {
+    if (!servidora) return { collaborators, assignments, categories, quickLinks };
+    const cats = categories.filter((c) => !ehContextoPessoal(c.context));
+    const catIds = new Set(cats.map((c) => c.id));
+    const collabs = collaborators.filter((c) => !ehColaboradorOculto(c.name));
+    const collabIds = new Set(collabs.map((c) => c.id));
+    return {
+      collaborators: collabs,
+      categories: cats,
+      assignments: assignments.filter((a) => catIds.has(a.category_id) && collabIds.has(a.collaborator_id) && !ehPessoal(a.tool_name, a.description)),
+      quickLinks: quickLinks.filter((q) => !ehPessoal(q.label)),
+    };
+  }, [servidora, collaborators, assignments, categories, quickLinks]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center dashboard-bg">
@@ -113,7 +144,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
   }
 
   return (
-    <PainelContext.Provider value={{ collaborators, assignments, categories, quickLinks, reload: loadData }}>
+    <PainelContext.Provider value={{ ...visivel, modo, servidora, setModo, reload: loadData }}>
       <ProvedorUI>
       <div className="h-screen flex flex-col md:flex-row dashboard-bg">
         {/* ===== SIDEBAR ===== */}
@@ -130,7 +161,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
             <span>⚡</span>
             {aberto && <span className="text-sm font-semibold text-[var(--text-primary)]">Jarbas</span>}
           </button>
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => !(servidora && item.pessoal)).map((item) => {
             const ativo = pathname?.startsWith(item.match);
             return (
               <button
@@ -164,8 +195,26 @@ export default function Dashboard({ session, children }: DashboardProps) {
 
         {/* ===== CONTEÚDO PRINCIPAL ===== */}
         <main className="flex-1 flex flex-col overflow-hidden order-1 md:order-none min-h-0">
+          {servidora && (
+            <div
+              className="shrink-0 px-3 py-1 text-xs font-semibold text-center text-white flex items-center justify-center gap-3"
+              style={{ background: "var(--af-teal, #2D6B6B)" }}
+              role="status"
+            >
+              <span>🎓 Modo Servidora: dados pessoais ocultos</span>
+              <button
+                onClick={() => setModo("tudo")}
+                className="underline underline-offset-2 hover:brightness-125 cursor-pointer"
+                title="Voltar a mostrar tudo"
+              >
+                voltar para Tudo
+              </button>
+            </div>
+          )}
           <JobsMonitor />
-          {children}
+          {/* A chave faz as páginas recomeçarem ao trocar de modo: nada do que
+              foi carregado em "Tudo" sobra na tela depois de ligar Servidora. */}
+          <Fragment key={modo}>{children}</Fragment>
         </main>
       </div>
       </ProvedorUI>

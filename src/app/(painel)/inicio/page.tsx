@@ -6,12 +6,13 @@
 
 import InicioPanel from "@/components/InicioPanel";
 import HojePanel from "@/components/HojePanel";
+import HojeServidora from "@/components/HojeServidora";
 import AssistentesPorArea from "@/components/AssistentesPorArea";
 import StatusSemaforo from "@/components/StatusSemaforo";
 import { usePainel } from "@/lib/painel-context";
 
 export default function InicioPage() {
-  const { collaborators, assignments, quickLinks } = usePainel();
+  const { collaborators, assignments, quickLinks, modo, setModo, servidora } = usePainel();
 
   const ativos = collaborators.filter(c => (c.status || "active") === "active").length;
 
@@ -40,12 +41,37 @@ export default function InicioPage() {
           </div>
         )}
         <div className="flex-1" />
+        {/* Botão Servidora / Tudo (Fase 5-A). A escolha vale até fechar o navegador. */}
+        <div
+          className="inline-flex shrink-0 rounded-lg border border-[var(--border)] overflow-hidden text-xs font-semibold"
+          role="group"
+          aria-label="Modo de exibição"
+        >
+          {(["tudo", "servidora"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setModo(m)}
+              aria-pressed={modo === m}
+              title={m === "servidora"
+                ? "Servidora: esconde finanças, agenda e tarefas pessoais, Luiz e áreas pessoais (para projetar em curso)"
+                : "Tudo: mostra o painel completo"}
+              className={`px-3 py-1.5 cursor-pointer transition-all whitespace-nowrap ${
+                modo === m ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+              }`}
+              style={modo === m ? { background: "var(--af-teal)" } : undefined}
+            >
+              {m === "servidora" ? "🎓 Servidora" : "Tudo"}
+            </button>
+          ))}
+        </div>
         <StatusSemaforo />
       </header>
 
       {/* Página única rolável: o dia primeiro, o escritório embaixo */}
       <div className="flex-1 overflow-y-auto">
-        <HojePanel lateral={<AssistentesPorArea />} />
+        {servidora
+          ? <HojeServidora lateral={<AssistentesPorArea />} />
+          : <HojePanel lateral={<AssistentesPorArea />} />}
         <InicioPanel />
       </div>
     </div>

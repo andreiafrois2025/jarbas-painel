@@ -15,6 +15,8 @@ import {
 } from "@/lib/biblioteca";
 import dynamic from "next/dynamic";
 import { useUI } from "./ui";
+import { usePainel } from "@/lib/painel-context";
+import { ehPessoal } from "@/lib/modo";
 
 // O grafo é uma aba entre seis; não precisa ser baixado por quem abre Criações.
 const GrafoView = dynamic(() => import("./GrafoView"), {
@@ -52,6 +54,20 @@ interface CriacaoUnificada {
 
 export default function BibliotecaPage() {
   const { confirmar, comDesfazer } = useUI();
+  const { servidora } = usePainel();
+
+  // Modo Servidora (Fase 5-A): skills, automações e criações que citam assunto
+  // pessoal saem do catálogo (tanto o ao vivo quanto o estático de reserva).
+  const filtraCatalogo = (c: Catalogo | null): Catalogo | null => {
+    if (!c || !servidora) return c;
+    return {
+      ...c,
+      skills: c.skills.filter((x) => !ehPessoal(x.nome, x.descricao_simples || x.descricao)),
+      automacoes: c.automacoes.filter((x) => !ehPessoal(x.nome, x.descricao, x.comando)),
+      criacoes: c.criacoes.filter((x) => !ehPessoal(x.nome, x.descricao, x.grupo)),
+    };
+  };
+
   const [aba, setAba] = useState<Aba>("criacoes");
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -72,7 +88,7 @@ export default function BibliotecaPage() {
     let vivo = true;
     fetchCatalogo().then((c) => {
       if (vivo) {
-        setCatalogo(c);
+        setCatalogo(filtraCatalogo(c));
         setCarregando(false);
       }
     });
@@ -83,7 +99,7 @@ export default function BibliotecaPage() {
 
   async function recarregar() {
     const c = await fetchCatalogo();
-    setCatalogo(c);
+    setCatalogo(filtraCatalogo(c));
   }
 
   function copiarConteudo(texto: string) {
@@ -99,7 +115,9 @@ export default function BibliotecaPage() {
   // catálogo estático (perde o "como usar" mas o formato vira consistente).
   const skillsExibidas = catalogo
     ? catalogo.skills
-    : SKILLS.flatMap((g) => g.itens).map((s) => ({
+    : SKILLS.flatMap((g) => g.itens)
+      .filter((s) => !(servidora && ehPessoal(s.nome, s.descricao)))
+      .map((s) => ({
         nome: s.nome,
         descricao: `${s.descricao} Como usar: ${s.como}`,
         descricao_simples: s.descricao,
@@ -175,7 +193,8 @@ export default function BibliotecaPage() {
     }
   } else if (!carregando) {
     for (const g of CRIACOES) {
-      gruposCriacoes.set(g.grupo, g.itens.map((c) => ({ ...c })));
+      const itens = g.itens.filter((c) => !(servidora && ehPessoal(c.nome, c.descricao, g.grupo)));
+      if (itens.length) gruposCriacoes.set(g.grupo, itens.map((c) => ({ ...c })));
     }
   }
   // nomes de grupo já existentes, pra sugerir no formulário (evita duplicar/digitar errado)

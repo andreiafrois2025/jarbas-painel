@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useMetricsHistory, tempoRelativo } from "@/lib/metrics";
 import type { User } from "@supabase/supabase-js";
+import { usePainel } from "@/lib/painel-context";
 
 // Config: Conta (perfil + segurança) e Integrações (status real de cada serviço).
 const STATUS_URL =
@@ -32,6 +33,7 @@ function redimensionarFoto(file: File): Promise<string> {
 }
 
 function ContaTab() {
+  const { servidora } = usePainel();
   const [user, setUser] = useState<User | null>(null);
   const [nome, setNome] = useState("");
   const [senha, setSenha] = useState("");
@@ -112,7 +114,7 @@ function ContaTab() {
             {avatar ? <img src={avatar} alt="Foto de perfil" className="w-full h-full object-cover" /> : "👩🏽"}
           </button>
           <div className="text-sm text-[var(--text-secondary)]">
-            <p className="font-medium text-[var(--text-primary)]">{user?.email}</p>
+            <p className="font-medium text-[var(--text-primary)]">{servidora ? "e-mail oculto neste modo" : user?.email}</p>
             <p>Clica na foto pra trocar (fica só no seu login).</p>
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden"

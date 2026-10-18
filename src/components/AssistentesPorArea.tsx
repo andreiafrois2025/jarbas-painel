@@ -6,12 +6,18 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Collaborator, Assignment, CONTEXTS, ContextType } from "@/lib/types";
+import { Collaborator, Assignment, CONTEXTS as CONTEXTS_TODOS, ContextType } from "@/lib/types";
+import { ehContextoPessoal } from "@/lib/modo";
 import { usePainel } from "@/lib/painel-context";
 
 export default function AssistentesPorArea() {
   const router = useRouter();
-  const { collaborators, assignments, categories } = usePainel();
+  const { collaborators, assignments, categories, servidora } = usePainel();
+  // Modo Servidora: os chips Pessoal e Família não aparecem
+  const CONTEXTS = useMemo(
+    () => CONTEXTS_TODOS.filter((ctx) => !(servidora && ehContextoPessoal(ctx))),
+    [servidora],
+  );
   const [assistArea, setAssistArea] = useState<ContextType>("IGAM");
 
   const assistentesByArea = useMemo(() => {
@@ -36,7 +42,7 @@ export default function AssistentesPorArea() {
       entry.asgs.push(asg);
     }
     return map;
-  }, [collaborators, assignments, categories]);
+  }, [collaborators, assignments, categories, CONTEXTS]);
 
   const totalAssistants = useMemo(() =>
     assistentesByArea[assistArea]?.reduce((n, e) => n + e.asgs.length, 0) || 0,

@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import { GraficoLinha, GraficoBarras, GraficoPizza } from "./charts";
 import { usePainel } from "@/lib/painel-context";
+import { ehPessoal, ehColaboradorOculto } from "@/lib/modo";
 import {
   useMetricsHistory, semanasOrdenadas, tempoRelativo,
 } from "@/lib/metrics";
@@ -16,7 +17,10 @@ import { fetchEquipePublica, fallbackPublico, type AgentePublico } from "@/lib/e
 // da página "modo palco"; como ela vai virar espelho do dash (pedido 19/07), a
 // bio passou a viver aqui também. Fonte: equipe-publica.json (com fallback).
 function EquipeGrid() {
-  const [equipe, setEquipe] = useState<AgentePublico[]>(fallbackPublico());
+  const { servidora } = usePainel();
+  const [equipeTodos, setEquipe] = useState<AgentePublico[]>(fallbackPublico());
+  // Modo Servidora: Lara e Dra. Nara não aparecem na grade nem no popover
+  const equipe = servidora ? equipeTodos.filter((a) => !ehColaboradorOculto(a.nome)) : equipeTodos;
   const [sel, setSel] = useState<AgentePublico | null>(null);
 
   useEffect(() => {
@@ -236,7 +240,16 @@ export default function MetricasPage() {
 function SecaoIAConstroi() {
   const [aberto, setAberto] = useState(false);
   const { hoje } = useMetricsHistory();
-  const r = hoje?.resumo_automacoes;
+  const { servidora } = usePainel();
+  const r0 = hoje?.resumo_automacoes;
+  // Modo Servidora: automações pessoais saem da lista e da contagem
+  const r = r0 && servidora
+    ? (() => {
+        const itens = r0.itens.filter((a) => !ehPessoal(a.nome, a.categoria));
+        const com_ia = itens.filter((a) => a.usa_ia).length;
+        return { ...r0, itens, total: itens.length, com_ia, sem_ia: itens.length - com_ia };
+      })()
+    : r0;
 
   // 25/07/2026 (F2): esse número vinha de uma lista digitada à mão que tinha
   // parado em 17 enquanto o relógio da VPS já tinha 20 — e ele vai pro telão
@@ -287,7 +300,7 @@ function SecaoIAConstroi() {
 function AbaGeral({ data, hoje, taxaSemanal }: {
   data: any; hoje: any; taxaSemanal: { label: string; valor: number }[]; area: Area;
 }) {
-  const { collaborators, assignments } = usePainel();
+  const { collaborators, assignments, servidora } = usePainel();
 
   // 25/07 (tarde) — o Painel Geral passou a ser sobre o ECOSSISTEMA, não sobre
   // conteúdo. Pedido dela: "coisas gerais assim, do ecossistema".
@@ -300,13 +313,17 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
     const acc: Record<string, number> = {};
     for (const d of janela) {
       for (const [quem, qtd] of Object.entries((d.atividades_por_agente ?? {}) as Record<string, number>)) {
+        if (servidora && ehColaboradorOculto(quem)) continue; // modo Servidora
         acc[quem] = (acc[quem] ?? 0) + qtd;
       }
     }
     return acc;
   };
 
-  const hojePorAgente = (hoje?.atividades_por_agente ?? {}) as Record<string, number>;
+  const hojePorAgente = Object.fromEntries(
+    Object.entries((hoje?.atividades_por_agente ?? {}) as Record<string, number>)
+      .filter(([quem]) => !(servidora && ehColaboradorOculto(quem))),
+  ) as Record<string, number>;
   const mesPorAgente = somaAgentes(ultimos(30));
   const totalHoje = Object.values(hojePorAgente).reduce((a, b) => a + b, 0);
   const totalMes = Object.values(mesPorAgente).reduce((a, b) => a + b, 0);
@@ -324,7 +341,7 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
   const porCategoria = (() => {
     if (!r?.itens) return [];
     const m = new Map<string, number>();
-    for (const i of r.itens) m.set(i.categoria || "outros", (m.get(i.categoria || "outros") ?? 0) + 1);
+    for (const i of r.itens) if (!(servidora && ehPessoal(i.nome, i.categoria))) m.set(i.categoria || "outros", (m.get(i.categoria || "outros") ?? 0) + 1);
     return [...m.entries()].map(([rotulo, valor]) => ({ rotulo, valor })).sort((a, b) => b.valor - a.valor);
   })();
 

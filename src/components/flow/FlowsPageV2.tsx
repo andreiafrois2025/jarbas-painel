@@ -8,6 +8,8 @@ import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
 import { interpretaCron, formataProxima } from "@/lib/cron";
 import FlowCanvas from "./FlowCanvas";
 import { useUI } from "../ui";
+import { usePainel } from "@/lib/painel-context";
+import { ehPessoal } from "@/lib/modo";
 import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 
 // =============================================
@@ -21,6 +23,7 @@ import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 export default function FlowsPageV2() {
   const router = useRouter();
   const { avisar } = useUI();
+  const { servidora } = usePainel();
   const [flows, setFlows] = useState<FlowDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -47,7 +50,10 @@ export default function FlowsPageV2() {
   const load = async (): Promise<FlowDoc[]> => {
     setLoading(true);
     try {
-      const list = await getFlowDocs();
+      const todos = await getFlowDocs();
+      // Modo Servidora: fluxos pessoais (escola, finanças…) nem entram na lista;
+      // um link direto para um deles cai na tela "sem fluxo".
+      const list = servidora ? todos.filter((f) => !ehPessoal(f.title, f.description)) : todos;
       setFlows(list);
       return list;
     } catch (e) {
@@ -59,7 +65,7 @@ export default function FlowsPageV2() {
   };
 
   useEffect(() => {
-    fetchCatalogo().then((c) => setAutomacoes(c?.automacoes || []));
+    fetchCatalogo().then((c) => setAutomacoes((c?.automacoes || []).filter((a) => !(servidora && ehPessoal(a.nome, a.descricao, a.comando)))));
   }, []);
 
   useEffect(() => {

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useStatus, NIVEL_UI } from "@/lib/status";
+import { usePainel } from "@/lib/painel-context";
+import { ehPessoal, ROTULO_OCULTO } from "@/lib/modo";
 
 // Semáforo de saúde do ecossistema — o resumo que fica no topo da home.
 // É o que a Andréia olha primeiro ("é um lugar que eu visualizo mais rápido"),
@@ -14,6 +16,7 @@ import { useStatus, NIVEL_UI } from "@/lib/status";
 export default function StatusSemaforo() {
   const router = useRouter();
   const { status, mudo: stale } = useStatus();
+  const { servidora } = usePainel();
   const [open, setOpen] = useState(false);
 
   if (!status && !stale) return null;
@@ -22,7 +25,8 @@ export default function StatusSemaforo() {
   const ui = NIVEL_UI[nivel];
   const problemas = stale
     ? ["A VPS parou de publicar o status (pode estar fora do ar)"]
-    : status!.problemas;
+    : status!.problemas.map((p) =>
+        servidora && ehPessoal(p) ? `Um serviço de uso pessoal precisa de atenção (${ROTULO_OCULTO})` : p);
 
   return (
     <div className="relative">

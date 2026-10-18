@@ -7,6 +7,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NOS, ARESTAS, type No, type TipoNo } from "@/lib/grafo";
+import { usePainel } from "@/lib/painel-context";
+import { ehPessoal, NOS_GRAFO_PESSOAIS } from "@/lib/modo";
 import GrafoConteudoView from "./GrafoConteudoView";
 
 const COR: Record<TipoNo, string> = {
@@ -29,6 +31,7 @@ export default function GrafoView() {
   const [pos, setPos] = useState<Record<string, Pos>>({});
   const [sel, setSel] = useState<No | null>(null);
   const [modo, setModo] = useState<Modo>("tudo");
+  const { servidora } = usePainel();
   const frame = useRef(0);
 
   // Nós e arestas visíveis conforme o modo. No modo "notion" trazemos também
@@ -43,6 +46,9 @@ export default function GrafoView() {
       if (cam(a) !== cam(b)) { pontes.add(a); pontes.add(b); }
     }
     const visivel = (n: No) => {
+      // Modo Servidora: sai área/automação pessoal (Luiz, finanças, família,
+      // escola...). Agentes ficam (Louis e Donna continuam no desenho).
+      if (servidora && (NOS_GRAFO_PESSOAIS.includes(n.id) || (n.tipo !== "agente" && ehPessoal(n.rotulo)))) return false;
       if (modo === "tudo") return true;
       if (modo === "ecossistema") return camadaDe(n) === "ecossistema";
       return n.camada === "notion" || pontes.has(n.id); // modo notion
@@ -51,7 +57,7 @@ export default function GrafoView() {
     const ids = new Set(nosVis.map((n) => n.id));
     const arestasVis = ARESTAS.filter(([a, b]) => ids.has(a) && ids.has(b));
     return { nosVis, arestasVis };
-  }, [modo]);
+  }, [modo, servidora]);
 
   // Se o nó selecionado sumiu ao trocar de modo, limpa a seleção.
   useEffect(() => {

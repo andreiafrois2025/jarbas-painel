@@ -44,10 +44,12 @@ export interface TarefaNotion {
 }
 
 /** Tarefas com id, pra poder marcar como feita direto no Notion (F6.3). */
-export function useTarefas() {
+export function useTarefas(ativo = true) {
   const [tarefas, setTarefas] = useState<TarefaNotion[] | null>(null);
 
   const carregar = useCallback(async () => {
+    // Modo Servidora: nem pergunta ao servidor (Fase 5-A)
+    if (!ativo) return;
     try {
       const r = await comToken("/api/hoje/tarefas");
       if (!r.ok) throw new Error(String(r.status));
@@ -56,7 +58,7 @@ export function useTarefas() {
     } catch {
       setTarefas(null); // deixa a tela cair no texto de sempre
     }
-  }, []);
+  }, [ativo]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -99,11 +101,15 @@ async function comToken(path: string, init?: RequestInit) {
   });
 }
 
-export function useHoje() {
+// `ativo=false` (modo Servidora): o hook não faz NENHUMA chamada, nem liga o
+// relógio. /api/hoje devolve agenda, tarefas e escola numa resposta só, então a
+// única forma de o dado pessoal não chegar ao navegador é não pedir.
+export function useHoje(ativo = true) {
   const [dados, setDados] = useState<DadosHoje | null>(null);
   const [erro, setErro] = useState(false);
 
   const carregar = useCallback(async () => {
+    if (!ativo) return;
     try {
       const r = await comToken("/api/hoje");
       if (!r.ok) throw new Error(String(r.status));
@@ -114,6 +120,7 @@ export function useHoje() {
   }, []);
 
   useEffect(() => {
+    if (!ativo) { setDados(null); setErro(false); return; }
     carregar();
     // recarrega sozinho a cada 5 min — o "atualizado às HH:MM" fica honesto
     const id = setInterval(carregar, 5 * 60 * 1000);
@@ -129,17 +136,18 @@ export function useHoje() {
       document.removeEventListener("visibilitychange", aoFicarVisivel);
       window.removeEventListener("focus", aoFocar);
     };
-  }, [carregar]);
+  }, [carregar, ativo]);
   return { dados, erro, recarregar: carregar };
 }
 
 export interface ResumoFin { receitas: number; despesas: number; saldo: number; n: number }
 export interface ResumoFinancas { mes: string; pessoal: ResumoFin; empresa: ResumoFin }
 
-export function useFinancas() {
+export function useFinancas(ativo = true) {
   const [financas, setFinancas] = useState<ResumoFinancas | null>(null);
   const [erroFin, setErroFin] = useState(false);
   useEffect(() => {
+    if (!ativo) return; // modo Servidora: não pede finanças
     (async () => {
       try {
         const r = await comToken("/api/financas");
@@ -147,7 +155,7 @@ export function useFinancas() {
         setFinancas(await r.json());
       } catch { setErroFin(true); }
     })();
-  }, []);
+  }, [ativo]);
   return { financas, erroFin };
 }
 

@@ -6,6 +6,8 @@ import { useMetricsHistory, tempoRelativo } from "@/lib/metrics";
 import { useIntegracoes, COMO_MEDIMOS, type Integracao } from "@/lib/integracoes";
 import { Tile, NOME_AUTOMACAO } from "./MetricasPage";
 import type { StatusSaude } from "@/lib/status";
+import { usePainel } from "@/lib/painel-context";
+import { ehPessoal, ROTULO_OCULTO } from "@/lib/modo";
 
 // =============================================================
 // 🩺 Saúde — o lugar único pra "está tudo funcionando?".
@@ -60,6 +62,7 @@ export default function SaudePage() {
 function AbaSaude() {
   const { status: vivo, mudo, carregando } = useStatus();
   const { hoje } = useMetricsHistory();
+  const { servidora } = usePainel();
 
   if (carregando && !vivo) {
     return <p className="text-sm text-[var(--text-muted)]">lendo o estado da VPS…</p>;
@@ -67,9 +70,14 @@ function AbaSaude() {
 
   const nivel = mudo ? "vermelho" : (vivo?.nivel ?? hoje?.saude?.nivel);
   const ui = NIVEL_UI[nivel as keyof typeof NIVEL_UI];
-  const problemas: string[] = mudo
+  const problemasBrutos: string[] = mudo
     ? ["A VPS parou de publicar o estado — pode estar fora do ar"]
     : (vivo?.problemas ?? hoje?.saude?.problemas ?? []);
+  // Modo Servidora: problema que cita assunto pessoal continua contando, mas o
+  // texto fica genérico (o número de pontos de atenção não muda).
+  const problemas = servidora
+    ? problemasBrutos.map((p) => (ehPessoal(p) ? `Um serviço de uso pessoal precisa de atenção (${ROTULO_OCULTO})` : p))
+    : problemasBrutos;
   const sinais = Object.entries((vivo?.sinais_vitais ?? hoje?.saude?.sinais ?? {}) as Record<string, boolean>);
   const fila = vivo?.fila_kanban ?? hoje?.fila;
   const automacoes = vivo?.automacoes ?? hoje?.automacoes;
@@ -113,7 +121,7 @@ function AbaSaude() {
         <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
           <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">Última execução das automações</h3>
           <ul className="space-y-1 text-sm text-[var(--text-primary)]">
-            {Object.entries((automacoes ?? {}) as Record<string, string | null>).map(([k, iso]) => (
+            {Object.entries((automacoes ?? {}) as Record<string, string | null>).filter(([k]) => !(servidora && ehPessoal(k, NOME_AUTOMACAO[k]))).map(([k, iso]) => (
               <li key={k} className="flex justify-between gap-2">
                 <span>{NOME_AUTOMACAO[k] ?? k}</span>
                 <span className="text-[var(--text-secondary)] whitespace-nowrap">{tempoRelativo(iso)}</span>
@@ -140,7 +148,11 @@ function AbaSaude() {
 
 function AbaIntegracoes() {
   const { status } = useStatus();
-  const { integracoes, erro } = useIntegracoes();
+  const { integracoes: todas, erro } = useIntegracoes();
+  const { servidora } = usePainel();
+  const integracoes = todas && servidora
+    ? todas.filter((i) => !ehPessoal(i.nome, i.detalhe, i.onde))
+    : todas;
 
   if (erro) return <p className="text-sm text-[var(--text-secondary)]">Não consegui falar com a VPS pra medir as integrações.</p>;
   if (!integracoes) return <p className="text-sm text-[var(--text-muted)]">medindo cada integração…</p>;
