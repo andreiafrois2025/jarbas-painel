@@ -4,6 +4,7 @@
 // página única, ao lado da Agenda de hoje. Estreita de propósito: a largura
 // acompanha a linha de chips das áreas (até pouco depois do "Família").
 
+import Mascote from "./Mascote";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Collaborator, Assignment, CONTEXTS as CONTEXTS_TODOS, ContextType } from "@/lib/types";
@@ -81,7 +82,7 @@ export default function AssistentesPorArea() {
           assistentesByArea[assistArea].map(({ collab, asgs }) => (
             <div key={collab.id} className="bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg p-2">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-base">{collab.icon || "👤"}</span>
+                <Mascote nome={collab.name} emoji={collab.icon || "👤"} tamanho={28} />
                 <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{collab.name}</span>
                 <span className="text-[9px] text-[var(--text-muted)] shrink-0">{asgs.length}</span>
               </div>

@@ -3,6 +3,7 @@
 // 💬 Chat do painel: conversa com o Jarbas e com cada funcionário.
 // Backend: squad-api /api/chat/* (Claude só leitura; ações só com o botão Confirmar).
 
+import Mascote from "./Mascote";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { chatApi, dividirResposta, enviarMensagem, type Acao, type Agente, type Assunto, type ConversaResumo, type Mensagem, type ModeloOpcao, type Uso } from "@/lib/chat";
 import { usePainel } from "@/lib/painel-context";
@@ -25,12 +26,7 @@ const GRUPOS: { rotulo?: string; ids: string[] }[] = [
 ];
 
 function Avatar({ a, tamanho = 36 }: { a?: Agente; tamanho?: number }) {
-  const estilo = { width: tamanho, height: tamanho, fontSize: tamanho * 0.62 };
-  if (a?.id === "jarbas") {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src="/jarbas-avatar.png" alt="" aria-hidden width={tamanho} height={tamanho} style={estilo} className="rounded-full object-cover border border-[var(--border)] bg-white shrink-0" />;
-  }
-  return <span style={estilo} className="rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0 leading-none" aria-hidden>{a?.emoji}</span>;
+  return <Mascote nome={a?.nome} emoji={a?.emoji} tamanho={tamanho} />;
 }
 
 function Chevron({ aberto }: { aberto: boolean }) {
@@ -212,7 +208,7 @@ export default function ChatPage() {
       {/* ===== LISTA DE PESSOAS ===== */}
       <aside className="md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col min-h-0 md:max-h-none">
         <button className="md:hidden flex items-center justify-between px-4 py-2 text-sm cursor-pointer" onClick={() => setListaAberta(!listaAberta)} aria-expanded={listaAberta}>
-          <span>{agente ? `${agente.emoji} ${agente.nome}` : "Escolher"}</span><span>{listaAberta ? "▲" : "▼ trocar"}</span>
+          <span className="flex items-center gap-2">{agente ? <><Avatar a={agente} tamanho={28} />{agente.nome}</> : "Escolher"}</span><span>{listaAberta ? "▲" : "▼ trocar"}</span>
         </button>
         <div className={`${listaAberta ? "block" : "hidden"} md:block overflow-y-auto max-h-[50vh] md:max-h-none p-2`} aria-label="Pessoas da equipe">
           {grupos.map((g, gi) => (
@@ -319,7 +315,7 @@ export default function ChatPage() {
           ))}
           {(ocupado || fluxo) && (
             <div className="flex gap-2 items-start">
-              <span className="mt-1"><Avatar a={agente} tamanho={28} /></span>
+              <span className="mt-1"><Avatar a={agente} tamanho={32} /></span>
               <div className="max-w-[min(48rem,100%)] rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
                 {fluxo ? <Resposta texto={fluxo} andamento onEscolha={(t) => enviar(t)} desativado /> : <p className="text-sm text-[var(--text-muted)] animate-pulse">{status || "pensando…"}</p>}
                 {fluxo && status && <p className="text-xs text-[var(--text-muted)] mt-1 animate-pulse">{status}</p>}
@@ -398,7 +394,7 @@ function Balao({ m, agente, ocupado, onEscolha, onAcao, assuntos, onMover }: {
   const assunto = assuntos?.find((a) => a.id === m.assuntoId);
   return (
     <div className="flex gap-2 items-start">
-      <span className="mt-1"><Avatar a={agente} tamanho={28} /></span>
+      <span className="mt-1"><Avatar a={agente} tamanho={32} /></span>
       <div className="max-w-[min(48rem,100%)] min-w-0">
         {assunto && m.respostaDe && <EtiquetaAssunto atual={assunto} assuntos={assuntos!} onMover={(id, t) => onMover(m.respostaDe!, id, t)} />}
         <div className="rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
