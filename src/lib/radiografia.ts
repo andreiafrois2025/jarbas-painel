@@ -108,7 +108,7 @@ function rotuloGrupo(membros: FlowDocNode[]): string {
 }
 
 /** Monta o desenho de um nível. */
-export function montaDesenho(flow: FlowDoc, nivel: Nivel): Desenho {
+export function montaDesenho(flow: FlowDoc, nivel: Nivel, limiteLeigo = 7): Desenho {
   let nodes = flow.nodes;
   let edges = flow.edges;
   const mapa = new Map<string, string>();
@@ -119,7 +119,7 @@ export function montaDesenho(flow: FlowDoc, nivel: Nivel): Desenho {
     nodes = nodes.filter((n) => n.type !== "note");
     const ids = new Set(nodes.map((n) => n.id));
     edges = edges.filter((e) => !e.isReturn && ids.has(e.source) && ids.has(e.target));
-    const { grupos, dono } = agrupaParaLeigo(nodes, edges, 7);
+    const { grupos, dono } = agrupaParaLeigo(nodes, edges, limiteLeigo);
     pecasBase = [...grupos.entries()].map(([id, membros]) => ({
       id,
       type: membros[0].type,
@@ -245,7 +245,7 @@ export function primeiraFrase(txt?: string): string {
   return (m ? m[1] : linha).slice(0, 200);
 }
 
-export function montaResumo(d: Desenho, nivel: Nivel): Resumo {
+export function montaResumo(d: Desenho, nivel: Nivel, max = 9): Resumo {
   const ordem = d.pecas
     .filter((p) => p.type !== "note")
     .slice()
@@ -261,7 +261,7 @@ export function montaResumo(d: Desenho, nivel: Nivel): Resumo {
   return {
     inicio: ini ? `${ini.label}${primeiraFrase(ini.membros[0].data.details) ? ". " + primeiraFrase(ini.membros[0].data.details) : ""}` : "—",
     fim: fins.length ? fins.map((f) => f.label).join(" ou ") : ordem.length ? ordem[ordem.length - 1].label : "—",
-    passos: ordem.slice(0, 9).map((p) => ({ id: p.id, t: p.label, d: textoPeca(p) })),
+    passos: ordem.slice(0, max).map((p) => ({ id: p.id, t: p.label, d: textoPeca(p) })),
   };
 }
 

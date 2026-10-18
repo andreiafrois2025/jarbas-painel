@@ -56,6 +56,8 @@ export interface FlowDocNode {
     glossario?: { termo: string; definicao: string }[];
     /** Marca: as posições deste nó foram arrumadas/salvas na vertical (de cima para baixo) */
     layoutV?: number;
+    /** Posição na vista HORIZONTAL (computador), gravada no modo Editar. A `position` continua sendo a vertical (celular). */
+    posH?: { x: number; y: number };
   };
 }
 
@@ -72,6 +74,9 @@ export interface FlowDocEdge {
   label?: string;
   /** Se true, é seta de retorno (loopback) — desenha animada */
   isReturn?: boolean;
+  /** Pontas da seta na vista horizontal (as `sourceHandle`/`targetHandle` valem pra vertical) */
+  sourceHandleH?: string;
+  targetHandleH?: string;
 }
 
 export interface FlowDoc {

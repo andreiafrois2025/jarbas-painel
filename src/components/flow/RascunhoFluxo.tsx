@@ -164,7 +164,7 @@ export default function RascunhoFluxo({ id, onVoltar, avisar }: Props) {
             setas={setasLeitura}
             selecao={sel}
             onSelect={setSel}
-            editavel={false}
+            editando={false}
             posicoesAuto={Object.fromEntries([...posAuto].map(([k, v]) => [k, { x: v.x, y: v.y }]))}
           />
         ) : (

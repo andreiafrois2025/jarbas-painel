@@ -12,13 +12,13 @@ export interface PosCaixa { x: number; y: number; camada: number }
 
 /** Tamanho real de cada peça (o mesmo desenhado pelo RoughNode). */
 export function tamanhoDoTipo(type: FlowDocNode["type"]): { w: number; h: number } {
-  if (type === "start" || type === "end") return { w: 140, h: 140 };
-  if (type === "condition") return { w: 210, h: 130 };
-  return { w: 240, h: 110 };
+  if (type === "start" || type === "end") return { w: 108, h: 108 };
+  if (type === "condition") return { w: 180, h: 104 };
+  return { w: 190, h: 84 };
 }
 
-const GAP_X = 70;
-const GAP_Y = 90; // espaço pra seta e pro rótulo dela
+const GAP_X = 44;
+const GAP_Y = 76; // espaço pra seta e pro rótulo dela
 
 export function layoutVertical(caixas: Caixa[], ligs: Lig[]): Map<string, PosCaixa> {
   const ids = new Set(caixas.map((c) => c.id));
@@ -122,4 +122,80 @@ export function verticaliza(flow: Pick<FlowDoc, "nodes" | "edges">): { nodes: Fl
     };
   });
   return { nodes, edges, salvo };
+}
+
+// ── Vista HORIZONTAL (computador): esquerda → direita ──────────────────
+export interface PosH extends PosCaixa { fila: number }
+
+/**
+ * Mesmo algoritmo do vertical, "deitado". Se a fila de camadas passa de `larguraMax`,
+ * quebra em mais de uma fila (uma embaixo da outra, cada uma lida da esquerda pra direita),
+ * pra o desenho continuar legível sem precisar encolher.
+ */
+export function layoutHorizontal(caixas: Caixa[], ligs: Lig[], larguraMax = Infinity): Map<string, PosH> {
+  const tam = new Map(caixas.map((c) => [c.id, c]));
+  const girado = caixas.map((c) => ({ ...c, w: c.h, h: c.w }));
+  const v = layoutVertical(girado, ligs);
+  // nesta altura: v.y = posição ao longo do fluxo; v.x = posição na transversal
+  const camadas = new Map<number, string[]>();
+  for (const [id, p] of v) camadas.set(p.camada, [...(camadas.get(p.camada) || []), id]);
+  const ordem = [...camadas.keys()].sort((a, b) => a - b);
+
+  const out = new Map<string, PosH>();
+  let fila = 0;
+  let inicioFila = 0; // "ao longo" onde a fila atual começa
+  let ids: string[] = [];
+  let yBase = 0;
+  const fecha = () => {
+    if (!ids.length) return;
+    const topo = Math.min(...ids.map((id) => v.get(id)!.x));
+    const base = Math.max(...ids.map((id) => v.get(id)!.x + tam.get(id)!.h));
+    for (const id of ids) {
+      const p = v.get(id)!;
+      out.set(id, { x: p.y - inicioFila, y: p.x - topo + yBase, camada: p.camada, fila });
+    }
+    yBase += base - topo + 56;
+    fila += 1;
+    ids = [];
+  };
+  for (const c of ordem) {
+    const doCamada = camadas.get(c)!;
+    const compr = Math.max(...doCamada.map((id) => tam.get(id)!.w));
+    const aoLongo = v.get(doCamada[0])!.y;
+    if (ids.length && aoLongo - inicioFila + compr > larguraMax) {
+      fecha();
+      inicioFila = aoLongo;
+    } else if (!ids.length) {
+      inicioFila = aoLongo;
+    }
+    ids.push(...doCamada);
+  }
+  fecha();
+  return out;
+}
+
+/** Pontas da seta na vista horizontal, conforme as posições. */
+export function pontasHorizontal(origem: PosH | undefined, destino: PosH | undefined, retorno?: boolean): { sourceHandle: string; targetHandle: string; volta: boolean } {
+  if (!origem || !destino) return { sourceHandle: "right", targetHandle: "left", volta: false };
+  const volta = !!retorno || destino.camada <= origem.camada;
+  if (volta) return { sourceHandle: "bottom", targetHandle: "bottom", volta: true };
+  if (destino.fila !== origem.fila) return { sourceHandle: "bottom", targetHandle: "top", volta: false };
+  return { sourceHandle: "right", targetHandle: "left", volta: false };
+}
+
+/**
+ * O fluxo "deitado": posições esquerda → direita (ou as que ela salvou no modo Editar, em `data.posH`).
+ */
+export function horizontaliza(flow: Pick<FlowDoc, "nodes" | "edges">, larguraMax: number): { nodes: FlowDocNode[]; edges: FlowDocEdge[]; salvo: boolean; auto: Record<string, { x: number; y: number }> } {
+  const salvo = flow.nodes.length > 0 && flow.nodes.every((n) => n.data.posH);
+  const caixas: Caixa[] = flow.nodes.map((n) => ({ id: n.id, ...tamanhoDoTipo(n.type), ordem: n.position?.y ?? 0 }));
+  const pos = layoutHorizontal(caixas, flow.edges.map((e) => ({ source: e.source, target: e.target, retorno: e.isReturn })), larguraMax);
+  const auto = Object.fromEntries(flow.nodes.map((n) => [n.id, { x: Math.round(pos.get(n.id)!.x), y: Math.round(pos.get(n.id)!.y) }]));
+  const nodes = flow.nodes.map((n) => ({ ...n, position: salvo ? n.data.posH! : auto[n.id] }));
+  const edges = flow.edges.map((e) => {
+    if (salvo && e.sourceHandleH && e.targetHandleH) return { ...e, sourceHandle: e.sourceHandleH, targetHandle: e.targetHandleH };
+    const pt = pontasHorizontal(pos.get(e.source), pos.get(e.target), e.isReturn);
+    return { ...e, isReturn: pt.volta, sourceHandle: pt.sourceHandle, targetHandle: pt.targetHandle };
+  });
+  return { nodes, edges, salvo, auto };
 }
