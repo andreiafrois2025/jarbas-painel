@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { NIVEIS, type Nivel } from "@/lib/radiografia";
+import { NIVEIS, avaliaSaude, tempoDesde, type Nivel, type Saude } from "@/lib/radiografia";
+import { interpretaCron } from "@/lib/cron";
+import type { AutomacaoApiItem } from "@/lib/biblioteca";
 import { fonteCarregou } from "@/lib/flow/medida";
 
 // Peças compartilhadas pela página do fluxo e pela página do grupo (mesma estrutura nas duas).
@@ -87,6 +89,49 @@ export interface Bolinha {
   codigo?: string;
   /** (v3.4) sem número: o grupo não é uma sequência, é um conjunto de rotinas */
   semNumero?: boolean;
+  /** (v3.5) situação da rotina: bolinha + frase do tooltip (null = sem relógio, roda quando chamado) */
+  situacao?: { saude: Saude | null; frase: string };
+}
+
+export const COR_SAUDE: Record<Saude, string> = {
+  ok: "var(--success)",
+  atrasada: "var(--warning)",
+  muda: "var(--danger)",
+  desconhecida: "var(--text-muted)",
+};
+
+/** Saúde de um fluxo a partir da automação do relógio (null = sem relógio). */
+export function saudeDaAutomacao(a: AutomacaoApiItem | null): Saude | null {
+  const cron = a ? interpretaCron(a.agenda) : null;
+  return a && cron ? avaliaSaude(a.ultima_execucao, cron.frequenciaMin) : null;
+}
+
+/** Frase da bolinha: "Rodou há 2h, tudo certo." */
+export function fraseSaude(a: AutomacaoApiItem | null): string {
+  const s = saudeDaAutomacao(a);
+  if (!s || !a) return "Sem relógio: este fluxo roda só quando alguém (ou um evento) o chama.";
+  if (s === "desconhecida") return "Tem horário marcado, mas não dá para saber quando rodou pela última vez.";
+  const quando = tempoDesde(a.ultima_execucao);
+  const marcado = interpretaCron(a.agenda)?.descricao;
+  const horario = marcado ? ` (horário marcado: ${marcado})` : "";
+  if (s === "ok") return `Rodou ${quando}, tudo certo.`;
+  if (s === "atrasada") return `Rodou ${quando}: está atrasado${horario}.`;
+  return `Parou: o último sinal de vida foi ${quando}${horario}.`;
+}
+
+export function BolinhaSituacao({ saude, frase }: { saude: Saude | null; frase: string }) {
+  return <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0 align-middle" title={frase} aria-label={frase} style={saude ? { background: COR_SAUDE[saude] } : { border: "1.5px solid var(--text-muted)" }} />;
+}
+
+/** Legenda discreta, numa linha só */
+export function LegendaSituacao() {
+  const b = (k: Saude) => <span className="inline-block w-2 h-2 rounded-full align-baseline" style={{ background: COR_SAUDE[k] }} />;
+  return (
+    <p className="text-[11px] text-[var(--text-muted)] flex flex-wrap gap-x-2 gap-y-0.5 items-center" aria-label="Legenda das bolinhas">
+      <span>{b("ok")} no ar</span>·<span>{b("atrasada")} atrasado</span>·<span>{b("muda")} parou</span>·
+      <span><span className="inline-block w-2 h-2 rounded-full align-baseline" style={{ border: "1.5px solid var(--text-muted)" }} /> roda quando chamado</span>
+    </p>
+  );
 }
 
 /** "🧭 O processo do início ao fim": recolhível, aberto por padrão. */
@@ -136,13 +181,22 @@ export function BlocoProcesso({ comeca, termina, bolinhas, selecionada, onEscolh
                   >
                     <span className="shrink-0 w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center text-white mt-0.5" style={{ background: "var(--accent, #2D6B6B)" }}>{b.semNumero ? "•" : i + 1}</span>
                     <span className="min-w-0 text-sm leading-snug">
-                      <strong className="font-semibold">{b.titulo}</strong>
+                      {(() => {
+                        const i = b.titulo.lastIndexOf(" ");
+                        return (
+                          <strong className="font-semibold">
+                            {i > 0 ? b.titulo.slice(0, i + 1) : ""}
+                            <span className="whitespace-nowrap">{i > 0 ? b.titulo.slice(i + 1) : b.titulo}{b.situacao && <span className="ml-2"><BolinhaSituacao saude={b.situacao.saude} frase={b.situacao.frase} /></span>}</span>
+                          </strong>
+                        );
+                      })()}
                     </span>
                   </button>
                 </li>
               );
             })}
           </ol>
+          {bolinhas.some((b) => b.situacao) && <LegendaSituacao />}
         </div>
       )}
     </section>

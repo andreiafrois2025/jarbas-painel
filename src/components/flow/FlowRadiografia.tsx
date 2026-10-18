@@ -15,7 +15,7 @@ import { aplicaLeigo, leigoDoFluxo, quemNoBalao, fraseCurta, repete } from "@/li
 import { nomeDoFluxo } from "@/lib/flow/macro-fluxos";
 import FlowViewer, { type Selecao, type NoVis, type SetaVis } from "./FlowViewer";
 import FlowCanvas from "./FlowCanvas";
-import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha } from "./PaginaPartes";
+import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha, BolinhaSituacao, fraseSaude } from "./PaginaPartes";
 import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 import CodigoReal, { nomeCurto } from "./CodigoReal";
 import { TYPE_LABEL, STROKE_BY_TYPE } from "./RoughNode";
@@ -283,9 +283,12 @@ export default function FlowRadiografia({
               {cron && <span className="text-[var(--text-secondary)]">⏰ {cron.descricao}</span>}
               {aposentada ? (
                 <span style={{ color: "var(--danger)" }} title="A revisão semanal viu que esta rotina não está mais no relógio do servidor">⛔ não roda mais</span>
-              ) : saude ? (
-                <span style={{ color: SELO_SAUDE[saude].cor }} title={automacao ? `Último sinal de vida: ${tempoDesde(automacao.ultima_execucao)}` : undefined}>{SELO_SAUDE[saude].bolinha} {SELO_SAUDE[saude].texto}</span>
-              ) : null}
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-[var(--text-secondary)]" title={fraseSaude(automacao)}>
+                  <BolinhaSituacao saude={saude} frase={fraseSaude(automacao)} />
+                  {saude ? `${({ ok: "no ar", atrasada: "atrasado", muda: "parou", desconhecida: "sem registro" } as const)[saude]}${automacao?.ultima_execucao ? ` · rodou ${tempoDesde(automacao.ultima_execucao)}` : ""}` : "roda quando chamado"}
+                </span>
+              )}
             </p>
             {/* detalhes de bastidor: só no nível Código */}
             {nivel === 3 && (

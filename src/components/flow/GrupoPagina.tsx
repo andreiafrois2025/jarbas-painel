@@ -19,7 +19,7 @@ import RoughNode from "./RoughNode";
 import { estiloSeta } from "./estilo";
 import { edgeTypes } from "./SetaEdge";
 import { paraRFSetas } from "./rotas";
-import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha } from "./PaginaPartes";
+import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha, saudeDaAutomacao, fraseSaude } from "./PaginaPartes";
 
 // =============================================
 // Página de um GRUPO (v3): mesma estrutura da página do fluxo
@@ -226,7 +226,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
 
   // ── textos da estrutura ──
   // (v3.3) a lista mostra só o título de cada rotina
-  const bolinhas: Bolinha[] = ordenados.map((f) => ({ id: f.id, titulo: nomeDoFluxo(f), semNumero: true }));
+  const bolinhas: Bolinha[] = ordenados.map((f) => ({ id: f.id, titulo: nomeDoFluxo(f), semNumero: true, situacao: { saude: saudeDaAutomacao(automacaoDe(f)), frase: fraseSaude(automacaoDe(f)) } }));
 
   const etapa = escolha ? porId.get(escolha.flowId)?.nodes.find((n) => n.id === escolha.nodeId) : null;
   const fEtapa = escolha ? porId.get(escolha.flowId) : null;
