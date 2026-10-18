@@ -104,14 +104,16 @@ async function comToken(path: string, init?: RequestInit) {
 // `ativo=false` (modo Servidora): o hook não faz NENHUMA chamada, nem liga o
 // relógio. /api/hoje devolve agenda, tarefas e escola numa resposta só, então a
 // única forma de o dado pessoal não chegar ao navegador é não pedir.
-export function useHoje(ativo = true) {
+// `modo="servidora"` pede à squad-api só o que é do trabalho (agenda do Igam e
+// tarefas com Área da vida = Trabalho); sem ele, a resposta é a de sempre.
+export function useHoje(ativo = true, modo?: "servidora") {
   const [dados, setDados] = useState<DadosHoje | null>(null);
   const [erro, setErro] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!ativo) return;
     try {
-      const r = await comToken("/api/hoje");
+      const r = await comToken(modo === "servidora" ? "/api/hoje?modo=servidora" : "/api/hoje");
       if (!r.ok) throw new Error(String(r.status));
       setDados(await r.json());
     } catch {
