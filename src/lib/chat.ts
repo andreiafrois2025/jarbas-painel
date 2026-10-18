@@ -117,7 +117,8 @@ export type Visual =
   | { tipo: "comparacao"; titulo?: string; colunas: { titulo: string; itens: string[] }[] }
   | { tipo: "linha_tempo"; titulo?: string; itens: { quando: string; titulo: string; texto?: string }[] }
   | { tipo: "checklist"; titulo?: string; itens: { texto: string; feito: boolean }[] }
-  | { tipo: "botoes"; pergunta?: string; opcoes: { rotulo: string; mensagem: string }[] };
+  | { tipo: "botoes"; pergunta?: string; opcoes: { rotulo: string; mensagem: string }[] }
+  | { tipo: "agenda"; titulo?: string; dias: { dia: string; itens: { hora: string; titulo: string }[] }[] };
 
 const txt = (v: unknown, max = 400): string | null => (typeof v === "string" && v.trim() && v.length <= max ? v.trim() : null);
 const txtOpc = (v: unknown, max = 400): string | undefined => (v == null ? undefined : txt(v, max) ?? undefined);
@@ -162,6 +163,20 @@ export function validarVisual(raw: unknown): Visual | null {
       itens.push({ texto: t, feito: it.feito === true });
     }
     return { tipo: "checklist", titulo, itens };
+  }
+  if (o.tipo === "agenda") {
+    const l = lista(o.dias, 14); if (!l) return null;
+    const dias: { dia: string; itens: { hora: string; titulo: string }[] }[] = [];
+    for (const d of l as Record<string, unknown>[]) {
+      const dia = txt(d?.dia, 60); if (!dia || !Array.isArray(d.itens) || d.itens.length > 30) return null;
+      const itens: { hora: string; titulo: string }[] = [];
+      for (const it of d.itens as Record<string, unknown>[]) {
+        const h = txt(it?.hora, 30); const t = txt(it?.titulo, 200); if (!h || !t) return null;
+        itens.push({ hora: h, titulo: t });
+      }
+      dias.push({ dia, itens });
+    }
+    return { tipo: "agenda", titulo, dias };
   }
   if (o.tipo === "botoes") {
     const l = lista(o.opcoes, 5); if (!l) return null;

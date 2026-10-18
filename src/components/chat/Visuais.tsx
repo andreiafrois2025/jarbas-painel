@@ -60,6 +60,31 @@ export default function Visuais({ v, onEscolha, desativado }: { v: Visual; onEsc
     );
   }
   if (v.tipo === "checklist") return <Checklist v={v} />;
+  if (v.tipo === "agenda") {
+    return (
+      <div className={caixa}>
+        {v.titulo && <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2">📅 {v.titulo}</p>}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {v.dias.map((d, i) => (
+            <div key={i} className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] overflow-hidden">
+              <p className="px-3 py-1.5 text-sm font-semibold capitalize bg-[var(--accent-soft)] text-[var(--accent-hover)]">{d.dia}</p>
+              {d.itens.length === 0
+                ? <p className="px-3 py-2 text-sm text-[var(--text-muted)]">Nada marcado</p>
+                : <ul className="p-3 space-y-2">
+                    {d.itens.map((it, j) => (
+                      <li key={j} className="flex gap-2 text-sm">
+                        <span className="shrink-0 font-semibold text-[var(--af-terracotta)] tabular-nums">{it.hora}</span>
+                        <span className="text-[var(--text-primary)]">{it.titulo}</span>
+                      </li>
+                    ))}
+                  </ul>}
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-[var(--text-muted)] mt-2">Só consulta. Para marcar ou mudar compromisso, peça à Donna no WhatsApp.</p>
+      </div>
+    );
+  }
   return (
     <div className="my-2">
       {v.pergunta && <p className="text-sm font-medium mb-1.5">{v.pergunta}</p>}

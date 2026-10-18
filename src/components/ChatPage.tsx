@@ -468,7 +468,50 @@ function PainelAssuntos({ assuntos, msgs, fixado, onFixar, onArquivar }: {
   );
 }
 
+function CartaoSquad({ a, ocupado, onDecidir }: { a: Acao; ocupado: boolean; onDecidir: (cancelar: boolean) => void }) {
+  const p = a.parametros as { nome?: string; icone?: string; objetivo?: string; entrada?: string; saida?: string;
+    etapas?: { id: string; quem: string; titulo: string; entrega: string; peca_assinavel?: boolean }[];
+    aprovacoes?: { depois_de: string; pergunta: string }[]; proibicoes?: string[] };
+  const etapas = p.etapas ?? []; const agentes = Array.from(new Set(etapas.map((e) => e.quem)));
+  const paradaApos = new Set((p.aprovacoes ?? []).map((x) => x.depois_de));
+  return (
+    <div className="my-2 rounded-xl border border-[var(--af-gold)] bg-[var(--af-gold)]/10 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Rascunho de squad</p>
+      <p className="text-base font-semibold text-[var(--text-primary)] mt-0.5">{p.icone} {p.nome}</p>
+      <p className="text-sm text-[var(--text-primary)] mt-1"><b>Objetivo:</b> {p.objetivo}</p>
+      <p className="text-sm text-[var(--text-secondary)] mt-1"><b>Entra:</b> {p.entrada}</p>
+      <p className="text-sm text-[var(--text-secondary)] mt-0.5"><b>Sai:</b> {p.saida}</p>
+      <div className="flex flex-wrap gap-1 mt-2">
+        {agentes.map((q) => <span key={q} className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] capitalize">{q}</span>)}
+      </div>
+      <ol className="mt-2 space-y-1.5 list-decimal pl-5 text-sm">
+        {etapas.map((e) => (
+          <li key={e.id}>
+            <span className="font-medium text-[var(--text-primary)]">{e.titulo}</span> <span className="text-[var(--text-muted)]">({e.quem}{e.peca_assinavel ? ", peça assinável" : ""})</span>
+            <span className="block text-[var(--text-secondary)]">entrega: {e.entrega}</span>
+            {paradaApos.has(e.id) && <span className="block text-[var(--af-terracotta)] text-xs font-semibold">⏸ para e espera a sua aprovação</span>}
+          </li>
+        ))}
+      </ol>
+      {!!p.proibicoes?.length && <p className="text-xs text-[var(--text-secondary)] mt-2"><b>Nunca faz:</b> {p.proibicoes.join(" · ")}</p>}
+      <p className="text-xs text-[var(--text-muted)] mt-2">{etapas.length} etapas, cada uma gasta uma chamada da assinatura quando a squad rodar. Criar não roda nada.</p>
+      {a.estado === "pendente" && (
+        <div className="flex gap-2 mt-2">
+          <button disabled={ocupado} onClick={() => onDecidir(false)} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-sm disabled:opacity-40 cursor-pointer">Aprovar e criar</button>
+          <button disabled={ocupado} onClick={() => onDecidir(true)} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm disabled:opacity-40 cursor-pointer">Descartar</button>
+        </div>
+      )}
+      {a.estado === "executando" && <p className="text-sm mt-2 animate-pulse">Criando a squad…</p>}
+      {a.estado === "cancelada" && <p className="text-sm mt-2 text-[var(--text-muted)]">Descartado. Nada foi criado.</p>}
+      {(a.estado === "feita" || a.estado === "erro") && a.resultado && (
+        <p className={`text-sm mt-2 ${a.resultado.ok ? "text-[var(--accent)]" : "text-[var(--danger)]"}`}>{a.resultado.ok ? "✓ " : "✗ "}{a.resultado.texto}</p>
+      )}
+    </div>
+  );
+}
+
 function CartaoAcao({ a, ocupado, onDecidir }: { a: Acao; ocupado: boolean; onDecidir: (cancelar: boolean) => void }) {
+  if (a.acao === "criar_squad") return <CartaoSquad a={a} ocupado={ocupado} onDecidir={onDecidir} />;
   return (
     <div className="my-2 rounded-xl border border-[var(--af-gold)] bg-[var(--af-gold)]/10 p-3">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Ação proposta</p>
