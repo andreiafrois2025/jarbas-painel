@@ -21,8 +21,8 @@ export const SQUADS_LICITACAO: {
   {
     id: "apoio-licitacao-outro-setor",
     icone: "📑",
-    nome: "Apoio a outro setor",
-    resumo: "Outro setor do Igam (ex.: GERUR) pede apoio: triagem, mercado, preços, ETP/TR, revisão jurídica e minuta de encaminhamento.",
+    nome: "Licitação outras áreas",
+    resumo: "Apoio a licitações de outras áreas do Igam (ex.: GERUR): triagem, mercado, preços, ETP/TR, revisão jurídica e minuta de encaminhamento.",
     secaoExemplo: "Pedido (apoio-licitacao-outro-setor)",
   },
 ];

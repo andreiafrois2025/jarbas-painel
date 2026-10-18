@@ -706,6 +706,7 @@ export default function LicitacaoPage() {
           subtitulo={`iniciado ${dataHoraCurta(job.startedAt)}`}
           onFechar={fecharJanela}
           largura="larga"
+          fecharGrande
         >
           {detalhe}
         </Janela>
