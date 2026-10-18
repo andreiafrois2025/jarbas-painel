@@ -1,349 +1,300 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import type { FlowDoc } from "@/lib/types";
-import { getFlowDocs, duplicateFlowDoc, updateFlowDoc } from "@/lib/storage";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { FlowDoc, FlowGrupo } from "@/lib/types";
+import { getFlowDocs, duplicateFlowDoc, updateFlowDoc, getFlowGrupos } from "@/lib/storage";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
-import { interpretaCron, formataProxima } from "@/lib/cron";
-import FlowCanvas from "./FlowCanvas";
+import { semAcento, ehAposentada } from "@/lib/radiografia";
+import FlowRadiografia from "./FlowRadiografia";
+import GrupoPagina from "./GrupoPagina";
+import RascunhoFluxo from "./RascunhoFluxo";
+import VozNovoFluxo from "./VozNovoFluxo";
+import { rascunhosApi, type RascunhoResumo } from "@/lib/flow/rascunhos";
+import { montaMacros, nomeDoFluxo } from "@/lib/flow/macro-fluxos";
+import { useLigacoesAuto, desenhoPodeEstarVelho } from "@/lib/flow/ligacoes";
+import { useNivel, lerUltimaVista, guardarUltimaVista } from "@/lib/flow/nivel";
 import { useUI } from "../ui";
 import { usePainel } from "@/lib/painel-context";
 import { ehPessoal } from "@/lib/modo";
-import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 
 // =============================================
-// Fluxos — a mesa de desenho.
+// Mapa dos Fluxos (v3, 18/10/2026): UMA tela.
+//  À esquerda, a lista (recolhível; no celular vira gaveta) com os grupos, cada um expansível
+//  mostrando seus fluxos com a bolinha de saúde, mais "Rascunhos" e "Aposentadas".
+//  À direita, o que foi escolhido: a página do grupo (diagrama em faixas) ou a do fluxo.
+//  1 clique em qualquer fluxo abre. Abre no último visto (localStorage) ou no primeiro grupo.
 //
-// 25/07/2026: esta tela deixou de ter lista própria. A porta de entrada dos
-// fluxos passou a ser Produção › Automações, que agrupa por categoria e tem o
-// botão de criar. Aqui só se desenha, chegando por um card de lá.
+// O endereço manda: ?macro=<slug> | ?fluxo=<id> | ?titulo=<título> | ?rascunho=<id>
+// (Voltar do navegador desfaz exatamente um passo; sem ouvinte de popstate.)
 // =============================================
 
 export default function FlowsPageV2() {
-  const sp = useSearchParams();
-  const fluxoParam = sp.get("fluxo");
+  const router = useRouter();
+  const base = usePathname() || "/producao/fluxos";
+  const params = useSearchParams();
   const { avisar } = useUI();
   const { servidora } = usePainel();
   const [flows, setFlows] = useState<FlowDoc[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // 25/07 — o "pisca" que ela viu ao clicar num card.
-  //
-  // A sequência era: a tela nascia sem fluxo escolhido e sem a lista carregada,
-  // então o primeiro desenho da tela caía no estado "escolha um fluxo" — a tela
-  // vazia. Só depois o endereço era lido e a lista chegava, aí o fluxo aparecia.
-  // Ou seja: a tela vazia não era um erro, era o estado inicial legítimo sendo
-  // mostrado por uma fração de segundo antes da resposta chegar.
-  //
-  // Correção: enquanto a tela ainda não se situou (não leu o endereço nem
-  // recebeu a lista), ela mostra o ESQUELETO da página de fluxo, não a tela
-  // vazia. A tela vazia só aparece quando de fato não há fluxo pedido.
-  const [situada, setSituada] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  // 25/07 (tarde): a janelinha que abria por cima do card virou ESTA página.
-  // Ela pediu: "essa janela poderia ser a página do fluxo, ocupando a tela toda,
-  // e no campo como funciona por dentro aparecer o fluxo direto". Então o
-  // cabeçalho ganhou o que estava lá (quando roda, próxima, última, comando) e
-  // o desenho ocupa o resto — já editável, sem precisar de outro botão.
   const [automacoes, setAutomacoes] = useState<AutomacaoApiItem[]>([]);
+  const [relogioMudouEm, setRelogioMudouEm] = useState<string | null>(null);
+  const [rascunhos, setRascunhos] = useState<RascunhoResumo[]>([]);
+  const [vozAberta, setVozAberta] = useState(false);
+  const [lista, setLista] = useState<boolean | null>(null); // null = ainda não escolheu (aberta no computador, fechada no celular)
+  const [busca, setBusca] = useState("");
+  const [grupos, setGrupos] = useState<FlowGrupo[] | null>(null); // null = migração 006 ainda não aplicada
+  const ligacoesAuto = useLigacoesAuto();
 
-  const load = async (): Promise<FlowDoc[]> => {
-    setLoading(true);
-    try {
-      const todos = await getFlowDocs();
-      // Modo Servidora: fluxos pessoais (escola, finanças…) nem entram na lista;
-      // um link direto para um deles cai na tela "sem fluxo".
-      const list = servidora ? todos.filter((f) => !ehPessoal(f.title, f.description)) : todos;
-      setFlows(list);
-      return list;
-    } catch (e) {
-      console.error("Erro ao carregar fluxos:", e);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  };
+  const idPedido = params.get("fluxo");
+  const macroPedido = params.get("macro");
+  const rascunhoPedido = params.get("rascunho");
+  const tituloPedido = params.get("titulo");
+  const nivelParam = params.get("nivel");
+  const [nivel, setNivel] = useNivel(nivelParam);
 
-  useEffect(() => {
-    fetchCatalogo().then((c) => setAutomacoes((c?.automacoes || []).filter((a) => !(servidora && ehPessoal(a.nome, a.descricao, a.comando)))));
-  }, []);
+  const carregaRascunhos = () => rascunhosApi.listar().then(setRascunhos).catch(() => setRascunhos([]));
 
   useEffect(() => {
-    // Deep-link: /producao/fluxos?fluxo=<id>&cat=<categoria> sobrevive ao F5
-    const params = new URLSearchParams(window.location.search);
-    const fluxo = params.get("fluxo");
-    if (fluxo) setSelectedId(fluxo);
-    // Deep-link por TÍTULO (?titulo=…): usado pelos cards de Biblioteca ›
-    // Automações, que sabem o nome do fluxo mas não o id do banco.
-    const titulo = params.get("titulo");
-    load().then((lista) => {
-      if (titulo && !fluxo) {
-        const alvo = lista.find((f) => f.title.toLowerCase() === titulo.toLowerCase());
-        if (alvo) setSelectedId(alvo.id);
-      }
-      setSituada(true);
+    fetchCatalogo().then((c) => {
+      setAutomacoes((c?.automacoes || []).filter((a) => !(servidora && ehPessoal(a.nome, a.descricao, a.comando))));
+      setRelogioMudouEm(c?.crontab_modificado_em ?? null);
     });
+    carregaRascunhos();
+    getFlowGrupos().then(setGrupos).catch(() => setGrupos(null));
+    getFlowDocs()
+      // Modo Servidora: fluxos pessoais nem entram na lista
+      .then((todos) => setFlows(servidora ? todos.filter((f) => !ehPessoal(f.title, f.description)) : todos))
+      .catch((e) => console.error("Erro ao carregar fluxos:", e))
+      .finally(() => setLoading(false));
   }, []);
 
-  // Painel v2: a página agora vive dentro de Máquina › Mapa e não é remontada
-  // quando o endereço troca (busca do topo, lista abaixo). Então o ?fluxo= é
-  // acompanhado aqui, não só lido na montagem.
-  useEffect(() => { setSelectedId(fluxoParam); }, [fluxoParam]);
+  const selected = useMemo(() => {
+    if (idPedido) return flows.find((f) => f.id === idPedido) || null;
+    if (tituloPedido) return flows.find((f) => semAcento(f.title) === semAcento(tituloPedido)) || null;
+    return null;
+  }, [flows, idPedido, tituloPedido]);
 
-  const abrirFluxo = (id: string | null) => {
-    setSelectedId(id);
-    // só troca o endereço (sem empilhar histórico), pra o F5 manter o fluxo
-    window.history.replaceState(null, "", id ? `/maquina?aba=mapa&fluxo=${id}` : "/maquina?aba=mapa");
-  };
+  const automacaoDe = (f: FlowDoc) => automacoes.find((a) => a.flow && semAcento(a.flow) === semAcento(f.title)) || null;
 
-  // 25/07/2026 — sobre o "voltar" do navegador.
-  //
-  // Primeira tentativa (de manhã): eu tinha posto um ouvinte de "popstate" aqui
-  // pra sincronizar o fluxo aberto com a URL. Ele criava um efeito colateral
-  // ruim: ao apertar Voltar, esta tela re-renderizava por um instante no estado
-  // "nenhum fluxo aberto" ANTES do navegador concluir a saída. Dava a impressão
-  // de que o Voltar não tinha funcionado — e a reação natural é apertar de novo,
-  // aí sim pulando duas páginas pra trás (foi como ela caiu no painel de Saúde).
-  //
-  // Correção: esta tela não mexe mais no histórico nem escuta popstate. Quem
-  // manda é o navegador. O caminho de ida é sempre router.push a partir de um
-  // card de Automações, então o Voltar desfaz exatamente esse passo.
+  const macros = useMemo(() => montaMacros(flows, grupos), [flows, grupos]);
+  const macro = macroPedido ? macros.find((m) => m.def.slug === macroPedido) || null : null;
+  const grupoDoSelecionado = selected ? macros.find((m) => m.fluxos.some((f) => f.id === selected.id)) || null : null;
+  const aposentadas = useMemo(() => flows.filter((f) => ehAposentada(f)), [flows]);
 
-  const selected = flows.find((f) => f.id === selectedId) || null;
-  const semAcento = (t: string) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  const automacao = selected
-    ? automacoes.find((a) => a.flow && semAcento(a.flow) === semAcento(selected.title)) || null
-    : null;
-  const cron = automacao ? interpretaCron(automacao.agenda) : null;
+  const href = (q: string) => `${base}?${base.startsWith("/maquina") ? "aba=mapa&" : ""}${q}`;
+  const abrirFluxo = (f: FlowDoc) => { router.push(href(`fluxo=${f.id}`)); if (typeof window !== "undefined" && window.innerWidth < 768) setLista(false); };
+  const abrirGrupo = (slug: string) => { router.push(href(`macro=${slug}`)); if (typeof window !== "undefined" && window.innerWidth < 768) setLista(false); };
+
+  // sem endereço: volta ao último visto, senão ao primeiro grupo
+  useEffect(() => {
+    if (loading || idPedido || macroPedido || rascunhoPedido || tituloPedido) return;
+    const ultimo = lerUltimaVista();
+    const [k, v] = (ultimo || "").split("=");
+    if (k === "macro" && macros.some((m) => m.def.slug === v)) return router.replace(href(`macro=${v}`));
+    if (k === "fluxo" && flows.some((f) => f.id === v)) return router.replace(href(`fluxo=${v}`));
+    if (macros[0]) router.replace(href(`macro=${macros[0].def.slug}`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, idPedido, macroPedido, rascunhoPedido, tituloPedido, macros, flows]);
+
+  // lembra o que estava aberto
+  useEffect(() => {
+    if (selected) guardarUltimaVista(`fluxo=${selected.id}`);
+    else if (macro) guardarUltimaVista(`macro=${macro.def.slug}`);
+  }, [selected, macro]);
 
   const handleDuplicate = async (id: string) => {
     const f = await duplicateFlowDoc(id);
-    await load();
-    setSelectedId(f.id);
+    setFlows(await getFlowDocs());
+    router.push(href(`fluxo=${f.id}&nivel=editar`));
   };
 
   const handleCanvasChange = async (updates: { nodes: FlowDoc["nodes"]; edges: FlowDoc["edges"] }) => {
     if (!selected) return;
     setSaveState("saving");
-    await updateFlowDoc(selected.id, updates);
-    setFlows((fs) => fs.map((f) => (f.id === selected.id ? { ...f, ...updates } : f)));
-    setSaveState("saved");
-    setTimeout(() => setSaveState("idle"), 1200);
+    try {
+      await updateFlowDoc(selected.id, updates);
+      setFlows((fs) => fs.map((f) => (f.id === selected.id ? { ...f, ...updates } : f)));
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 1400);
+    } catch (e) {
+      console.error("Erro ao salvar o desenho:", e);
+      setSaveState("idle");
+      avisar("Não consegui salvar o desenho. Tente de novo.");
+    }
   };
 
-  // Ainda não dá pra saber o que mostrar: ou o endereço não foi lido, ou a
-  // lista não chegou, ou o fluxo pedido ainda não foi encontrado nela.
-  if (!situada || loading || (selectedId && !selected)) {
-    return <EsqueletoFluxo pedido={!!selectedId} />;
-  }
+  const termo = semAcento(busca.trim());
+  const bate = (texto: string) => semAcento(texto).includes(termo);
 
-  // ─── Modo canvas (fluxo aberto) ───
-  if (selected) {
-    return (
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-4 py-2 flex items-center gap-3 shrink-0">
-          <button
-            onClick={() => abrirFluxo(null)}
-            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-          >
-            ← Voltar ao mapa
-          </button>
-          <h2 className="text-base font-semibold truncate flex-1">{selected.title}</h2>
-          {selected.is_seed && (
-            <span
-              className="text-[10px] px-2 py-0.5 rounded bg-[var(--af-teal)] text-white"
-              title="Fluxo veio dos seeds do sistema. Pode editar à vontade."
-            >
-              seed
-            </span>
-          )}
-          {saveState === "saving" && <span className="text-[11px] text-[var(--text-muted)]">salvando…</span>}
-          {saveState === "saved" && <span className="text-[11px] text-[var(--success)]">salvo ✓</span>}
-          <div className="flex gap-1">
-            <button
-              onClick={async () => {
-                await copy(toMermaid(selected));
-                avisar("Mermaid copiado — cola em qualquer IA.");
-              }}
-              className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--bg-tertiary)]"
-              title="Copia como Mermaid (formato de fluxo em texto)"
-            >
-              📋 Mermaid
-            </button>
-            <button
-              onClick={async () => {
-                await copy(toPrompt(selected));
-                avisar("Descrição copiada — cola em qualquer IA.");
-              }}
-              className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--bg-tertiary)]"
-              title="Copia como prompt textual"
-            >
-              📝 Prompt
-            </button>
-            <button
-              onClick={() => download(`${selected.title}.json`, JSON.stringify(selected, null, 2), "application/json")}
-              className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--bg-tertiary)]"
-              title="Baixa JSON estruturado"
-            >
-              💾 JSON
-            </button>
-            {selected.is_seed && (
-              <button
-                onClick={() => handleDuplicate(selected.id)}
-                className="text-xs px-2 py-1 rounded bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]"
-                title="Duplica pra editar"
-              >
-                ⎘ Duplicar
-              </button>
-            )}
-          </div>
-        </div>
-        {selected.description && (
-          <div className="bg-[var(--bg-tertiary)] px-4 py-2 text-xs text-[var(--text-secondary)] shrink-0 border-b border-[var(--border)]">
-            {selected.description.replace(/^\[[^\]]+\]\s*/, "")}
-          </div>
-        )}
-
-        {automacao && cron && (
-          <div className="shrink-0 border-b border-[var(--border)] bg-[var(--bg-primary)] px-4 py-3">
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              <Dado rotulo="Quando roda" valor={cron.descricao} extra={`${automacao.agenda} (UTC)`} />
-              <Dado rotulo="Próxima" valor={formataProxima(cron.proxima)} />
-              <Dado rotulo="Última execução" valor={quandoFoi(automacao.ultima_execucao)}
-                extra={!automacao.log ? "não deixa registro" : automacao.log_compartilhado ? "sinal indireto" : undefined} />
-              <Dado
-                rotulo="Custo por execução"
-                valor={automacao.usa_ia ? "🤖 usa IA" : "🐍 sem IA"}
-                extra={automacao.custo_execucao}
-              />
-            </div>
-            <details className="mt-2">
-              <summary className="text-[11px] text-[var(--text-muted)] cursor-pointer select-none">
-                comando que roda na VPS
-              </summary>
-              <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-[11px] text-[var(--text-secondary)] bg-[var(--bg-secondary)] rounded p-2 border border-[var(--border)]">
-                {automacao.comando}
-              </pre>
-            </details>
-          </div>
-        )}
-
-        <div className="flex-1 min-h-[420px] relative">
-          <FlowCanvas flow={selected} onChange={handleCanvasChange} />
-        </div>
+  // ── Conteúdo à direita ──
+  let conteudo: React.ReactNode;
+  if (rascunhoPedido) {
+    conteudo = <RascunhoFluxo key={rascunhoPedido} id={rascunhoPedido} onVoltar={() => { carregaRascunhos(); router.push(href(macros[0] ? `macro=${macros[0].def.slug}` : "")); }} avisar={avisar} />;
+  } else if (loading || (!selected && !macro && !(idPedido || tituloPedido || macroPedido))) {
+    conteudo = <Esqueleto />;
+  } else if (selected) {
+    conteudo = (
+      <FlowRadiografia
+        key={selected.id}
+        flow={selected}
+        automacao={automacaoDe(selected)}
+        relogioMudouEm={relogioMudouEm}
+        nivel={nivel}
+        onNivel={setNivel}
+        editorInicial={nivelParam === "editar"}
+        saveState={saveState}
+        scriptMudou={desenhoPodeEstarVelho(selected, ligacoesAuto)}
+        grupo={grupoDoSelecionado ? { slug: grupoDoSelecionado.def.slug, titulo: grupoDoSelecionado.def.titulo, icone: grupoDoSelecionado.def.icone } : null}
+        onAbrirGrupo={() => grupoDoSelecionado && abrirGrupo(grupoDoSelecionado.def.slug)}
+        onDuplicate={() => handleDuplicate(selected.id)}
+        onCanvasChange={handleCanvasChange}
+        avisar={avisar}
+      />
+    );
+  } else if (macro) {
+    conteudo = (
+      <GrupoPagina
+        key={macro.def.slug}
+        macro={macro}
+        automacaoDe={automacaoDe}
+        nivel={nivel}
+        onNivel={setNivel}
+        onAbrirFluxo={abrirFluxo}
+        ligacoesAuto={ligacoesAuto}
+      />
+    );
+  } else {
+    conteudo = (
+      <div className="flex-1 flex items-center justify-center p-6 text-sm text-center" style={{ color: "var(--danger)" }}>
+        Não achei o que você abriu pelo endereço. Escolha na lista ao lado.
       </div>
     );
   }
 
-  // ─── Sem fluxo aberto ───
-  //
-  // 25/07/2026: aqui existia o KANBAN de fluxos, aposentado a pedido da Andréia
-  // — era a tela que ela abria e nunca usava ("eu clico porque quero ver o
-  // fluxo direto"). Além disso, o card do kanban e o card de Automações eram
-  // praticamente a mesma coisa, com o kanban só adicionando uma parada.
-  //
-  // Agora a porta de entrada é Produção › Automações, que lista os mesmos
-  // fluxos agrupados por categoria (como ela procura) e tem o botão de criar.
-  // Esta tela ficou sendo o que ela sempre foi de fato: o lugar de desenhar.
-  // Painel v2: a lista de fluxos voltou a morar aqui (é o "Mapa" da Máquina),
-  // agrupada pela categoria que cada fluxo traz na descrição: "[Categoria] texto".
-  // Quando o fluxo é de uma automação do relógio da VPS, vale o nome e a categoria
-  // dela (o título do fluxo costuma ser o comando, tipo "/usr/bin/python3 ...").
-  const doRelogio = (f: FlowDoc) => automacoes.find((a) => a.flow && semAcento(a.flow) === semAcento(f.title));
-  const grupos = new Map<string, FlowDoc[]>();
-  for (const f of flows) {
-    const cat = doRelogio(f)?.categoria || /^\[([^\]]+)\]/.exec(f.description || "")?.[1] || "Outros";
-    grupos.set(cat, [...(grupos.get(cat) || []), f]);
-  }
+  const ativoClasse = "bg-[var(--accent-soft,rgba(45,107,107,0.12))] font-semibold";
+  const itemBusca = "w-full text-left px-2.5 py-2 rounded-md text-[13px] leading-snug cursor-pointer hover:bg-[var(--bg-tertiary)]";
+
+  // (v3.5) busca: grupos, rotinas (inclusive aposentadas) e rascunhos que batem, numa lista simples
+  const resultados = termo ? (
+    <div className="space-y-0.5">
+      {macros.filter((m) => bate(`${m.def.titulo} ${m.def.resumo}`)).map((m) => (
+        <button key={`g-${m.def.slug}`} onClick={() => abrirGrupo(m.def.slug)} className={itemBusca}>{m.def.icone} <span className="font-medium">{m.def.titulo}</span></button>
+      ))}
+      {flows.filter((f) => bate(`${nomeDoFluxo(f)} ${f.description || ""}`)).map((f) => {
+        const g = macros.find((m) => m.fluxos.some((x) => x.id === f.id));
+        return (
+          <button key={f.id} onClick={() => abrirFluxo(f)} className={`${itemBusca} ${selected?.id === f.id ? ativoClasse : ""}`}>
+            <span className="block">{nomeDoFluxo(f)}{ehAposentada(f) ? " ⛔" : ""}</span>
+            {g && <span className="block text-[11px] text-[var(--text-muted)]">{g.def.icone} {g.def.titulo}</span>}
+          </button>
+        );
+      })}
+      {rascunhos.filter((r) => bate(r.titulo)).map((r) => (
+        <button key={r.id} onClick={() => { router.push(href(`rascunho=${r.id}`)); if (window.innerWidth < 768) setLista(false); }} className={`${itemBusca} ${rascunhoPedido === r.id ? ativoClasse : ""}`}>
+          <span className="block">✏️ {r.titulo}</span>
+          <span className="block text-[11px] text-[var(--text-muted)]">rascunho · nada roda</span>
+        </button>
+      ))}
+    </div>
+  ) : null;
+  const semResultado = termo && resultados && !macros.some((m) => bate(`${m.def.titulo} ${m.def.resumo}`)) && !flows.some((f) => bate(`${nomeDoFluxo(f)} ${f.description || ""}`)) && !rascunhos.some((r) => bate(r.titulo));
+
+  const painelLista = (
+    <nav
+      aria-label="Grupos de fluxos"
+      className={`${lista === null ? "hidden md:flex" : lista ? "flex" : "hidden"} flex-col shrink-0 w-[300px] max-w-[86vw] border-r border-[var(--border)] bg-[var(--bg-secondary)] max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-2xl min-h-0`}
+    >
+      <div className="p-2.5 border-b border-[var(--border)] flex items-center gap-2">
+        <input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="buscar fluxo…"
+          aria-label="Buscar fluxo"
+          className="flex-1 min-w-0 text-sm px-2.5 py-1.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)]"
+        />
+        <button onClick={() => setLista(false)} aria-label="Recolher a lista" title="Recolher a lista" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] px-1.5 cursor-pointer">«</button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        {loading && <p className="text-xs text-[var(--text-muted)] animate-pulse p-2">carregando…</p>}
+        {termo ? (
+          <>
+            {resultados}
+            {semResultado && <p className="text-xs text-[var(--text-muted)] p-2">Nada encontrado para «{busca}».</p>}
+          </>
+        ) : (
+          macros.map((m) => {
+            const ativo = macro?.def.slug === m.def.slug || grupoDoSelecionado?.def.slug === m.def.slug;
+            return (
+              <button
+                key={m.def.slug}
+                onClick={() => abrirGrupo(m.def.slug)}
+                title={m.def.resumo}
+                aria-current={ativo ? "page" : undefined}
+                className={`w-full flex items-start gap-2.5 px-2.5 py-2 rounded-md text-left text-sm leading-snug cursor-pointer hover:bg-[var(--bg-tertiary)] ${ativo ? ativoClasse : "font-medium"}`}
+              >
+                <span className="shrink-0">{m.def.icone}</span>
+                <span className="min-w-0">{m.def.titulo}</span>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </nav>
+  );
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6">
-      <div className="flex items-baseline gap-3 mb-4">
-        <h2 className="text-lg font-semibold">🗺️ O que roda por trás</h2>
-        <p className="text-sm text-[var(--text-secondary)]">
-          {flows.length} fluxos desenhados. Clique em um para ver como funciona por dentro.
-        </p>
+    <div className="flex-1 min-h-0 flex relative">
+      {painelLista}
+      {lista && <button aria-label="Fechar a lista" className="md:hidden absolute inset-0 z-30 bg-black/30 cursor-default" onClick={() => setLista(false)} />}
+
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col relative">
+        {lista !== true && (
+          <div className={`px-3 pt-2 shrink-0 ${lista === null ? "md:hidden" : ""}`}>
+            <button
+              onClick={() => setLista(true)}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer"
+              title="Mostrar a lista de fluxos"
+            >
+              ☰ Fluxos
+            </button>
+          </div>
+        )}
+        <div className="flex-1 min-h-0 flex flex-col">
+          {conteudo}
+        </div>
+
+        <button
+          onClick={() => setVozAberta(true)}
+          className="absolute bottom-4 right-4 z-30 text-sm px-4 py-2.5 rounded-full text-white cursor-pointer shadow-lg whitespace-nowrap"
+          style={{ background: "var(--accent, #2D6B6B)" }}
+          title="Fale o fluxo que você quer; o Jarbas desenha um rascunho. Nada executa."
+        >
+          🎙 <span className="max-sm:hidden">Novo fluxo por voz</span>
+        </button>
       </div>
-      {flows.length === 0 && <p className="text-sm text-[var(--text-secondary)]">Nenhum fluxo desenhado ainda.</p>}
-      <div className="space-y-6">
-        {[...grupos.entries()].sort((a, b) => (a[0] === "Outros" ? 1 : b[0] === "Outros" ? -1 : b[1].length - a[1].length)).map(([cat, lista]) => (
-          <section key={cat}>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">{cat}</h3>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {lista.map((f) => (
-                <button key={f.id} onClick={() => abrirFluxo(f.id)}
-                  className="text-left rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3.5 cursor-pointer hover:border-[var(--ac)] transition-colors">
-                  <span className="block text-sm font-semibold text-[var(--text-primary)]">{doRelogio(f)?.nome || nomeAmigavel(f.title)}</span>
-                  {(doRelogio(f)?.descricao || f.description) && (
-                    <span className="block text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
-                      {(doRelogio(f)?.descricao || f.description || "").replace(/^\[[^\]]+\]\s*/, "")}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
+
+      {vozAberta && (
+        <VozNovoFluxo
+          onFechar={() => setVozAberta(false)}
+          onPronto={(r) => { setVozAberta(false); carregaRascunhos(); router.push(href(`rascunho=${r.id}`)); }}
+        />
+      )}
     </div>
   );
 }
 
-// Alguns fluxos têm o próprio comando como título ("/usr/bin/python3 /root/x/y.py -z"):
-// na lista aparece só o nome do script, que dá pra ler.
-function nomeAmigavel(titulo: string): string {
-  if (!titulo.startsWith("/")) return titulo;
-  const script = titulo.split(/\s+/).find((t) => /\.(py|sh|js)$/.test(t));
-  return script ? script.split("/").pop()! : titulo;
-}
-
-function Dado({ rotulo, valor, extra }: { rotulo: string; valor: string; extra?: string }) {
-  return (
-    <div className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)]">
-      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">{rotulo}</p>
-      <p className="text-sm text-[var(--text-primary)]">{valor}</p>
-      {extra && <p className="text-[10px] text-[var(--text-muted)] mt-0.5 break-words">{extra}</p>}
-    </div>
-  );
-}
-
-function quandoFoi(iso: string | null | undefined): string {
-  if (!iso) return "não sei dizer";
-  const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (min < 1) return "agora mesmo";
-  if (min < 60) return `há ${min} min`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `há ${h}h`;
-  const d = Math.floor(h / 24);
-  return `há ${d} dia${d > 1 ? "s" : ""}`;
-}
-
-// Esqueleto da página de fluxo: mesma moldura do conteúdo real, em cinza.
-// Serve pra que nada apareça no lugar errado enquanto os dados vêm.
-function EsqueletoFluxo({ pedido }: { pedido: boolean }) {
-  const barra = (w: string, h = 12) => (
-    <span className="block rounded animate-pulse" style={{ width: w, height: h, background: "var(--bg-tertiary, #EDE8E1)" }} />
-  );
+// Esqueleto: mesma moldura do conteúdo real, em cinza (evita o "pisca" de tela vazia)
+function Esqueleto() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-4 py-3 flex items-center gap-3 shrink-0">
-        <span className="text-sm text-[var(--text-muted)]">← Voltar ao mapa</span>
-        <div className="flex-1">{barra("40%", 16)}</div>
+      <div className="px-6 py-5 space-y-3">
+        <span className="block rounded animate-pulse" style={{ width: "40%", height: 24, background: "var(--bg-tertiary, #EDE8E1)" }} />
+        <span className="block rounded animate-pulse" style={{ width: "70%", height: 14, background: "var(--bg-tertiary, #EDE8E1)" }} />
       </div>
-      {pedido && (
-        <div className="shrink-0 border-b border-[var(--border)] px-4 py-3">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2 border border-[var(--border)] space-y-1.5">
-                {barra("55%", 9)}
-                {barra("80%", 14)}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       <div className="flex-1 min-h-[420px] flex items-center justify-center">
-        <span className="text-sm text-[var(--text-muted)] animate-pulse">abrindo o fluxo…</span>
+        <span className="text-sm text-[var(--text-muted)] animate-pulse">abrindo o mapa…</span>
       </div>
     </div>
   );

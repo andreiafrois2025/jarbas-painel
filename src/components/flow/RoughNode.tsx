@@ -3,6 +3,7 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { FlowDocNode } from "@/lib/types";
+import { medePeca } from "@/lib/flow/medida";
 
 // =============================================
 // Nodes desenhados à mão (estilo excalidraw) usando rough.js.
@@ -21,7 +22,7 @@ const SHAPE_BY_TYPE: Record<FlowDocNode["type"], NodeShape> = {
   end: "endCircle",
 };
 
-const FILL_BY_TYPE: Record<FlowDocNode["type"], string> = {
+export const FILL_BY_TYPE: Record<FlowDocNode["type"], string> = {
   start: "#D4E8E8",
   action: "#FFFFFF",
   condition: "#F5E6C8",
@@ -29,7 +30,7 @@ const FILL_BY_TYPE: Record<FlowDocNode["type"], string> = {
   end: "#F0D4C4",
 };
 
-const STROKE_BY_TYPE: Record<FlowDocNode["type"], string> = {
+export const STROKE_BY_TYPE: Record<FlowDocNode["type"], string> = {
   start: "#2D6B6B",
   action: "#5A6B6B",
   condition: "#C4A460",
@@ -37,7 +38,7 @@ const STROKE_BY_TYPE: Record<FlowDocNode["type"], string> = {
   end: "#A0583C",
 };
 
-const TYPE_LABEL: Record<FlowDocNode["type"], string> = {
+export const TYPE_LABEL: Record<FlowDocNode["type"], string> = {
   start: "início",
   action: "ação",
   condition: "decisão",
@@ -52,6 +53,8 @@ interface RoughData extends Record<string, unknown> {
   executor?: string;
   tags?: string[];
   _flowType?: FlowDocNode["type"];
+  /** páginas de leitura (Mapa/Grupo) não mostram a etiqueta pequena do tipo (AÇÃO, DECISÃO…) */
+  semRotuloTipo?: boolean;
 }
 
 function stringSeed(s: string): number {
@@ -76,8 +79,9 @@ export default function RoughNode({ id, data, selected }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [roughFailed, setRoughFailed] = useState(false);
 
-  const width = shape === "circle" || shape === "endCircle" ? 140 : shape === "diamond" ? 210 : 240;
-  const height = shape === "circle" || shape === "endCircle" ? 140 : shape === "diamond" ? 130 : 110;
+  // v3.1: o tamanho vem do TEXTO (medido e quebrado em linhas): nada vaza para fora do balão.
+  // O auto-layout usa a mesma função, então peça e espaçamento sempre concordam.
+  const { w: width, h: height, textoW, linhas } = medePeca(type, d.label, d.executor, d.icon);
 
   const seed = useMemo(() => stringSeed(id), [id]);
 
@@ -158,8 +162,8 @@ export default function RoughNode({ id, data, selected }: Props) {
     : {};
 
   const handleStyle: React.CSSProperties = {
-    width: 14,
-    height: 14,
+    width: 11,
+    height: 11,
     background: "#FFFFFF",
     border: `2px solid ${stroke}`,
     borderRadius: "50%",
@@ -181,10 +185,10 @@ export default function RoughNode({ id, data, selected }: Props) {
           style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
         />
       )}
-      <div
+      {!d.semRotuloTipo && <div
         style={{
           position: "absolute",
-          top: 4,
+          top: 3,
           left: 8,
           fontSize: 9,
           color: stroke,
@@ -198,16 +202,19 @@ export default function RoughNode({ id, data, selected }: Props) {
         }}
       >
         {TYPE_LABEL[type]}
-      </div>
+      </div>}
       <div
-        className="relative z-10 flex flex-col items-center justify-center h-full px-3 text-center"
+        className="relative z-10 flex flex-col items-center justify-center h-full text-center overflow-hidden"
         style={{ fontFamily: 'var(--font-kalam), "Comic Sans MS", cursive', color: "#2D3B3B" }}
       >
-        {d.icon && <span className="text-xl leading-none mb-1">{d.icon}</span>}
-        <span className="text-[13px] leading-tight font-semibold">{d.label || "sem título"}</span>
-        {d.executor && (
-          <span className="text-[10px] mt-1 opacity-70 italic">{d.executor}</span>
-        )}
+        {/* caixa de texto com a mesma largura usada na medição */}
+        <div className="flex flex-col items-center" style={{ width: textoW, maxWidth: "100%" }}>
+          {d.icon && <span className="text-base leading-none mb-0.5">{d.icon}</span>}
+          <span className="text-[13px] leading-[1.15] font-semibold" style={{ display: "-webkit-box", WebkitLineClamp: linhas, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{d.label || "sem título"}</span>
+          {d.executor && (
+            <span className="text-[10px] mt-0.5 opacity-70 italic w-full truncate">{d.executor}</span>
+          )}
+        </div>
       </div>
 
       {/* Handles em todas as 4 direções — connectionMode="loose" torna cada um source+target */}
