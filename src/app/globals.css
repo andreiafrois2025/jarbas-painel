@@ -496,8 +496,8 @@ body {
 .esc-ring { border-radius: 50%; background: radial-gradient(transparent 40%, rgba(255, 244, 214, .85) 55%, transparent 72%); animation: esc-lampada 5.5s ease-in-out infinite; mix-blend-mode: screen; }
 .esc-flash { border-radius: 50%; background: radial-gradient(#fff, rgba(255, 255, 255, .6) 40%, transparent 70%); opacity: 0; transition: opacity .25s ease-out; }
 .esc-flash.on { opacity: 1; transition: opacity .05s; }
-.esc-tela { overflow: hidden; border-radius: 6%; background: #072B3A; transform: translate(-50%, -50%) !important; }
-.esc-tela-c { position: absolute; inset: 0; opacity: 0; animation: esc-troca 12s linear infinite; animation-delay: var(--d, 0s); }
+.esc-tela { overflow: hidden; border-radius: 6%; transform: translate(-50%, -50%) !important; }
+.esc-tela-c { position: absolute; inset: 0; background: #072B3A; opacity: 0; animation: esc-troca 12s linear infinite; animation-delay: var(--d, 0s); }
 .esc-tela-k { animation-delay: calc(var(--d, 0s) + 4s); }
 .esc-tela-n { animation-delay: calc(var(--d, 0s) + 8s); }
 @keyframes esc-troca { 0%, 3% { opacity: 0; } 8%, 30% { opacity: 1; } 35%, 100% { opacity: 0; } }
