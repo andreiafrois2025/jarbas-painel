@@ -11,6 +11,7 @@ import { ehPessoal, ehColaboradorOculto, limpaTexto, pareceComando } from "@/lib
 import {
   useMetricsHistory, semanasOrdenadas, tempoRelativo,
 } from "@/lib/metrics";
+import HorasEquipe from "./HorasEquipe";
 import { fetchEquipePublica, fallbackPublico, type AgentePublico } from "@/lib/equipe";
 
 // Grid da equipe clicável: abre a bio do agente num popover. A descrição vinha
@@ -355,8 +356,9 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
   dSemana.setUTCDate(dSemana.getUTCDate() - ((dSemana.getUTCDay() + 6) % 7)); // volta até a segunda
   const inicioSemana = dSemana.toISOString().slice(0, 10);
   const inicioMes = hojeIso.slice(0, 8) + "01";
-  const horasSemana = horasNoPeriodo(inicioSemana);
-  const horasMes = horasNoPeriodo(inicioMes);
+  // Com o livro-caixa (18/10/2026) o snapshot já traz semana e mês prontos.
+  const horasSemana = hoje?.horas_semana != null ? { valor: hoje.horas_semana, desde: null } : horasNoPeriodo(inicioSemana);
+  const horasMes = hoje?.horas_mes != null ? { valor: hoje.horas_mes, desde: null } : horasNoPeriodo(inicioMes);
   const fmtHoras = (v: number) => `${(Math.round(v * 10) / 10).toString().replace(".", ",")}h`;
 
   const r = hoje?.resumo_automacoes;
@@ -386,9 +388,9 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           {([
             ["horas economizadas esta semana", horasSemana,
-              "posts do grupo enviados e carrosséis concluídos desde segunda-feira"],
+              "tudo o que a equipe entregou desde segunda-feira"],
             ["horas economizadas este mês", horasMes,
-              "posts do grupo enviados e carrosséis concluídos desde o dia 1"],
+              "tudo o que a equipe entregou desde o dia 1"],
           ] as const).map(([rot, h, fonte]) => (
             <div key={rot} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
               <div className="text-4xl font-bold leading-none" style={{ color: "#2D6B6B" }}>
@@ -404,7 +406,7 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
             <div className="text-xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{fmtHoras(horasHoje)}</div>
             <div className="mt-1.5 text-xs text-[var(--text-secondary)]">no total acumulado</div>
             <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-              25 min por post do grupo + 2h por carrossel, desde {dias[0]?.date ? brData(dias[0].date) : "o início"}
+              entregas de todos os agentes, desde {dias[0]?.date ? brData(dias[0].date) : "o início"}
             </div>
           </div>
         </div>
@@ -418,6 +420,8 @@ function AbaGeral({ data, hoje, taxaSemanal }: {
           ))}
         </div>
       </section>
+
+      {hoje && <HorasEquipe hoje={hoje} tabela={data.tabela_horas} />}
 
       <div className="grid gap-4 lg:grid-cols-2 items-start">
         <CartaoGrafico titulo="Atividades por agente — hoje" sub="quem trabalhou desde a meia-noite">
