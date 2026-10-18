@@ -40,6 +40,8 @@ export interface SetaVis {
   isReturn?: boolean;
   sourceHandle?: string;
   targetHandle?: string;
+  /** pontas escolhidas por ela nas alças (v3.4) */
+  fixa?: boolean;
 }
 export type Selecao = { tipo: "peca" | "seta"; id: string } | null;
 
@@ -142,6 +144,7 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
         isReturn: !!(e.data as { isReturn?: boolean } | undefined)?.isReturn,
         sourceHandle: (e.sourceHandle as string | undefined) ?? undefined,
         targetHandle: (e.targetHandle as string | undefined) ?? undefined,
+        fixa: !!(e.data as { fixa?: boolean } | undefined)?.fixa,
       })),
     );
   }, [onSalvar]);
@@ -163,11 +166,13 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
   const onEdgesChange = useCallback((c: EdgeChange[]) => setEdges((es) => applyEdgeChanges(c, es)), []);
   const onConnect = useCallback((p: Connection) => {
     if (!editando || !p.source || !p.target) return;
-    setEdges((es) => [...es, estiloSeta({ id: `e-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, source: p.source!, target: p.target!, sourceHandle: p.sourceHandle ?? undefined, targetHandle: p.targetHandle ?? undefined }, false)]);
+    const nova = estiloSeta({ id: `e-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, source: p.source!, target: p.target!, sourceHandle: p.sourceHandle ?? undefined, targetHandle: p.targetHandle ?? undefined }, false);
+    setEdges((es) => [...es, { ...nova, data: { ...nova.data, fixa: true } }]);
     marcaSujo();
   }, [editando, marcaSujo]);
   const onReconnect = useCallback((velha: Edge, nova: Connection) => {
-    setEdges((es) => reconnectEdge(velha, nova, es));
+    // mantém o mesmo id (senão o rótulo e o tipo da seta se perdem ao salvar) e grava as alças escolhidas
+    setEdges((es) => reconnectEdge(velha, nova, es, { shouldReplaceId: false }).map((e) => (e.id === velha.id ? { ...e, pathOptions: undefined, data: { ...e.data, fixa: true } } as Edge : e)));
     marcaSujo();
   }, [marcaSujo]);
 
@@ -182,7 +187,7 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
 
   return (
     <div className="fluxo-canvas" ref={caixa} style={{ position: "absolute", inset: 0 }}>
-      <style>{`.fluxo-canvas .react-flow__pane{cursor:grab}.fluxo-canvas .react-flow__pane.dragging{cursor:grabbing}.fluxo-canvas .react-flow__handle{opacity:0;pointer-events:none;transition:opacity .15s}.fluxo-canvas.editando .react-flow__handle{pointer-events:all;opacity:.55;width:10px;height:10px;background:#2D6B6B;border:2px solid #fff}.fluxo-canvas.editando .react-flow__node:hover .react-flow__handle,.fluxo-canvas.editando .react-flow__node.selected .react-flow__handle{opacity:1}.fluxo-canvas.editando .react-flow__edge.selected .react-flow__edge-path{stroke-width:2.6}.fluxo-canvas .react-flow__node{cursor:pointer}.fluxo-canvas.editando .react-flow__node{cursor:move}`}</style>
+      <style>{`.fluxo-canvas .react-flow__pane{cursor:grab}.fluxo-canvas .react-flow__pane.dragging{cursor:grabbing}.fluxo-canvas .react-flow__handle{opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}.fluxo-canvas .react-flow.editando .react-flow__handle{pointer-events:all;opacity:.95;width:13px!important;height:13px!important;cursor:crosshair}.fluxo-canvas .react-flow.editando .react-flow__handle:hover,.fluxo-canvas .react-flow.editando .react-flow__handle.connectingfrom,.fluxo-canvas .react-flow.editando .react-flow__handle.connectingto{width:18px!important;height:18px!important;background:#2D6B6B!important}.fluxo-canvas .react-flow.editando .react-flow__edge.selected .react-flow__edge-path{stroke-width:2.6}.fluxo-canvas .react-flow__node{cursor:pointer}.fluxo-canvas .react-flow.editando .react-flow__node{cursor:move}`}</style>
       <ReactFlow
         className={editando ? "editando" : ""}
         nodes={nodes}

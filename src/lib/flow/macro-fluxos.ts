@@ -28,7 +28,12 @@ export interface MacroDef {
   /** por que estes fluxos ficaram juntos */
   porque: string;
   membros: MembroMacro[];
-  /** setas entre os subfluxos: [de, para, rótulo] (ids de 8 caracteres) */
+  /**
+   * Setas entre os subfluxos: [de, para, rótulo] (ids de 8 caracteres).
+   * v3.4 (18/10/2026): seta SÓ quando uma rotina produz algo que a outra consome, de quem produz para quem consome.
+   * Nada de encadear pela ordem da lista. A evidência de cada uma (arquivo/linha) está em /root/ligacoes_fluxos_verificadas.json
+   * e esta lista é só a cópia de segurança para quando o painel não consegue ler o arquivo publicado pelo curador.
+   */
   ligacoes: [string, string, string?][];
 }
 
@@ -43,11 +48,12 @@ export const MACROS: MacroDef[] = [
       { id: "36078246" }, { id: "177f5f98" }, { id: "803b72b5" }, { id: "da5be261" }, { id: "c92bc84a" }, { id: "cb704473" },
     ],
     ligacoes: [
-      ["36078246", "177f5f98", "Mike aprende seu gosto"],
-      ["177f5f98", "803b72b5", "se for urgente"],
-      ["177f5f98", "da5be261", "você pede envio já"],
-      ["177f5f98", "c92bc84a", "lembrete do que falta"],
-      ["177f5f98", "cb704473", "confere o começo"],
+      // style_learner.py:266 grava style-profile.json; ia_content_generator.py:456 lê
+      ["36078246", "177f5f98", "o gosto aprendido orienta a escolha"],
+      // modo --uau-only do mesmo gerador grava o card na ia_queue.json (ia_content_generator.py:836); o diário lê a fila (:711, :761)
+      ["803b72b5", "177f5f98", "o card urgente entra na mesma fila"],
+      // ia_group_sender.py (Enviar agora) grava na ia_queue.json (:44, :606); o gerador lê os pendentes (:761)
+      ["da5be261", "177f5f98", "marca o que já foi enviado"],
     ],
   },
   {
@@ -57,23 +63,16 @@ export const MACROS: MacroDef[] = [
     resumo: "Da ideia de vídeo na quarta até o Reel editado depois que você grava.",
     porque: "É uma única cadeia no calendário: quarta nascem as pautas, sexta você grava, e o bruto vai pro editor. Estavam separados só porque cada peça é um script.",
     membros: [{ id: "3890db81" }, { id: "455a8267" }, { id: "422fd5b7" }, { id: "5352dad3" }],
-    ligacoes: [
-      ["3890db81", "455a8267", "quarta: ideias"],
-      ["455a8267", "422fd5b7", "sexta: gravar"],
-      ["422fd5b7", "5352dad3", "você envia o vídeo"],
-    ],
+    ligacoes: [], // quarta/sexta/vídeo são passos que ELA faz; nenhum script entrega dado ao outro
   },
   {
     slug: "ideias-carrossel",
     icone: "📸",
     titulo: "Ideias e carrossel de Instagram",
     resumo: "As ideias que chegam pela Donna e pelo quadro de conteúdos viram carrossel pronto.",
-    porque: "As duas portas de entrada (Donna e Radar) gravam no mesmo lugar, a coluna IDEIAS do banco Conteúdos, e é de lá que a squad de carrossel parte.",
+    porque: "As duas portas de entrada (Donna e Radar) gravam no mesmo lugar, a coluna IDEIAS do banco Conteúdos. A squad de carrossel é acionada por você e não lê esse banco sozinha, por isso não há seta entre elas.",
     membros: [{ id: "3a1c5bd1" }, { id: "e80ccc82" }, { id: "bbdeea3e" }],
-    ligacoes: [
-      ["3a1c5bd1", "bbdeea3e", "ideia guardada"],
-      ["e80ccc82", "bbdeea3e", "ideia com pesquisa"],
-    ],
+    ligacoes: [],
   },
   {
     slug: "financas",
@@ -88,9 +87,10 @@ export const MACROS: MacroDef[] = [
       { id: "d0634136", nome: "Aviso de contas perto do vencimento" },
     ],
     ligacoes: [
+      // ensure-jarbas-dispatcher.sh:5-6 liga o wa_finances_dispatcher.py
       ["a4a9889e", "144398ee", "mantém ligado"],
-      ["2dfbdb58", "b6bda8c8", "depois dos lançamentos"],
-      ["b6bda8c8", "d0634136", "saldos conferidos"],
+      // o Louis cria a linha no Notion; sync_pluggy.py:274-300 concilia e não lança de novo
+      ["144398ee", "2dfbdb58", "o que o Louis anotou não é lançado de novo"],
     ],
   },
   {
@@ -100,10 +100,7 @@ export const MACROS: MacroDef[] = [
     resumo: "Resumo da manhã, aviso de compromisso, escola do Luiz e o que você manda guardar.",
     porque: "É tudo a Donna cuidando da agenda e da casa. O briefing do WhatsApp é cópia do Telegram, a escola tem aviso e relatório da mesma agenda, e o 'guarda filme, livro e compra' é a mesma Donna anotando.",
     membros: [{ id: "6a105095" }, { id: "57a89e2e" }, { id: "9403a9da" }, { id: "f3cf1cd8" }, { id: "32d7a394" }, { id: "b88ee029" }],
-    ligacoes: [
-      ["6a105095", "57a89e2e", "mesmo resumo"],
-      ["f3cf1cd8", "32d7a394", "mesma agenda"],
-    ],
+    ligacoes: [], // os dois briefings leem o Google Agenda cada um por si; aviso e relatório da escola só LEEM escola-agenda.json
   },
   {
     slug: "saude-vps",
@@ -118,10 +115,8 @@ export const MACROS: MacroDef[] = [
       { id: "be4b019e" },
     ],
     ligacoes: [
-      ["a3eb53a2", "1e65b77a", "problema vira aviso"],
-      ["a3eb53a2", "2667808f", "revisão mais funda"],
-      ["a05e09b8", "b16013c7", "se travar"],
-      ["b16013c7", "94c60e3b", "se o Telegram cair"],
+      // ronda-diaria.py:212 grava ronda-report.json; status-saude.py:35 e :264 leem
+      ["2667808f", "a3eb53a2", "relatório da ronda no semáforo"],
     ],
   },
   {
@@ -131,7 +126,7 @@ export const MACROS: MacroDef[] = [
     resumo: "Rotinas de madrugada que mantêm o painel, a equipe e o mapa de conhecimento em dia.",
     porque: "Rodam sozinhas de madrugada e alimentam páginas do painel (métricas, equipe, grafo, desenhos de fluxo). Criar agente fica aqui porque o agente novo aparece na equipe pública.",
     membros: [{ id: "47b33465" }, { id: "539c9aa3" }, { id: "3787b3b9" }, { id: "a4d3382c" }, { id: "e0ec4684" }],
-    ligacoes: [["e0ec4684", "539c9aa3", "agente novo na equipe"]],
+    ligacoes: [], // nenhum script do "Criar agente" grava onde o equipe-sync.py lê
   },
   {
     slug: "licitacao-igam",

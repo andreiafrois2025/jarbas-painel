@@ -72,6 +72,7 @@ function toRFEdges(edges: FlowDocEdge[], vertical: boolean, nodes: FlowDocNode[]
       // Defaults pros seeds antigos (esquerda→direita)
       sourceHandle: e.sourceHandle ?? (vertical ? "bottom" : "right"),
       targetHandle: e.targetHandle ?? (vertical ? "top" : "left"),
+      fixa: !!e.fixa,
     })),
     nodes.map((n) => ({ id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, executor: n.data.executor, position: n.position })),
   );
@@ -99,6 +100,7 @@ function fromRFEdges(edges: Edge[]): FlowDocEdge[] {
     targetHandle: (e.targetHandle as string | undefined) ?? undefined,
     label: typeof e.label === "string" ? e.label : undefined,
     isReturn: !!(e.data as { isReturn?: boolean } | undefined)?.isReturn,
+    fixa: (e.data as { fixa?: boolean } | undefined)?.fixa || undefined,
   }));
 }
 
@@ -163,7 +165,7 @@ function FlowCanvasInner({ flow, onChange, horizontal }: Props) {
           false,
           undefined,
         );
-        const next = [...es, newEdge];
+        const next = [...es, { ...newEdge, data: { ...newEdge.data, fixa: true } }];
         persist(nodes, next);
         return next;
       });
@@ -175,7 +177,9 @@ function FlowCanvasInner({ flow, onChange, horizontal }: Props) {
   const onReconnect = useCallback(
     (oldEdge: Edge, newConnection: Connection) => {
       setEdges((es) => {
-        const next = reconnectEdge(oldEdge, newConnection, es);
+        // mesmo id (o padrão troca e a seta perderia rótulo/tipo) e as alças escolhidas passam a valer sempre
+        const next = reconnectEdge(oldEdge, newConnection, es, { shouldReplaceId: false })
+          .map((e) => (e.id === oldEdge.id ? ({ ...e, pathOptions: undefined, data: { ...e.data, fixa: true } } as Edge) : e));
         setSelectedEdge((s) =>
           s && s.id === oldEdge.id ? next.find((e) => e.id === oldEdge.id) || s : s,
         );
@@ -244,7 +248,7 @@ function FlowCanvasInner({ flow, onChange, horizontal }: Props) {
           const isReturn = updates.isReturn !== undefined ? updates.isReturn : !!(e.data as { isReturn?: boolean } | undefined)?.isReturn;
           const label =
             "label" in updates ? updates.label : typeof e.label === "string" ? e.label : undefined;
-          return styleEdge(
+          const novo = styleEdge(
             {
               id: e.id,
               source: e.source,
@@ -255,6 +259,7 @@ function FlowCanvasInner({ flow, onChange, horizontal }: Props) {
             isReturn,
             label,
           );
+          return (e.data as { fixa?: boolean } | undefined)?.fixa ? { ...novo, data: { ...novo.data, fixa: true } } : novo;
         });
         setSelectedEdge((s) => (s && s.id === edgeId ? next.find((e) => e.id === edgeId) || s : s));
         persist(nodes, next);

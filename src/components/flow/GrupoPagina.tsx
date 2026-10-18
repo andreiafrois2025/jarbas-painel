@@ -37,13 +37,15 @@ const PASSO_SETA = 14;
 
 interface DadosFaixa extends Record<string, unknown> {
   flowId: string;
-  num: number;
   nome: string;
   icone: string;
   horario?: string;
   cor?: string;
   saude?: string;
   aposentada: boolean;
+  /** (v3.4) quem esta rotina alimenta e de quem recebe, só quando há ligação real */
+  alimenta?: string;
+  recebe?: string;
   /** só no nível Código: o script mudou depois do desenho */
   velho?: boolean;
   largura: number;
@@ -62,11 +64,12 @@ function Faixa({ data, selected }: { data: DadosFaixa; selected?: boolean }) {
       }}
     >
       <div className="absolute left-0 right-0 top-0 flex items-center gap-2 px-3" style={{ height: CABECA }}>
-        <span className="w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center text-white shrink-0" style={{ background: "#2D6B6B" }}>{data.num}</span>
         <span className="text-lg leading-none">{data.icone}</span>
         <span className="text-[14px] font-semibold truncate" style={{ color: "#2D3B3B" }}>{data.nome}</span>
         {data.cor && <span title={data.saude} className="text-xs">{data.cor}</span>}
         <span className="text-[11px] opacity-70 truncate hidden sm:inline" style={{ color: "#2D3B3B" }}>{data.aposentada ? "⛔ não roda mais" : data.horario}</span>
+        {data.alimenta && <span className="text-[11px] truncate hidden md:inline px-2 py-0.5 rounded-full" style={{ color: "#2D6B6B", background: "rgba(45,107,107,0.12)" }} title={`Entrega algo para: ${data.alimenta}`}>→ alimenta: {data.alimenta}</span>}
+        {data.recebe && <span className="text-[11px] truncate hidden md:inline px-2 py-0.5 rounded-full" style={{ color: "#6B5A2D", background: "rgba(196,164,96,0.18)" }} title={`Recebe algo de: ${data.recebe}`}>← recebe de: {data.recebe}</span>}
         {data.velho && <span className="text-[11px] truncate" style={{ color: "#B7791F" }} title="O código desta rotina mudou depois que o desenho foi feito">✏️ desenho pode estar velho</span>}
         <span className="flex-1" />
         <button
@@ -119,7 +122,9 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
       feitos.push(id);
       lig.filter(([a]) => a === id).forEach(([, b]) => ent.set(b, (ent.get(b) || 0) - 1));
     }
-    return feitos.map((id) => porId.get(id)!);
+    // (v3.4) as que têm ligação vêm primeiro (quem alimenta antes de quem recebe); as soltas ficam depois, na ordem do grupo
+    const ligadas = new Set(lig.flat());
+    return [...feitos.filter((id) => ligadas.has(id)), ...feitos.filter((id) => !ligadas.has(id))].map((id) => porId.get(id)!);
   }, [fluxos, ligs, porId]);
 
   // o corredor das setas entre raias cresce conforme o maior rótulo (senão ele sai cortado à esquerda)
@@ -172,13 +177,15 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
     const ns: Node[] = [];
     const es: Edge[] = [];
     let y = 0;
-    raias.forEach((r, i) => {
+    raias.forEach((r) => {
       const a = automacaoDe(r.f);
       const cron = a ? interpretaCron(a.agenda) : null;
       const saude = a && cron ? avaliaSaude(a.ultima_execucao, cron.frequenciaMin) : null;
       const alturaR = CABECA + r.h + PAD;
+      const quemAlimenta = ligs.filter(([de]) => r.f.id.startsWith(de)).map(([, para]) => raias.find((x) => x.f.id.startsWith(para))?.f).filter((x): x is FlowDoc => !!x).map((x) => nomeDoFluxo(x));
+      const quemRecebe = ligs.filter(([, para]) => r.f.id.startsWith(para)).map(([de]) => raias.find((x) => x.f.id.startsWith(de))?.f).filter((x): x is FlowDoc => !!x).map((x) => nomeDoFluxo(x));
       const dados: DadosFaixa = {
-        flowId: r.f.id, num: i + 1, nome: nomeDoFluxo(r.f), icone: r.f.nodes.find((n) => n.type === "start")?.data.icon || "🗺️",
+        flowId: r.f.id, alimenta: quemAlimenta.join(", ") || undefined, recebe: quemRecebe.join(", ") || undefined, nome: nomeDoFluxo(r.f), icone: r.f.nodes.find((n) => n.type === "start")?.data.icon || "🗺️",
         horario: cron ? `⏰ ${cron.descricao}` : undefined, saude: saude ? SELO_SAUDE[saude].texto : undefined, cor: saude ? SELO_SAUDE[saude].bolinha : undefined,
         aposentada: false, velho: nivel === 3 && !!desenhoPodeEstarVelho(r.f, ligacoesAuto), largura: W, altura: alturaR, onAbrir: (id) => onAbrirFluxo(porId.get(id)!),
       };
@@ -219,7 +226,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
 
   // ── textos da estrutura ──
   // (v3.3) a lista mostra só o título de cada rotina
-  const bolinhas: Bolinha[] = ordenados.map((f) => ({ id: f.id, titulo: nomeDoFluxo(f) }));
+  const bolinhas: Bolinha[] = ordenados.map((f) => ({ id: f.id, titulo: nomeDoFluxo(f), semNumero: true }));
 
   const etapa = escolha ? porId.get(escolha.flowId)?.nodes.find((n) => n.id === escolha.nodeId) : null;
   const fEtapa = escolha ? porId.get(escolha.flowId) : null;
@@ -234,7 +241,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
 
         <BotoesNivel nivel={nivel} onMuda={onNivel} />
         <BlocoProcesso
-          titulo="As rotinas deste grupo, na ordem"
+          titulo="As rotinas deste grupo"
           bolinhas={bolinhas}
           onEscolher={(id) => { const f = porId.get(id); if (f) onAbrirFluxo(f); }}
         />
@@ -274,7 +281,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
                 <Background gap={22} color="#E2DAD0" />
                 <Controls showInteractive={false} showFitView position="bottom-left" />
               </ReactFlow>
-              <p className="absolute bottom-2 right-3 z-10 text-[11px] text-[var(--text-muted)] pointer-events-none hidden sm:block">arraste o fundo para passear · Ctrl + rolar para o zoom{ligs.some((l) => l[3]) ? " · seta tracejada = achada sozinha no código" : ""}</p>
+              <p className="absolute bottom-2 right-3 z-10 text-[11px] text-[var(--text-muted)] pointer-events-none hidden sm:block">arraste o fundo para passear · Ctrl + rolar para o zoom{ligs.some((l) => l[3]) ? " · seta tracejada = achada sozinha no código" : ligs.length ? " · seta = uma rotina entrega algo que a outra usa" : " · estas rotinas não passam nada umas para as outras"}</p>
               {etapa && fEtapa && (
                 <aside className="absolute z-20 bg-[var(--bg-secondary)] shadow-2xl overflow-y-auto p-4 pb-20 border-[var(--border)] inset-x-0 bottom-0 max-h-[62%] border-t rounded-t-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[360px] sm:max-h-none sm:border-t-0 sm:border-l sm:rounded-none">
                   <button onClick={() => setEscolha(null)} aria-label="Fechar" className="float-right text-lg leading-none text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">×</button>

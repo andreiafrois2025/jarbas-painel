@@ -19,6 +19,8 @@ export interface SetaRota {
   isReturn?: boolean;
   sourceHandle?: string;
   targetHandle?: string;
+  /** (v3.4) pontas escolhidas por ela nas alças: a arrumação automática não troca */
+  fixa?: boolean;
 }
 
 /**
@@ -40,7 +42,8 @@ export function paraRFSetas(setas: SetaRota[], nos: NoRota[] | { id: string; pos
   // desenho deitado (computador): normais saem pela direita; no de celular as normais descem e as voltas saem pela direita
   const horizontal = setas.some((s) => (s.sourceHandle === "right" && s.targetHandle === "left") || (s.isReturn && s.sourceHandle === "bottom" && s.targetHandle === "bottom"));
   type Rota = SetaRota & { contorna?: boolean; folga?: boolean };
-  let lista: Rota[] = setas.map((s) => ({ ...s }));
+  // alça escolhida por ela vale sempre; se as duas pontas ficam do mesmo lado, a linha contorna (afastamento próprio)
+  let lista: Rota[] = setas.map((s) => ({ ...s, ...(s.fixa && s.sourceHandle && s.sourceHandle === s.targetHandle ? { contorna: true } : {}) }));
 
   if (horizontal) {
     // bordas já ocupadas por seta que muda de fileira (sai por baixo / entra por cima)
@@ -52,7 +55,7 @@ export function paraRFSetas(setas: SetaRota[], nos: NoRota[] | { id: string; pos
     }
     lista = lista.map((s) => {
       const a = caixa.get(s.source), b = caixa.get(s.target);
-      if (!a || !b) return s;
+      if (!a || !b || s.fixa) return s;
       if (!s.isReturn) {
         if (s.sourceHandle !== "right" || s.targetHandle !== "left" || !mesmaFileira(a, b)) return s;
         const yA = a.y + a.h / 2, yB = b.y + b.h / 2;
@@ -74,7 +77,7 @@ export function paraRFSetas(setas: SetaRota[], nos: NoRota[] | { id: string; pos
     // desenho de celular (de cima para baixo): seta normal que atravessaria uma peça do meio contorna pela direita
     lista = lista.map((s) => {
       const a = caixa.get(s.source), b = caixa.get(s.target);
-      if (s.isReturn || !a || !b || s.sourceHandle !== "bottom" || s.targetHandle !== "top") return s;
+      if (s.fixa || s.isReturn || !a || !b || s.sourceHandle !== "bottom" || s.targetHandle !== "top") return s;
       const xa = a.x + a.w / 2, xb = b.x + b.w / 2;
       const bloqueada = [...caixa.entries()].some(([id, c]) => id !== s.source && id !== s.target
         && c.y > a.y + a.h - 4 && c.y + c.h < b.y + 4 && c.x - 8 < Math.max(xa, xb) && c.x + c.w + 8 > Math.min(xa, xb));
@@ -108,12 +111,13 @@ export function paraRFSetas(setas: SetaRota[], nos: NoRota[] | { id: string; pos
         else offset = Math.max(offset, Math.min(a.y, b.y) - Math.min(...meio.map((c) => c.y)) + base - 10 + 30 * k);
       }
     }
-    return estiloSeta(
+    const seta = estiloSeta(
       { id: s.id, source: s.source, target: s.target, sourceHandle: s.sourceHandle ?? (s.isReturn ? "right" : "bottom"), targetHandle: s.targetHandle ?? (s.isReturn ? "right" : "top") },
       !!s.isReturn,
       s.label,
       offset,
     );
+    return s.fixa ? { ...seta, data: { ...seta.data, fixa: true } } : seta;
   });
 }
 

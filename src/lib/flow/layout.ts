@@ -155,7 +155,7 @@ export function verticaliza(flow: Pick<FlowDoc, "nodes" | "edges">, medidas?: Ma
   });
   const edges = flow.edges.map((e) => {
     const volta = e.isReturn || (pos.get(e.target)?.camada ?? 0) <= (pos.get(e.source)?.camada ?? 0);
-    if (salvo && e.sourceHandle && e.targetHandle) return e;
+    if ((salvo || e.fixa) && e.sourceHandle && e.targetHandle) return e;
     return {
       ...e,
       isReturn: !!volta,
@@ -238,9 +238,10 @@ export function horizontaliza(flow: Pick<FlowDoc, "nodes" | "edges">, larguraMax
   const auto = Object.fromEntries(flow.nodes.map((n) => [n.id, { x: Math.round(pos.get(n.id)!.x), y: Math.round(pos.get(n.id)!.y) }]));
   const nodes = flow.nodes.map((n) => ({ ...n, position: salvo ? n.data.posH! : auto[n.id] }));
   const edges = flow.edges.map((e) => {
-    if (salvo && e.sourceHandleH && e.targetHandleH) return { ...e, sourceHandle: e.sourceHandleH, targetHandle: e.targetHandleH };
+    // `fixa` na vista horizontal = `fixaH` (alça que ela escolheu); a vista só repassa, quem salva devolve para `fixaH`
+    if ((salvo || e.fixaH) && e.sourceHandleH && e.targetHandleH) return { ...e, sourceHandle: e.sourceHandleH, targetHandle: e.targetHandleH, fixa: !!e.fixaH };
     const pt = pontasHorizontal(pos.get(e.source), pos.get(e.target), e.isReturn);
-    return { ...e, isReturn: pt.volta, sourceHandle: pt.sourceHandle, targetHandle: pt.targetHandle };
+    return { ...e, isReturn: pt.volta, sourceHandle: pt.sourceHandle, targetHandle: pt.targetHandle, fixa: false };
   });
   return { nodes, edges, salvo, auto };
 }

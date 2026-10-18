@@ -25,6 +25,8 @@ export interface LigacaoAuto {
   para_id: string | null;
   /** texto simples, ex.: "passa as notícias e dicas aprovadas para o grupo" */
   rotulo: string;
+  /** conferida à mão no código (v3.4): vale como seta firme; sem isso é "achada sozinha" (tracejada) */
+  verificada?: boolean;
   via?: { recurso: string; rotulo: string; escrito_em?: string; lido_em?: string }[];
 }
 
@@ -73,11 +75,12 @@ export function ligacoesDoGrupo(macro: MacroMontado, auto: LigacoesFluxos | null
     .map(([a, b, r]) => [a, b, r, false]);
   const ja = new Set(out.map(([a, b]) => `${a}>${b}`));
   for (const l of auto?.ligacoes || []) {
+    if (!l.verificada) continue; // v3.4: a leitura automática só SUGERE; seta só para o que foi conferido no código
     if (!l.de_id || !l.para_id || !ids8.has(l.de_id) || !ids8.has(l.para_id)) continue;
     const k = `${l.de_id}>${l.para_id}`;
     if (ja.has(k) || ja.has(`${l.para_id}>${l.de_id}`)) continue; // a mão dela/minha já cobre esse par
     ja.add(k);
-    out.push([l.de_id, l.para_id, l.rotulo, true]);
+    out.push([l.de_id, l.para_id, l.rotulo, false]);
   }
   return out;
 }

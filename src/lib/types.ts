@@ -81,6 +81,10 @@ export interface FlowDocEdge {
   /** Pontas da seta na vista horizontal (as `sourceHandle`/`targetHandle` valem pra vertical) */
   sourceHandleH?: string;
   targetHandleH?: string;
+  /** (v3.4) as pontas da seta foram escolhidas por ela (arrastou de uma alça a outra): valem sempre, a escolha automática não mexe (vista vertical) */
+  fixa?: boolean;
+  /** idem, para a vista horizontal */
+  fixaH?: boolean;
 }
 
 export interface FlowDoc {

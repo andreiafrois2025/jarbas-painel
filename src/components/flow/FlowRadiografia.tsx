@@ -145,7 +145,7 @@ export default function FlowRadiografia({
       const t = txt.get(n.id)!;
       return { id: n.id, type: n.type, label: t.label, icon: t.icon, details: t.details, executor: t.executor, position };
     };
-    const setaDe = (e: FlowDocEdge): SetaVis => ({ id: e.id, source: e.source, target: e.target, label: rotulos[e.id], isReturn: !!e.isReturn, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle });
+    const setaDe = (e: FlowDocEdge): SetaVis => ({ id: e.id, source: e.source, target: e.target, label: rotulos[e.id], isReturn: !!e.isReturn, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle, fixa: !!e.fixa });
     if (nivel === 1) {
       const caixas = d1.pecas.map((p) => ({ id: p.id, ...medePeca(p.type, p.label, undefined, p.icon), ordem: p.y }));
       const ligs = d1.setas.map((s) => ({ source: s.source, target: s.target, retorno: s.isReturn, rotulo: s.label }));
@@ -184,7 +184,7 @@ export default function FlowRadiografia({
       const edges: FlowDocEdge[] = ss.map((s) => {
         const velha = flow.edges.find((e) => e.id === s.id);
         // o rótulo mostrado pode ser o simples: ao salvar, o original é o que vale
-        return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: velha ? velha.label : s.label, isReturn: s.isReturn, sourceHandle: s.sourceHandle, targetHandle: s.targetHandle };
+        return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: velha ? velha.label : s.label, isReturn: s.isReturn, sourceHandle: s.sourceHandle, targetHandle: s.targetHandle, fixa: s.fixa || undefined };
       });
       onCanvasChange({ nodes, edges });
       return;
@@ -195,7 +195,7 @@ export default function FlowRadiografia({
     });
     const edges: FlowDocEdge[] = ss.map((s) => {
       const velha = flow.edges.find((e) => e.id === s.id);
-      return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: velha ? velha.label : s.label, isReturn: velha ? velha.isReturn : s.isReturn, sourceHandleH: s.sourceHandle, targetHandleH: s.targetHandle };
+      return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: velha ? velha.label : s.label, isReturn: velha ? velha.isReturn : s.isReturn, sourceHandleH: s.sourceHandle, targetHandleH: s.targetHandle, fixaH: s.fixa || undefined };
     });
     onCanvasChange({ nodes, edges });
   };
@@ -209,7 +209,7 @@ export default function FlowRadiografia({
     });
     const edges: FlowDocEdge[] = u.edges.map((e) => {
       const velha = flow.edges.find((x) => x.id === e.id);
-      return { ...(velha || { sourceHandle: "bottom", targetHandle: "top" }), id: e.id, source: e.source, target: e.target, label: e.label, isReturn: e.isReturn, sourceHandleH: e.sourceHandle, targetHandleH: e.targetHandle };
+      return { ...(velha || { sourceHandle: "bottom", targetHandle: "top" }), id: e.id, source: e.source, target: e.target, label: e.label, isReturn: e.isReturn, sourceHandleH: e.sourceHandle, targetHandleH: e.targetHandle, fixaH: e.fixa || undefined };
     });
     onCanvasChange({ nodes, edges });
   };
