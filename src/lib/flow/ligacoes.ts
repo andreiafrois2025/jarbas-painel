@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FlowDoc } from "../types";
+import { squadFetch } from "../squadFetch";
 import type { MacroMontado } from "./macro-fluxos";
 
 // =============================================================
@@ -33,35 +34,60 @@ export interface LigacaoAuto {
 export interface LigacoesFluxos {
   gerado_em?: string;
   ligacoes: LigacaoAuto[];
+  /** (v3.6) setas que a Andréia excluiu pelo Mapa: [de, para] (8 caracteres). Valem também para as declaradas em macro-fluxos.ts */
+  removidas: [string, string][];
   /** fluxos (8 caracteres do id) cujo script mudou depois do desenho */
   desenho_velho: Record<string, { script_mudou_em: string; desenho_em: string }>;
 }
 
 let cache: Promise<LigacoesFluxos | null> | null = null;
+let atual: LigacoesFluxos | null = null;
+const ouvintes = new Set<(x: LigacoesFluxos) => void>();
+
+function normaliza(j: { gerado_em?: string; ligacoes?: LigacaoAuto[]; desenho_velho?: LigacoesFluxos["desenho_velho"]; removidas?: [string, string][] } | null): LigacoesFluxos | null {
+  return j && Array.isArray(j.ligacoes)
+    ? { gerado_em: j.gerado_em, ligacoes: j.ligacoes, desenho_velho: j.desenho_velho || {}, removidas: Array.isArray(j.removidas) ? j.removidas : [] }
+    : null;
+}
 
 function busca(): Promise<LigacoesFluxos | null> {
   if (!cache) {
-    cache = fetch(`${URL_LIGACOES}?t=${Math.floor(Date.now() / 600_000)}`, { cache: "no-store" })
+    cache = fetch(`${URL_LIGACOES}?t=${Math.floor(Date.now() / 60_000)}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) =>
-        j && Array.isArray(j.ligacoes)
-          ? ({ gerado_em: j.gerado_em, ligacoes: j.ligacoes, desenho_velho: j.desenho_velho || {} } as LigacoesFluxos)
-          : null,
-      )
+      .then((j) => normaliza(j))
       .catch(() => null);
   }
   return cache;
 }
 
-/** Lê o arquivo de ligações uma vez por visita. null = ainda carregando ou indisponível. */
+/** Lê o arquivo de ligações uma vez por visita. null = ainda carregando ou indisponível. Atualiza na hora quando ela edita uma seta. */
 export function useLigacoesAuto(): LigacoesFluxos | null {
-  const [v, setV] = useState<LigacoesFluxos | null>(null);
+  const [v, setV] = useState<LigacoesFluxos | null>(atual);
   useEffect(() => {
     let vivo = true;
-    busca().then((x) => vivo && setV(x));
-    return () => { vivo = false; };
+    busca().then((x) => { if (x && !atual) atual = x; if (vivo) setV(atual ?? x); });
+    const ouve = (x: LigacoesFluxos) => vivo && setV(x);
+    ouvintes.add(ouve);
+    return () => { vivo = false; ouvintes.delete(ouve); };
   }, []);
   return v;
+}
+
+/** (v3.6) Excluir ou criar uma seta entre fluxos. Grava pela squad-api, que republica o arquivo; a tela atualiza com a resposta. */
+export async function decidirLigacao(acao: "excluir" | "criar", origem: string, destino: string, motivo?: string): Promise<void> {
+  const r = await squadFetch("/api/fluxos/ligacoes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ acao, origem: origem.slice(0, 8), destino: destino.slice(0, 8), motivo: motivo || "" }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.erro || `erro ${r.status}`);
+  const novo = normaliza(j.ligacoes);
+  if (novo) {
+    atual = novo;
+    cache = Promise.resolve(novo);
+    ouvintes.forEach((f) => f(novo));
+  }
 }
 
 /** Seta entre duas rotinas de um grupo: [de, para, rótulo, automática?] (ids de 8 caracteres) */
@@ -70,14 +96,16 @@ export type LigacaoDoGrupo = [string, string, string | undefined, boolean];
 /** Declaradas em macro-fluxos.ts + as descobertas, só entre rotinas deste grupo (declarada ganha de automática). */
 export function ligacoesDoGrupo(macro: MacroMontado, auto: LigacoesFluxos | null): LigacaoDoGrupo[] {
   const ids8 = new Set(macro.fluxos.map((f) => f.id.slice(0, 8)));
+  const fora = new Set((auto?.removidas || []).map(([a, b]) => `${a}>${b}`)); // excluídas por ela: nunca voltam
   const out: LigacaoDoGrupo[] = macro.def.ligacoes
-    .filter(([a, b]) => ids8.has(a) && ids8.has(b))
+    .filter(([a, b]) => ids8.has(a) && ids8.has(b) && !fora.has(`${a}>${b}`))
     .map(([a, b, r]) => [a, b, r, false]);
   const ja = new Set(out.map(([a, b]) => `${a}>${b}`));
   for (const l of auto?.ligacoes || []) {
     if (!l.verificada) continue; // v3.4: a leitura automática só SUGERE; seta só para o que foi conferido no código
     if (!l.de_id || !l.para_id || !ids8.has(l.de_id) || !ids8.has(l.para_id)) continue;
     const k = `${l.de_id}>${l.para_id}`;
+    if (fora.has(k)) continue;
     if (ja.has(k) || ja.has(`${l.para_id}>${l.de_id}`)) continue; // a mão dela/minha já cobre esse par
     ja.add(k);
     out.push([l.de_id, l.para_id, l.rotulo, false]);

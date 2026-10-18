@@ -14,7 +14,7 @@ import { layoutHorizontal, pontasHorizontal } from "@/lib/flow/layout";
 import { medePeca, larguraRotuloSeta } from "@/lib/flow/medida";
 import { aplicaLeigo, leigoDoFluxo, quemNoBalao, fraseCurta, repete } from "@/lib/flow/leigo";
 import { nomeDoFluxo, type MacroMontado } from "@/lib/flow/macro-fluxos";
-import { ligacoesDoGrupo, desenhoPodeEstarVelho, type LigacoesFluxos } from "@/lib/flow/ligacoes";
+import { ligacoesDoGrupo, desenhoPodeEstarVelho, decidirLigacao, type LigacoesFluxos } from "@/lib/flow/ligacoes";
 import RoughNode from "./RoughNode";
 import { estiloSeta } from "./estilo";
 import { edgeTypes } from "./SetaEdge";
@@ -50,6 +50,8 @@ interface DadosFaixa extends Record<string, unknown> {
   velho?: boolean;
   largura: number;
   altura: number;
+  /** (v3.6) modo Editar setas: a alça da esquerda aparece e dá para puxar uma seta daqui até outra raia */
+  editando?: boolean;
   onAbrir: (id: string) => void;
 }
 
@@ -79,7 +81,10 @@ function Faixa({ data, selected }: { data: DadosFaixa; selected?: boolean }) {
         >abrir fluxo ↗</button>
       </div>
       {/* as setas entre raias entram e saem pela esquerda, num corredor livre (não cortam as peças) */}
-      <Handle id="left" type="source" position={Position.Left} style={alca} />
+      <Handle
+        id="left" type="source" position={Position.Left} className={data.editando ? "alca-editavel" : undefined}
+        style={data.editando ? { width: 16, height: 16, left: -8, opacity: 1, pointerEvents: "all", background: "#2D6B6B", border: "2px solid #fff", cursor: "crosshair" } : alca}
+      />
     </div>
   );
 }
@@ -102,11 +107,47 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
   const [areaRef, area] = useMedida<HTMLDivElement>();
   const [escolha, setEscolha] = useState<Escolha>(null);
   const fv = useFontes();
+  // (v3.6) modo Editar setas
+  const [editando, setEditando] = useState(false);
+  const [selPar, setSelPar] = useState<[string, string] | null>(null); // seta escolhida (ids de 8 caracteres)
+  const [confirma, setConfirma] = useState(false);
+  const [novaDe, setNovaDe] = useState("");
+  const [novaPara, setNovaPara] = useState("");
+  const [novoMotivo, setNovoMotivo] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
 
   const fluxos = useMemo(() => macro.fluxos.filter((f) => !ehAposentada(f)), [macro]);
   const porId = useMemo(() => new Map(fluxos.map((f) => [f.id, f])), [fluxos]);
   // setas entre rotinas: as declaradas em macro-fluxos.ts + as que o curador descobriu lendo o código
   const ligs = useMemo(() => ligacoesDoGrupo({ ...macro, fluxos }, ligacoesAuto), [macro, fluxos, ligacoesAuto]);
+
+  const nomeCurto = (id8: string) => { const f = fluxos.find((x) => x.id.startsWith(id8)); return f ? nomeDoFluxo(f) : id8; };
+  const existe = (a: string, b: string) => ligs.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+  const sair = () => { setEditando(false); setSelPar(null); setConfirma(false); setAviso(null); };
+
+  async function excluir() {
+    if (!selPar) return;
+    setOcupado(true); setAviso(null);
+    try {
+      await decidirLigacao("excluir", selPar[0], selPar[1]);
+      setAviso({ ok: true, texto: `Pronto: a seta ${nomeCurto(selPar[0])} → ${nomeCurto(selPar[1])} foi excluída e não volta sozinha.` });
+      setSelPar(null); setConfirma(false);
+    } catch (e) { setAviso({ ok: false, texto: `Não consegui excluir: ${(e as Error).message}` }); }
+    setOcupado(false);
+  }
+
+  async function criar() {
+    if (!novaDe || !novaPara || novaDe === novaPara) { setAviso({ ok: false, texto: "Escolha duas rotinas diferentes: de onde sai e para onde vai." }); return; }
+    if (existe(novaDe, novaPara)) { setAviso({ ok: false, texto: "Já existe uma seta entre essas duas rotinas." }); return; }
+    setOcupado(true); setAviso(null);
+    try {
+      await decidirLigacao("criar", novaDe, novaPara, novoMotivo.trim());
+      setAviso({ ok: true, texto: `Pronto: ${nomeCurto(novaDe)} → ${nomeCurto(novaPara)} foi criada.` });
+      setNovaDe(""); setNovaPara(""); setNovoMotivo("");
+    } catch (e) { setAviso({ ok: false, texto: `Não consegui criar: ${(e as Error).message}` }); }
+    setOcupado(false);
+  }
 
   // ordem das raias: segue as ligações (quem alimenta vem antes), senão a ordem do grupo
   const ordenados = useMemo(() => {
@@ -240,6 +281,41 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
         </div>
 
         <BotoesNivel nivel={nivel} onMuda={onNivel} />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => (editando ? sair() : setEditando(true))}
+            aria-pressed={editando}
+            className="text-sm px-3.5 py-1.5 rounded-lg border cursor-pointer"
+            style={editando ? { background: "#2D6B6B", color: "#fff", borderColor: "#2D6B6B" } : { borderColor: "#2D6B6B", color: "#2D6B6B", background: "transparent" }}
+          >{editando ? "✓ Terminar de editar as setas" : "✏️ Editar as setas entre rotinas"}</button>
+          {!editando && <span className="text-xs text-[var(--text-muted)]">apagar ou criar as setas «alimenta / recebe de»</span>}
+        </div>
+        {editando && (
+          <div className="rounded-xl border p-3 space-y-3 text-sm" style={{ borderColor: "#7FA9A9", background: "rgba(212,232,232,0.30)" }}>
+            <p className="text-[13px] text-[var(--text-secondary)]">
+              <strong>Modo Editar setas.</strong> Clique numa seta do desenho para escolher e poder excluir. Para criar, puxe a bolinha verde da esquerda de uma rotina até a bolinha de outra, ou use a caixinha abaixo.
+            </p>
+            <div className="grid gap-2 md:grid-cols-[1fr_1fr_1.4fr_auto] items-end">
+              <label className="text-xs text-[var(--text-muted)] space-y-1 block">Sai de
+                <select value={novaDe} onChange={(e) => setNovaDe(e.target.value)} className="w-full text-sm rounded-lg border px-2 py-1.5 bg-[var(--bg-secondary)] text-[var(--text-primary)]" style={{ borderColor: "var(--border)" }}>
+                  <option value="">escolha a rotina…</option>
+                  {ordenados.map((f) => <option key={f.id} value={f.id.slice(0, 8)}>{nomeDoFluxo(f)}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-[var(--text-muted)] space-y-1 block">Vai para
+                <select value={novaPara} onChange={(e) => setNovaPara(e.target.value)} className="w-full text-sm rounded-lg border px-2 py-1.5 bg-[var(--bg-secondary)] text-[var(--text-primary)]" style={{ borderColor: "var(--border)" }}>
+                  <option value="">escolha a rotina…</option>
+                  {ordenados.map((f) => <option key={f.id} value={f.id.slice(0, 8)}>{nomeDoFluxo(f)}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-[var(--text-muted)] space-y-1 block">Motivo (opcional)
+                <input value={novoMotivo} maxLength={140} onChange={(e) => setNovoMotivo(e.target.value)} placeholder="ex.: o resultado vira entrada da outra" className="w-full text-sm rounded-lg border px-2 py-1.5 bg-[var(--bg-secondary)] text-[var(--text-primary)]" style={{ borderColor: "var(--border)" }} />
+              </label>
+              <button disabled={ocupado} onClick={criar} className="text-sm px-3.5 py-1.5 rounded-lg text-white cursor-pointer disabled:opacity-60" style={{ background: "#2D6B6B" }}>{ocupado ? "Criando…" : "Criar seta"}</button>
+            </div>
+          </div>
+        )}
         <BlocoProcesso
           titulo="As rotinas deste grupo"
           bolinhas={bolinhas}
@@ -249,23 +325,38 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
         <div ref={areaRef} className="relative rounded-xl overflow-hidden border border-[var(--border)]" style={{ height: altura }}>
           {montagem && (
             <div className="absolute inset-0">
-              <style>{`.grupo-canvas .react-flow__pane{cursor:grab}.grupo-canvas .react-flow__node-rough{cursor:pointer}.grupo-canvas .react-flow__handle{opacity:0;pointer-events:none}`}</style>
+              <style>{`.grupo-canvas .react-flow__pane{cursor:grab}.grupo-canvas .react-flow__node-rough{cursor:pointer}.grupo-canvas .react-flow__handle{opacity:0;pointer-events:none}.grupo-canvas .react-flow__handle.alca-editavel{opacity:1;pointer-events:all}`}</style>
               <ReactFlow
                 className="grupo-canvas"
-                key={`${macro.def.slug}-${nivel}-${Math.round(larguraFaixa / 40)}`}
-                nodes={montagem.ns.map((n) => ({ ...n, selected: !!escolha && n.id === `${escolha.flowId}:${escolha.nodeId}` }))}
-                edges={montagem.es}
+                key={`${macro.def.slug}-${nivel}-${Math.round(larguraFaixa / 40)}-${ligs.length}`}
+                nodes={montagem.ns.map((n) => ({ ...n, selected: !!escolha && n.id === `${escolha.flowId}:${escolha.nodeId}`, ...(n.type === "faixa" ? { data: { ...n.data, editando } } : {}) }))}
+                edges={montagem.es.map((e) => {
+                  const k = selPar ? ligs.findIndex(([a, b]) => a === selPar[0] && b === selPar[1]) : -1;
+                  return editando && k >= 0 && e.id === `liga-${k}` ? { ...e, selected: true, style: { ...e.style, stroke: "#A0583C", strokeWidth: 3.2 } } : e;
+                })}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 nodesDraggable={false}
-                nodesConnectable={false}
+                nodesConnectable={editando}
                 connectionMode={ConnectionMode.Loose}
+                connectionRadius={40}
+                isValidConnection={(c) => !!c.source && !!c.target && c.source !== c.target && c.source.startsWith("lane:") && c.target.startsWith("lane:")}
+                onConnect={(c) => {
+                  if (!editando || !c.source || !c.target) return;
+                  setNovaDe(c.source.slice(5, 13)); setNovaPara(c.target.slice(5, 13)); setSelPar(null); setConfirma(false);
+                  setAviso({ ok: true, texto: "Seta puxada. Escreva o motivo (se quiser) e confirme em «Criar seta»." });
+                }}
+                onEdgeClick={(_, e) => {
+                  if (!editando || !e.id.startsWith("liga-")) return;
+                  const l = ligs[Number(e.id.slice(5))];
+                  if (l) { setSelPar([l[0], l[1]]); setConfirma(false); setAviso(null); }
+                }}
                 onNodeClick={(_, n) => {
                   if (n.id.startsWith("lane:")) return;
                   const i = n.id.indexOf(":");
                   setEscolha({ flowId: n.id.slice(0, i), nodeId: n.id.slice(i + 1) });
                 }}
-                onPaneClick={() => setEscolha(null)}
+                onPaneClick={() => { setEscolha(null); setSelPar(null); setConfirma(false); }}
                 deleteKeyCode={null}
                 panOnDrag
                 zoomOnScroll={false}
@@ -281,6 +372,27 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
                 <Background gap={22} color="#E2DAD0" />
                 <Controls showInteractive={false} showFitView position="bottom-left" />
               </ReactFlow>
+              {editando && (selPar || aviso) && (
+                <div className="fixed z-40 bottom-20 left-3 right-3 sm:left-auto sm:right-5 sm:w-[440px] space-y-2 shadow-2xl">
+            {selPar && (
+                  <div className="rounded-lg p-3 border space-y-2 text-sm" style={{ borderColor: "#A0583C", background: "var(--bg-secondary)" }}>
+                    <p>Seta escolhida: <strong>{nomeCurto(selPar[0])}</strong> → <strong>{nomeCurto(selPar[1])}</strong></p>
+                    {!confirma ? (
+                      <button onClick={() => setConfirma(true)} className="text-sm px-3 py-1.5 rounded-lg text-white cursor-pointer" style={{ background: "#A0583C" }}>Excluir ligação</button>
+                    ) : (
+                      <div className="space-y-2" role="alertdialog" aria-label="Confirmar exclusão">
+                        <p>Excluir esta seta? Ela não volta sozinha, nem quando o curador rodar. Você pode criar de novo quando quiser.</p>
+                        <div className="flex gap-2">
+                          <button disabled={ocupado} onClick={excluir} className="text-sm px-3 py-1.5 rounded-lg text-white cursor-pointer disabled:opacity-60" style={{ background: "#A0583C" }}>{ocupado ? "Excluindo…" : "Sim, excluir"}</button>
+                          <button disabled={ocupado} onClick={() => setConfirma(false)} className="text-sm px-3 py-1.5 rounded-lg border cursor-pointer" style={{ borderColor: "var(--border)" }}>Cancelar</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                  {aviso && !selPar && <p role="status" className="rounded-lg border px-3 py-2 text-[13px] bg-[var(--bg-secondary)]" style={{ borderColor: aviso.ok ? "#2D6B6B" : "#B03A2E", color: aviso.ok ? "#2D6B6B" : "#B03A2E" }}>{aviso.texto}</p>}
+                </div>
+              )}
               <p className="absolute bottom-2 right-3 z-10 text-[11px] text-[var(--text-muted)] pointer-events-none hidden sm:block">arraste o fundo para passear · Ctrl + rolar para o zoom{ligs.some((l) => l[3]) ? " · seta tracejada = achada sozinha no código" : ligs.length ? " · seta = uma rotina entrega algo que a outra usa" : " · estas rotinas não passam nada umas para as outras"}</p>
               {etapa && fEtapa && (
                 <aside className="absolute z-20 bg-[var(--bg-secondary)] shadow-2xl overflow-y-auto p-4 pb-20 border-[var(--border)] inset-x-0 bottom-0 max-h-[62%] border-t rounded-t-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[360px] sm:max-h-none sm:border-t-0 sm:border-l sm:rounded-none">
