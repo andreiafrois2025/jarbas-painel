@@ -7,9 +7,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { chatApi, dividirResposta, enviarMensagem, type Acao, type Agente, type ConversaResumo, type Mensagem, type Uso } from "@/lib/chat";
 import TextoSeguro from "./chat/TextoSeguro";
 import Visuais from "./chat/Visuais";
+import InfoDica from "./chat/InfoDica";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const minuscula = (s: string) => (s.length > 1 && s[1] === s[1].toLowerCase() ? s[0].toLowerCase() + s.slice(1) : s);
+const dicaDe = (a: Agente) => [
+  { titulo: "Quem é", texto: a.cargo },
+  { titulo: "Chame quando", texto: minuscula(a.quando) },
+  { titulo: "Como funciona", texto: "aqui ele só conversa e lê. Se algo precisar mudar alguma coisa (lembrete, tarefa, mapa, imagem), aparece um botão Confirmar antes." },
+];
 
 export default function ChatPage() {
   const [agentes, setAgentes] = useState<Agente[]>([]);
@@ -138,16 +144,13 @@ export default function ChatPage() {
         </button>
         <ul className={`${listaAberta ? "block" : "hidden"} md:block overflow-y-auto max-h-[50vh] md:max-h-none p-2 space-y-1`} aria-label="Pessoas da equipe">
           {agentes.map((a) => (
-            <li key={a.id}>
+            <li key={a.id} className={`flex items-center gap-1 rounded-xl transition-colors ${a.id === agenteId ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)]"}`}>
               <button onClick={() => { setAgenteId(a.id); setListaAberta(false); }} aria-current={a.id === agenteId ? "true" : undefined}
-                className={`w-full text-left flex gap-3 items-start p-2 rounded-xl cursor-pointer transition-colors ${a.id === agenteId ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)]"}`}>
+                className="flex-1 min-w-0 text-left flex gap-3 items-center p-2 cursor-pointer">
                 <span className="text-2xl leading-none w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0" aria-hidden>{a.emoji}</span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-[var(--text-primary)]">{a.nome} <span className="font-normal text-[10px] text-[var(--text-muted)]">· {a.modelo}</span></span>
-                  <span className="block text-xs text-[var(--text-secondary)]">{a.cargo}</span>
-                  <span className="block text-[11px] text-[var(--text-muted)] mt-0.5">Chame quando: {minuscula(a.quando)}</span>
-                </span>
+                <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{a.nome} <span className="font-normal text-[10px] text-[var(--text-muted)]">· {a.modelo}</span></span>
               </button>
+              <span className="pr-2"><InfoDica nome={a.nome} linhas={dicaDe(a)} /></span>
             </li>
           ))}
           {!agentes.length && !erro && <li className="p-3 text-sm text-[var(--text-muted)]">Carregando equipe…</li>}
@@ -159,7 +162,7 @@ export default function ChatPage() {
         <header className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-3 flex-wrap bg-[var(--bg-secondary)]">
           <span className="text-2xl" aria-hidden>{agente?.emoji}</span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-base font-semibold text-[var(--text-primary)] leading-tight">{agente?.nome ?? "Chat"}</h1>
+            <h1 className="text-base font-semibold text-[var(--text-primary)] leading-tight flex items-center gap-1">{agente?.nome ?? "Chat"}{agente && <InfoDica nome={agente.nome} linhas={dicaDe(agente)} />}</h1>
             <p className="text-xs text-[var(--text-secondary)] truncate">{agente?.cargo}</p>
           </div>
           {uso && (
@@ -193,8 +196,6 @@ export default function ChatPage() {
             <div className="max-w-xl mx-auto text-center text-[var(--text-secondary)] mt-10">
               <p className="text-5xl mb-2" aria-hidden>{agente.emoji}</p>
               <p className="font-semibold text-[var(--text-primary)]">Converse com {agente.nome}</p>
-              <p className="text-sm mt-1">Chame quando: {minuscula(agente.quando)}.</p>
-              <p className="text-xs mt-3 text-[var(--text-muted)]">Aqui ele só conversa e lê. Se algo precisar mudar alguma coisa (lembrete, tarefa, mapa, imagem), aparece um botão Confirmar antes.</p>
             </div>
           )}
           {msgs.map((m) => (
