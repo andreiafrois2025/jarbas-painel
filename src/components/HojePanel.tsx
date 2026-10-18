@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStatus } from "@/lib/status";
 import { useUI } from "./ui";
-import { useHoje, useTarefas, marcarLido, promoverProGrupo, promoverProConteudo, type CardCaixa, type ItemParaMim } from "@/lib/hoje";
+import { useHoje, useTarefas, marcarLido, promoverProGrupo, promoverProConteudo, type CardCaixa, type ItemParaMim, type TarefaNotion } from "@/lib/hoje";
 import { tempoRelativo } from "@/lib/metrics";
 
 const AGENDA_URL = "https://calendar.google.com/calendar/u/0/r";
@@ -323,7 +323,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
                 {dados.tarefas_semana && (
                   <details className="mt-3 border-t border-[var(--border)] pt-2">
                     <summary className="text-xs font-semibold text-[var(--text-primary)] cursor-pointer select-none">
-                      🗓️ Tarefas da semana
+                      🗓️ Próximos 2 dias
                     </summary>
                     <pre className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap font-sans max-h-48 overflow-y-auto mt-2">
                       {dados.tarefas_semana}
@@ -486,7 +486,7 @@ function EsqueletoHoje({ lateral }: { lateral?: React.ReactNode }) {
 // E se a leitura com id falhar (VPS fora, Notion fora), a tela cai no texto de
 // sempre em vez de mostrar lista vazia.
 function ListaTarefas({ textoCru }: { textoCru?: string }) {
-  const { tarefas, marcarFeita } = useTarefas();
+  const { tarefas, atrasadas, atrasadasTotal, marcarFeita } = useTarefas();
   const { avisar } = useUI();
   const [emCurso, setEmCurso] = useState<string | null>(null);
 
@@ -497,9 +497,6 @@ function ListaTarefas({ textoCru }: { textoCru?: string }) {
       </pre>
     );
   }
-  if (tarefas.length === 0) {
-    return <p className="text-sm text-[var(--text-secondary)]">🎉 Nenhuma tarefa pendente pra hoje.</p>;
-  }
 
   const marcar = async (id: string, nome: string) => {
     setEmCurso(id);
@@ -508,9 +505,10 @@ function ListaTarefas({ textoCru }: { textoCru?: string }) {
     avisar(ok ? `"${nome.slice(0, 40)}" marcada como feita no Notion` : "Não consegui marcar no Notion — nada foi mudado");
   };
 
-  return (
+  // mesmo item (clicável/marcável) para a janela e para as atrasadas
+  const itens = (lista: TarefaNotion[]) => (
     <ul className="space-y-1.5">
-      {tarefas.map((t) => (
+      {lista.map((t) => (
         <li key={t.id} className="flex items-start gap-2 text-sm group">
           <button
             onClick={() => marcar(t.id, t.nome)}
@@ -523,10 +521,31 @@ function ListaTarefas({ textoCru }: { textoCru?: string }) {
           </button>
           <span className="text-[var(--text-primary)] flex-1">
             {t.nome}
+            {t.prazo && <span className="text-[var(--text-muted)] text-xs"> · {t.prazo.slice(8, 10)}/{t.prazo.slice(5, 7)}</span>}
             {t.status && <span className="text-[var(--text-muted)] text-xs"> · {t.status}</span>}
           </span>
         </li>
       ))}
     </ul>
+  );
+
+  return (
+    <>
+      {tarefas.length === 0 ? (
+        <p className="text-sm text-[var(--text-secondary)]">
+          {atrasadasTotal > 0 ? "Nada para os próximos 3 dias." : "🎉 Nenhuma tarefa pendente pra hoje."}
+        </p>
+      ) : (
+        itens(tarefas)
+      )}
+      {atrasadasTotal > 0 && (
+        <details className="mt-3 border-t border-[var(--border)] pt-2">
+          <summary className="text-xs font-semibold text-[var(--text-primary)] cursor-pointer select-none">
+            ⚠️ {atrasadasTotal} atrasada{atrasadasTotal > 1 ? "s" : ""} · ver
+          </summary>
+          <div className="max-h-64 overflow-y-auto mt-2">{itens(atrasadas)}</div>
+        </details>
+      )}
+    </>
   );
 }
