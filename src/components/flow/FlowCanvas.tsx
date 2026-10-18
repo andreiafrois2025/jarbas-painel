@@ -7,7 +7,6 @@ import {
   Background,
   Controls,
   MiniMap,
-  MarkerType,
   ConnectionMode,
   applyNodeChanges,
   applyEdgeChanges,
@@ -20,6 +19,9 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import RoughNode from "./RoughNode";
+import { estiloSeta } from "./estilo";
+import { edgeTypes } from "./SetaEdge";
+import { paraRFSetas } from "./rotas";
 import FlowToolbar from "./FlowToolbar";
 import FlowLegend from "./FlowLegend";
 import NodeEditor from "./NodeEditor";
@@ -37,6 +39,8 @@ import type { FlowDoc, FlowDocNode, FlowDocEdge } from "@/lib/types";
 interface Props {
   flow: FlowDoc;
   onChange?: (updates: { nodes: FlowDocNode[]; edges: FlowDocEdge[] }) => void;
+  /** desenho deitado (computador): as peças novas entram à direita da última, não embaixo */
+  horizontal?: boolean;
 }
 
 const NEW_NODE_LABELS: Record<FlowDocNode["type"], string> = {
@@ -47,35 +51,9 @@ const NEW_NODE_LABELS: Record<FlowDocNode["type"], string> = {
   end: "Fim",
 };
 
-function styleEdge(
-  base: {
-    id: string;
-    source: string;
-    target: string;
-    sourceHandle?: string;
-    targetHandle?: string;
-  },
-  isReturn: boolean,
-  label?: string,
-): Edge {
-  return {
-    ...base,
-    type: "smoothstep",
-    label,
-    animated: isReturn,
-    style: isReturn
-      ? { stroke: "#A0583C", strokeDasharray: "6 4", strokeWidth: 1.6 }
-      : { stroke: "#5A6B6B", strokeWidth: 1.6 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: isReturn ? "#A0583C" : "#5A6B6B" },
-    labelStyle: {
-      fontFamily: '"Kalam", "Comic Sans MS", cursive',
-      fontSize: 11,
-      fill: "#2D3B3B",
-    },
-    labelBgStyle: { fill: "#FFF9C4", fillOpacity: 0.85 },
-    labelBgPadding: [4, 2] as [number, number],
-  };
-}
+const styleEdge = estiloSeta;
+
+const ehVertical = (f: FlowDoc) => f.nodes.some((n) => n.data.layoutV);
 
 function toRFNodes(nodes: FlowDocNode[]): Node[] {
   return nodes.map((n) => ({
@@ -86,20 +64,17 @@ function toRFNodes(nodes: FlowDocNode[]): Node[] {
   }));
 }
 
-function toRFEdges(edges: FlowDocEdge[]): Edge[] {
-  return edges.map((e) =>
-    styleEdge(
-      {
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        // Defaults pros seeds antigos (esquerda→direita)
-        sourceHandle: e.sourceHandle ?? "right",
-        targetHandle: e.targetHandle ?? "left",
-      },
-      !!e.isReturn,
-      e.label,
-    ),
+function toRFEdges(edges: FlowDocEdge[], vertical: boolean, nodes: FlowDocNode[]): Edge[] {
+  // mesmas rotas do modo de leitura (voltas e desvios contornam as peças, sem se sobrepor)
+  return paraRFSetas(
+    edges.map((e) => ({
+      id: e.id, source: e.source, target: e.target, label: e.label, isReturn: !!e.isReturn,
+      // Defaults pros seeds antigos (esquerda→direita)
+      sourceHandle: e.sourceHandle ?? (vertical ? "bottom" : "right"),
+      targetHandle: e.targetHandle ?? (vertical ? "top" : "left"),
+      fixa: !!e.fixa,
+    })),
+    nodes.map((n) => ({ id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, executor: n.data.executor, position: n.position })),
   );
 }
 
@@ -124,20 +99,21 @@ function fromRFEdges(edges: Edge[]): FlowDocEdge[] {
     sourceHandle: (e.sourceHandle as string | undefined) ?? undefined,
     targetHandle: (e.targetHandle as string | undefined) ?? undefined,
     label: typeof e.label === "string" ? e.label : undefined,
-    isReturn: !!e.animated,
+    isReturn: !!(e.data as { isReturn?: boolean } | undefined)?.isReturn,
+    fixa: (e.data as { fixa?: boolean } | undefined)?.fixa || undefined,
   }));
 }
 
-function FlowCanvasInner({ flow, onChange }: Props) {
+function FlowCanvasInner({ flow, onChange, horizontal }: Props) {
   const [nodes, setNodes] = useState<Node[]>(toRFNodes(flow.nodes));
-  const [edges, setEdges] = useState<Edge[]>(toRFEdges(flow.edges));
+  const [edges, setEdges] = useState<Edge[]>(toRFEdges(flow.edges, !horizontal && ehVertical(flow), flow.nodes));
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [showLegend, setShowLegend] = useState(false);
 
   useEffect(() => {
     setNodes(toRFNodes(flow.nodes || []));
-    setEdges(toRFEdges(flow.edges || []));
+    setEdges(toRFEdges(flow.edges || [], !horizontal && ehVertical(flow), flow.nodes || []));
     setSelectedNode(null);
     setSelectedEdge(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,7 +165,7 @@ function FlowCanvasInner({ flow, onChange }: Props) {
           false,
           undefined,
         );
-        const next = [...es, newEdge];
+        const next = [...es, { ...newEdge, data: { ...newEdge.data, fixa: true } }];
         persist(nodes, next);
         return next;
       });
@@ -201,7 +177,9 @@ function FlowCanvasInner({ flow, onChange }: Props) {
   const onReconnect = useCallback(
     (oldEdge: Edge, newConnection: Connection) => {
       setEdges((es) => {
-        const next = reconnectEdge(oldEdge, newConnection, es);
+        // mesmo id (o padrão troca e a seta perderia rótulo/tipo) e as alças escolhidas passam a valer sempre
+        const next = reconnectEdge(oldEdge, newConnection, es, { shouldReplaceId: false })
+          .map((e) => (e.id === oldEdge.id ? ({ ...e, pathOptions: undefined, data: { ...e.data, fixa: true } } as Edge) : e));
         setSelectedEdge((s) =>
           s && s.id === oldEdge.id ? next.find((e) => e.id === oldEdge.id) || s : s,
         );
@@ -215,19 +193,20 @@ function FlowCanvasInner({ flow, onChange }: Props) {
   const addNode = useCallback(
     (type: FlowDocNode["type"]) => {
       const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const newNode: Node = {
-        id,
-        type: "rough",
-        position: { x: 260 + Math.random() * 120, y: 240 + Math.random() * 120 },
-        data: { _flowType: type, label: NEW_NODE_LABELS[type] },
-      };
+      // entra embaixo do último passo (o desenho é de cima pra baixo)
+      const abaixo = nodes.reduce((m, n) => Math.max(m, n.position.y), -160) + 190;
+      const aDireita = nodes.reduce((m, n) => Math.max(m, n.position.x), -60) + 280;
+      const yMeio = nodes.length ? Math.round(nodes.reduce((s, n) => s + n.position.y, 0) / nodes.length) : 0;
+      const newNode: Node = horizontal
+        ? { id, type: "rough", position: { x: aDireita, y: yMeio }, data: { _flowType: type, label: NEW_NODE_LABELS[type] } }
+        : { id, type: "rough", position: { x: 0, y: abaixo }, data: { _flowType: type, label: NEW_NODE_LABELS[type], layoutV: 1 } };
       setNodes((ns) => {
         const next = [...ns, newNode];
         persist(next, edges);
         return next;
       });
     },
-    [edges, persist],
+    [edges, nodes, persist, horizontal],
   );
 
   const updateNodeData = useCallback(
@@ -266,10 +245,10 @@ function FlowCanvasInner({ flow, onChange }: Props) {
       setEdges((es) => {
         const next = es.map((e) => {
           if (e.id !== edgeId) return e;
-          const isReturn = updates.isReturn !== undefined ? updates.isReturn : !!e.animated;
+          const isReturn = updates.isReturn !== undefined ? updates.isReturn : !!(e.data as { isReturn?: boolean } | undefined)?.isReturn;
           const label =
             "label" in updates ? updates.label : typeof e.label === "string" ? e.label : undefined;
-          return styleEdge(
+          const novo = styleEdge(
             {
               id: e.id,
               source: e.source,
@@ -280,6 +259,7 @@ function FlowCanvasInner({ flow, onChange }: Props) {
             isReturn,
             label,
           );
+          return (e.data as { fixa?: boolean } | undefined)?.fixa ? { ...novo, data: { ...novo.data, fixa: true } } : novo;
         });
         setSelectedEdge((s) => (s && s.id === edgeId ? next.find((e) => e.id === edgeId) || s : s));
         persist(nodes, next);
@@ -314,6 +294,7 @@ function FlowCanvasInner({ flow, onChange }: Props) {
         onReconnect={onReconnect}
         edgesReconnectable
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
         onNodeClick={(_, node) => {
           setSelectedNode(node);

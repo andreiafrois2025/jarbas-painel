@@ -12,7 +12,7 @@
 // =============================================
 
 import { supabase } from "./supabase";
-import { Category, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Squad, FlowDoc, FlowCategory, FlowColumn } from "./types";
+import { Category, DEFAULT_CATEGORIES, Collaborator, Assignment, QuickLink, DeskOccupant, Squad, FlowDoc, FlowGrupo, FlowCategory, FlowColumn } from "./types";
 
 // ---- AUTH ----
 
@@ -343,6 +343,13 @@ export async function getFlowDocs(): Promise<FlowDoc[]> {
   return data || [];
 }
 
+/** Grupos do Mapa (migração 006). Devolve null se a tabela ainda não existe: o painel usa o macro-fluxos.ts. */
+export async function getFlowGrupos(): Promise<FlowGrupo[] | null> {
+  const { data, error } = await supabase.from("flow_grupos").select("slug,nome,emoji,ordem").order("ordem", { ascending: true });
+  if (error) return null;
+  return data && data.length ? data : null;
+}
+
 /** Um fluxo por id */
 export async function getFlowDoc(id: string): Promise<FlowDoc | null> {
   const { data, error } = await supabase.from("flows_doc").select("*").eq("id", id).maybeSingle();
@@ -379,7 +386,7 @@ export async function addFlowDoc(input: {
 /** Salvar edits (nodes/edges/título/descrição) */
 export async function updateFlowDoc(
   id: string,
-  updates: Partial<Pick<FlowDoc, "title" | "description" | "nodes" | "edges" | "is_public" | "kanban_column" | "kanban_order">>,
+  updates: Partial<Pick<FlowDoc, "title" | "description" | "nodes" | "edges" | "is_public" | "kanban_column" | "kanban_order" | "grupo" | "ordem">>,
 ): Promise<void> {
   const { error } = await supabase.from("flows_doc").update(updates).eq("id", id);
   if (error) throw error;

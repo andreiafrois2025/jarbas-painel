@@ -26,15 +26,14 @@ interface Props {
 
 // Abas internas de Produção; cada aba é uma rota, então F5 mantém a aba.
 //
-// 25/07/2026: "Fluxos" saiu do menu. A rota continua existindo (é pra onde um
-// card de Automações leva pra desenhar), mas deixou de ser um destino que se
-// escolhe — não é mais lista, é a mesa de desenho de um fluxo específico.
+// 18/10/2026: "Fluxos" volta ao menu como "🗺️ Mapa" (tela única: lista de grupos à
+// esquerda, grupo ou fluxo à direita). Automações continua aqui, por enquanto.
 export default function ProducaoPage({ sub }: Props) {
   const router = useRouter();
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0">
+      <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0 overflow-x-auto [&>button]:shrink-0 [&>button]:whitespace-nowrap">
         <h1 className="text-base md:text-lg font-semibold mr-4 py-3">Produção</h1>
         <button
           onClick={() => router.push("/producao/squads")}
@@ -45,6 +44,16 @@ export default function ProducaoPage({ sub }: Props) {
           }`}
         >
           🤖 Squads
+        </button>
+        <button
+          onClick={() => router.push("/producao/fluxos")}
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
+            sub === "fluxos"
+              ? "border-[var(--accent)] text-[var(--text-primary)]"
+              : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          🗺️ Mapa
         </button>
         <button
           onClick={() => router.push("/producao/automacoes")}
@@ -84,7 +93,7 @@ export default function ProducaoPage({ sub }: Props) {
         )}
         {sub === "fluxos" && (
           <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
-            mesa de desenho — chega-se aqui por um card de Automações
+            grupos e fluxos em 3 níveis: leigo, intermediário e código
           </span>
         )}
         {sub === "estudio" && (

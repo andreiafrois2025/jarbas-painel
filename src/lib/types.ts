@@ -50,6 +50,18 @@ export interface FlowDocNode {
     executor?: string;
     /** Tags livres (Notion, WhatsApp, cron, etc.) */
     tags?: string[];
+    /** Trecho real do script (gravado pelo curador). Opcional: sem ele a aba Código mostra "em breve". */
+    codigo?: { arquivo?: string; linhas?: string; linguagem?: string; trecho: string; explicacao_tecnica?: string };
+    /** Termos técnicos desta peça, com definição (opcional; complementa o dicionário embutido) */
+    glossario?: { termo: string; definicao: string }[];
+    /** Marca: as posições deste nó foram arrumadas/salvas na vertical (de cima para baixo) */
+    layoutV?: number;
+    /** Posição na vista HORIZONTAL (computador), gravada no modo Editar. A `position` continua sendo a vertical (celular). */
+    posH?: { x: number; y: number };
+    /** Texto em linguagem simples desta etapa (gerado pelo curador; níveis Leigo e Intermediário) */
+    leigo?: { rotulo: string; frase: string; quem?: string };
+    /** Textos simples do fluxo inteiro; fica na etapa de início. `h` = impressão do desenho quando foi escrito */
+    leigoFluxo?: { nome: string; frase: string; comeca: string; termina: string; setas?: Record<string, string>; h?: string };
   };
 }
 
@@ -66,6 +78,13 @@ export interface FlowDocEdge {
   label?: string;
   /** Se true, é seta de retorno (loopback) — desenha animada */
   isReturn?: boolean;
+  /** Pontas da seta na vista horizontal (as `sourceHandle`/`targetHandle` valem pra vertical) */
+  sourceHandleH?: string;
+  targetHandleH?: string;
+  /** (v3.4) as pontas da seta foram escolhidas por ela (arrastou de uma alça a outra): valem sempre, a escolha automática não mexe (vista vertical) */
+  fixa?: boolean;
+  /** idem, para a vista horizontal */
+  fixaH?: boolean;
 }
 
 export interface FlowDoc {
@@ -81,9 +100,23 @@ export interface FlowDoc {
   kanban_column?: string | null;
   /** Ordem dentro da coluna */
   kanban_order?: number;
+  /** Migração 006 (opcional): nome da rotina do relógio da VPS a que este desenho pertence */
+  automacao_id?: string | null;
+  /** Migração 006 (opcional): slug do grupo do Mapa; null = usa o padrão do macro-fluxos.ts */
+  grupo?: string | null;
+  /** Migração 006 (opcional): posição dentro do grupo */
+  ordem?: number | null;
   user_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Grupo do Mapa de fluxos (tabela flow_grupos, migração 006) */
+export interface FlowGrupo {
+  slug: string;
+  nome: string;
+  emoji: string;
+  ordem: number;
 }
 
 /** Coluna do kanban interno de fluxos — gerenciada pelo usuário */
