@@ -7,15 +7,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { chatApi, dividirResposta, enviarMensagem, type Acao, type Agente, type ConversaResumo, type Mensagem, type Uso } from "@/lib/chat";
 import TextoSeguro from "./chat/TextoSeguro";
 import Visuais from "./chat/Visuais";
-import InfoDica from "./chat/InfoDica";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const minuscula = (s: string) => (s.length > 1 && s[1] === s[1].toLowerCase() ? s[0].toLowerCase() + s.slice(1) : s);
-const dicaDe = (a: Agente) => [
-  { titulo: "Quem é", texto: a.cargo },
-  { titulo: "Chame quando", texto: minuscula(a.quando) },
-  { titulo: "Como funciona", texto: "aqui ele só conversa e lê. Se algo precisar mudar alguma coisa (lembrete, tarefa, mapa, imagem), aparece um botão Confirmar antes." },
+
+// Ordem por afinidade (baseada na tabela "quando chamar cada um" do jarbas.md). Quem não estiver aqui cai no fim.
+const GRUPOS: { rotulo?: string; ids: string[] }[] = [
+  { ids: ["jarbas"] },
+  { rotulo: "Conteúdo", ids: ["izzy", "felipe", "theo"] },
+  { rotulo: "Jurídico e licitação", ids: ["katrina", "harvey"] },
+  { rotulo: "Rotina e finanças", ids: ["donna", "louis"] },
+  { rotulo: "Dados e mapas", ids: ["eric", "tonny"] },
+  { rotulo: "Pesquisa e estratégia", ids: ["mike", "rafaela", "sofia"] },
+  { rotulo: "Tecnologia", ids: ["junior"] },
+  { rotulo: "Pessoas e bem-estar", ids: ["nara", "lara"] },
 ];
+
+function Avatar({ a, tamanho = 36 }: { a?: Agente; tamanho?: number }) {
+  const estilo = { width: tamanho, height: tamanho, fontSize: tamanho * 0.62 };
+  if (a?.id === "jarbas") {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src="/jarbas-avatar.png" alt="" aria-hidden width={tamanho} height={tamanho} style={estilo} className="rounded-full object-cover border border-[var(--border)] bg-white shrink-0" />;
+  }
+  return <span style={estilo} className="rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0 leading-none" aria-hidden>{a?.emoji}</span>;
+}
 
 export default function ChatPage() {
   const [agentes, setAgentes] = useState<Agente[]>([]);
@@ -40,6 +55,17 @@ export default function ChatPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const agente = useMemo(() => agentes.find((a) => a.id === agenteId), [agentes, agenteId]);
+  const grupos = useMemo(() => {
+    const usados = new Set<string>();
+    const gs = GRUPOS.map((g) => ({ rotulo: g.rotulo, itens: g.ids.map((id) => agentes.find((a) => a.id === id)).filter((a): a is Agente => !!a) }));
+    gs.forEach((g) => g.itens.forEach((a) => usados.add(a.id)));
+    const resto = agentes.filter((a) => !usados.has(a.id));
+    if (resto.length) gs.splice(gs.length - 1, 0, { rotulo: "Outros", itens: resto }); // antes do último grupo
+    return gs.filter((g) => g.itens.length);
+  }, [agentes]);
+  const [dicaAberta, setDicaAberta] = useState(true);
+  useEffect(() => { try { setDicaAberta(window.localStorage.getItem("chatDica") !== "0"); } catch { /* sem storage */ } }, []);
+  const alternarDica = () => setDicaAberta((v) => { try { window.localStorage.setItem("chatDica", v ? "0" : "1"); } catch { /* sem storage */ } return !v; });
 
   // inicial: lista de pessoas, uso e o último funcionário usado neste aparelho
   useEffect(() => {
@@ -142,29 +168,48 @@ export default function ChatPage() {
         <button className="md:hidden flex items-center justify-between px-4 py-2 text-sm cursor-pointer" onClick={() => setListaAberta(!listaAberta)} aria-expanded={listaAberta}>
           <span>{agente ? `${agente.emoji} ${agente.nome}` : "Escolher"}</span><span>{listaAberta ? "▲" : "▼ trocar"}</span>
         </button>
-        <ul className={`${listaAberta ? "block" : "hidden"} md:block overflow-y-auto max-h-[50vh] md:max-h-none p-2 space-y-1`} aria-label="Pessoas da equipe">
-          {agentes.map((a) => (
-            <li key={a.id} className={`flex items-center gap-1 rounded-xl transition-colors ${a.id === agenteId ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)]"}`}>
-              <button onClick={() => { setAgenteId(a.id); setListaAberta(false); }} aria-current={a.id === agenteId ? "true" : undefined}
-                className="flex-1 min-w-0 text-left flex gap-3 items-center p-2 cursor-pointer">
-                <span className="text-2xl leading-none w-9 h-9 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0" aria-hidden>{a.emoji}</span>
-                <span className="text-sm font-semibold text-[var(--text-primary)] truncate">{a.nome} <span className="font-normal text-[10px] text-[var(--text-muted)]">· {a.modelo}</span></span>
-              </button>
-              <span className="pr-2"><InfoDica nome={a.nome} linhas={dicaDe(a)} /></span>
-            </li>
+        <div className={`${listaAberta ? "block" : "hidden"} md:block overflow-y-auto max-h-[50vh] md:max-h-none p-2`} aria-label="Pessoas da equipe">
+          {grupos.map((g, gi) => (
+            <div key={gi} className={gi ? "mt-3" : ""}>
+              {g.rotulo && <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{g.rotulo}</p>}
+              <ul className="space-y-0.5">
+                {g.itens.map((a) => (
+                  <li key={a.id}>
+                    <button onClick={() => { setAgenteId(a.id); setListaAberta(false); }} aria-current={a.id === agenteId ? "true" : undefined}
+                      className={`group w-full text-left p-2 rounded-xl cursor-pointer transition-colors ${a.id === agenteId ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] focus-visible:bg-[var(--bg-tertiary)]"}`}>
+                      <span className="flex gap-3 items-center">
+                        <Avatar a={a} />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-[var(--text-primary)] truncate">{a.nome} <span className="font-normal text-[10px] text-[var(--text-muted)]">· {a.modelo}</span></span>
+                          <span className="block text-xs text-[var(--text-secondary)] truncate">{a.cargo}</span>
+                        </span>
+                      </span>
+                      {/* expande suave ao passar o mouse ou focar (teclado/toque) */}
+                      <span className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] group-focus-visible:grid-rows-[1fr] group-focus:grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out">
+                        <span className="overflow-hidden">
+                          <span className="block pl-12 pt-1 text-[11px] leading-snug text-[var(--text-muted)]">Chame quando: {minuscula(a.quando)}</span>
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-          {!agentes.length && !erro && <li className="p-3 text-sm text-[var(--text-muted)]">Carregando equipe…</li>}
-        </ul>
+          {!agentes.length && !erro && <p className="p-3 text-sm text-[var(--text-muted)]">Carregando equipe…</p>}
+        </div>
       </aside>
 
       {/* ===== CONVERSA ===== */}
       <section className="flex-1 min-w-0 min-h-0 flex flex-col">
         <header className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-3 flex-wrap bg-[var(--bg-secondary)]">
-          <span className="text-2xl" aria-hidden>{agente?.emoji}</span>
+          <Avatar a={agente} tamanho={40} />
           <div className="min-w-0 flex-1">
-            <h1 className="text-base font-semibold text-[var(--text-primary)] leading-tight flex items-center gap-1">{agente?.nome ?? "Chat"}{agente && <InfoDica nome={agente.nome} linhas={dicaDe(agente)} />}</h1>
+            <h1 className="text-base font-semibold text-[var(--text-primary)] leading-tight">{agente?.nome ?? "Chat"}</h1>
             <p className="text-xs text-[var(--text-secondary)] truncate">{agente?.cargo}</p>
+            {agente && dicaAberta && <p className="text-[11px] text-[var(--text-muted)] leading-snug mt-0.5">Chame quando: {minuscula(agente.quando)}</p>}
           </div>
+          {agente && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher dica" : "ver dica"}</button>}
           {uso && (
             <span className={`text-xs px-2 py-1 rounded-lg border ${uso.aviso ? "border-[var(--warning)] bg-[var(--warning)]/15" : "border-[var(--border)]"} text-[var(--text-secondary)]`}
               title="Cada mensagem gasta uma parte da assinatura do Claude">
@@ -194,7 +239,7 @@ export default function ChatPage() {
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite">
           {!msgs.length && !ocupado && agente && (
             <div className="max-w-xl mx-auto text-center text-[var(--text-secondary)] mt-10">
-              <p className="text-5xl mb-2" aria-hidden>{agente.emoji}</p>
+              <div className="flex justify-center mb-2"><Avatar a={agente} tamanho={72} /></div>
               <p className="font-semibold text-[var(--text-primary)]">Converse com {agente.nome}</p>
             </div>
           )}
@@ -203,7 +248,7 @@ export default function ChatPage() {
           ))}
           {(ocupado || fluxo) && (
             <div className="flex gap-2 items-start">
-              <span className="text-xl mt-1" aria-hidden>{agente?.emoji}</span>
+              <span className="mt-1"><Avatar a={agente} tamanho={28} /></span>
               <div className="max-w-[min(48rem,100%)] rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
                 {fluxo ? <Resposta texto={fluxo} andamento onEscolha={enviar} desativado /> : <p className="text-sm text-[var(--text-muted)] animate-pulse">{status || "pensando…"}</p>}
                 {fluxo && status && <p className="text-xs text-[var(--text-muted)] mt-1 animate-pulse">{status}</p>}
@@ -272,7 +317,7 @@ function Balao({ m, agente, ocupado, onEscolha, onAcao }: { m: Mensagem; agente?
   }
   return (
     <div className="flex gap-2 items-start">
-      <span className="text-xl mt-1" aria-hidden>{agente?.emoji}</span>
+      <span className="mt-1"><Avatar a={agente} tamanho={28} /></span>
       <div className="max-w-[min(48rem,100%)] min-w-0 rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
         <Resposta texto={m.texto} onEscolha={onEscolha} desativado={ocupado} />
         {m.acoes?.map((a, i) => <CartaoAcao key={i} a={a} ocupado={ocupado} onDecidir={(c) => onAcao(i, c)} />)}
