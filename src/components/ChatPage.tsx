@@ -4,12 +4,13 @@
 // Backend: squad-api /api/chat/* (Claude só leitura; ações só com o botão Confirmar).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { chatApi, dividirResposta, enviarMensagem, type Acao, type Agente, type ConversaResumo, type Mensagem, type Uso } from "@/lib/chat";
+import { chatApi, dividirResposta, enviarMensagem, type Acao, type Agente, type Assunto, type ConversaResumo, type Mensagem, type ModeloOpcao, type Uso } from "@/lib/chat";
+import { usePainel } from "@/lib/painel-context";
+import type { Collaborator } from "@/lib/types";
 import TextoSeguro from "./chat/TextoSeguro";
 import Visuais from "./chat/Visuais";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-const minuscula = (s: string) => (s.length > 1 && s[1] === s[1].toLowerCase() ? s[0].toLowerCase() + s.slice(1) : s);
 
 // Ordem por afinidade (baseada na tabela "quando chamar cada um" do jarbas.md). Quem não estiver aqui cai no fim.
 const GRUPOS: { rotulo?: string; ids: string[] }[] = [
@@ -32,7 +33,30 @@ function Avatar({ a, tamanho = 36 }: { a?: Agente; tamanho?: number }) {
   return <span style={estilo} className="rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0 leading-none" aria-hidden>{a?.emoji}</span>;
 }
 
+function Chevron({ aberto }: { aberto: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+      className={`transition-transform duration-200 ${aberto ? "rotate-180" : ""}`}><path d="M5 8l5 5 5-5" /></svg>
+  );
+}
+
+// Descrição vinda do RH (tabela collaborators, a mesma da página Equipe): muda lá, muda aqui.
+function DescricaoRH({ c, fallback }: { c?: Collaborator; fallback: string }) {
+  const bloco = (rot: string, v?: string) => v ? <div><span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">{rot}</span><p className="text-xs text-[var(--text-primary)] mt-0.5">{v}</p></div> : null;
+  if (!c || !(c.specialization || c.skills || c.personality || c.bio)) return <p className="text-xs text-[var(--text-muted)]">{fallback}</p>;
+  return <div className="space-y-1.5">{bloco("🎓 Especialização", c.specialization)}{bloco("🛠️ Habilidades", c.skills)}{bloco("🧠 Personalidade", c.personality)}{bloco("📋 Bio", c.bio)}</div>;
+}
+
 export default function ChatPage() {
+  const { collaborators } = usePainel();
+  const perfilDe = useCallback((a?: Agente) => (a ? collaborators.find((c) => c.name.trim().toLowerCase() === a.nome.toLowerCase()) : undefined), [collaborators]);
+  const [abertos, setAbertos] = useState<Set<string>>(new Set()); // itens da lista com a descrição aberta
+  const alternarItem = (id: string) => setAbertos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const [modelos, setModelos] = useState<ModeloOpcao[]>([]);
+  const [modeloSel, setModeloSel] = useState("haiku");
+  const [assuntos, setAssuntos] = useState<Assunto[]>([]);
+  const [painelAssuntos, setPainelAssuntos] = useState(false);
+  const [fixarAssunto, setFixarAssunto] = useState<string | null>(null);
   const [agentes, setAgentes] = useState<Agente[]>([]);
   const [agenteId, setAgenteId] = useState("jarbas");
   const [conversas, setConversas] = useState<ConversaResumo[]>([]);
@@ -72,46 +96,68 @@ export default function ChatPage() {
     try { const s = window.localStorage.getItem("chatAgente"); if (s) setAgenteId(s); } catch { /* sem storage */ }
     chatApi.agentes().then(setAgentes).catch((e) => setErro(e.message));
     chatApi.uso().then(setUso).catch(() => {});
+    chatApi.modelos().then(setModelos).catch(() => {});
   }, []);
 
   const abrirConversa = useCallback(async (id: string) => {
-    try { const c = await chatApi.conversa(id); setConversaId(id); setMsgs(c.mensagens); setErro(""); } catch (e) { setErro((e as Error).message); }
+    try { const c = await chatApi.conversa(id); setConversaId(id); setMsgs(c.mensagens); setAssuntos(c.assuntos || []); setModeloSel(c.modelo); setErro(""); } catch (e) { setErro((e as Error).message); }
   }, []);
 
   // ao trocar de pessoa: abre a conversa mais recente dela (ou uma em branco)
   useEffect(() => {
     if (!agentes.length) return;
     try { window.localStorage.setItem("chatAgente", agenteId); } catch { /* sem storage */ }
-    setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]);
+    setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null);
+    setModeloSel(agenteId === "jarbas" ? "sonnet" : "haiku");
     chatApi.conversas(agenteId).then((cs) => { setConversas(cs); if (cs[0]) abrirConversa(cs[0].id); }).catch((e) => setErro(e.message));
   }, [agenteId, agentes.length, abrirConversa]);
 
   useEffect(() => { fim.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [msgs, fluxo, status]);
 
-  const enviar = useCallback(async (conteudo: string) => {
+  const enviar = useCallback(async (conteudo: string, assuntoIdParam?: string) => {
     const m = conteudo.trim();
     if (!m || ocupado) return;
     setErro(""); setOcupado(true); setFluxo(""); setStatus("pensando…");
     const idsAnexos = anexos.map((a) => a.id);
+    const assuntoEnvio = assuntoIdParam ?? fixarAssunto ?? undefined;
     setMsgs((x) => [...x, { id: "tmp-" + Date.now(), papel: "user", texto: m, ts: new Date().toISOString(), anexos }]);
-    setTexto(""); setAnexos([]);
+    setTexto(""); setAnexos([]); setFixarAssunto(null);
     ctl.current = new AbortController();
-    let acumulado = "";
-    await enviarMensagem({ agente: agenteId, conversaId: conversaId ?? undefined, mensagem: m, anexos: idsAnexos }, {
-      onMeta: (meta) => setConversaId(meta.conversaId),
+    let acumulado = ""; let idConv = conversaId;
+    await enviarMensagem({ agente: agenteId, conversaId: conversaId ?? undefined, mensagem: m, anexos: idsAnexos, modelo: modeloSel, assuntoId: assuntoEnvio }, {
+      onMeta: (meta) => { idConv = meta.conversaId; setConversaId(meta.conversaId); },
+      onAssunto: (a) => { if (a.novo) setStatus("novo assunto: " + a.titulo); },
+      onModelo: (mm) => { setModeloSel(mm.chave); setMsgs((x) => [...x, mm.mensagem]); },
       onDelta: (t) => { acumulado += t; setFluxo(acumulado); setStatus(""); },
       onStatus: setStatus,
-      onDone: (d) => { setMsgs((x) => [...x, d.mensagem]); setFluxo(""); setUso(d.uso); },
-      onErro: (e) => { setErro(e); setUso((u) => u); },
+      onDone: (d) => { setUso(d.uso); },
+      onErro: (e) => { setErro(e); },
     }, ctl.current.signal);
-    // se foi interrompida, guarda o que já chegou como mensagem local
-    if (ctl.current.signal.aborted && acumulado) {
-      setMsgs((x) => [...x, { id: "parcial-" + Date.now(), papel: "assistant", texto: acumulado + "\n\n(interrompida)", ts: new Date().toISOString() }]);
-    }
     setFluxo(""); setStatus(""); setOcupado(false); ctl.current = null;
+    // o servidor é a fonte da verdade (assuntos, etiquetas, resposta interrompida): recarrega a conversa
+    if (idConv) { try { const c = await chatApi.conversa(idConv); setMsgs(c.mensagens); setAssuntos(c.assuntos || []); setModeloSel(c.modelo); } catch { /* mantém o que está na tela */ } }
     chatApi.conversas(agenteId).then(setConversas).catch(() => {});
     chatApi.uso().then(setUso).catch(() => {});
-  }, [ocupado, anexos, agenteId, conversaId]);
+  }, [ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto]);
+
+  // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
+  const escolherModelo = async (chave: string) => {
+    const op = modelos.find((x) => x.chave === chave); if (!op) return;
+    const aviso = `Trocando para ${op.rotulo.replace(/^Claude /, "")} nesta conversa.` + (op.aviso ? " " + op.aviso : "");
+    setModeloSel(chave);
+    const sis: Mensagem = { id: "sis-" + Date.now(), papel: "sistema", texto: aviso, ts: new Date().toISOString() };
+    if (conversaId) { try { await chatApi.trocarModelo(conversaId, chave); } catch (e) { setErro((e as Error).message); return; } }
+    setMsgs((x) => [...x, sis]);
+  };
+
+  const moverMsg = async (mensagemId: string, assuntoId: string, titulo?: string) => {
+    if (!conversaId) return;
+    try { const r = await chatApi.mover(conversaId, mensagemId, assuntoId, titulo); setMsgs(r.mensagens); setAssuntos(r.assuntos); } catch (e) { setErro((e as Error).message); }
+  };
+  const arquivarAssunto = async (id: string, arquivado: boolean) => {
+    if (!conversaId) return;
+    try { setAssuntos(await chatApi.assunto(conversaId, id, { arquivado })); if (arquivado && fixarAssunto === id) setFixarAssunto(null); } catch (e) { setErro((e as Error).message); }
+  };
 
   const parar = () => ctl.current?.abort();
 
@@ -174,23 +220,23 @@ export default function ChatPage() {
               {g.rotulo && <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{g.rotulo}</p>}
               <ul className="space-y-0.5">
                 {g.itens.map((a) => (
-                  <li key={a.id}>
+                  <li key={a.id} className={`relative rounded-xl transition-colors ${a.id === agenteId ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)]"}`}>
                     <button onClick={() => { setAgenteId(a.id); setListaAberta(false); }} aria-current={a.id === agenteId ? "true" : undefined}
-                      className={`group w-full text-left p-2 rounded-xl cursor-pointer transition-colors ${a.id === agenteId ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] focus-visible:bg-[var(--bg-tertiary)]"}`}>
-                      <span className="flex gap-3 items-center">
-                        <Avatar a={a} />
-                        <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-[var(--text-primary)] truncate">{a.nome} <span className="font-normal text-[10px] text-[var(--text-muted)]">· {a.modelo}</span></span>
-                          <span className="block text-xs text-[var(--text-secondary)] truncate">{a.cargo}</span>
-                        </span>
-                      </span>
-                      {/* expande suave ao passar o mouse ou focar (teclado/toque) */}
-                      <span className="grid grid-rows-[0fr] group-hover:grid-rows-[1fr] group-focus-visible:grid-rows-[1fr] group-focus:grid-rows-[1fr] transition-[grid-template-rows] duration-200 ease-out">
-                        <span className="overflow-hidden">
-                          <span className="block pl-12 pt-1 text-[11px] leading-snug text-[var(--text-muted)]">Chame quando: {minuscula(a.quando)}</span>
-                        </span>
+                      className="w-full text-left p-2 pr-9 rounded-xl cursor-pointer flex gap-3 items-center focus-visible:outline-2 focus-visible:outline-[var(--accent)]">
+                      <Avatar a={a} />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-[var(--text-primary)] truncate">{a.nome} <span className="font-normal text-[10px] text-[var(--text-muted)]">· {a.modelo}</span></span>
+                        <span className="block text-xs text-[var(--text-secondary)] truncate">{perfilDe(a)?.specialization || a.cargo}</span>
                       </span>
                     </button>
+                    <button type="button" onClick={() => alternarItem(a.id)} aria-expanded={abertos.has(a.id)} aria-controls={`desc-${a.id}`}
+                      aria-label={`${abertos.has(a.id) ? "Recolher" : "Ver"} a descrição de ${a.nome}`}
+                      className="absolute top-2 right-2 w-6 h-6 inline-flex items-center justify-center rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] focus-visible:outline-2 focus-visible:outline-[var(--accent)] cursor-pointer">
+                      <Chevron aberto={abertos.has(a.id)} />
+                    </button>
+                    <div id={`desc-${a.id}`} aria-hidden={!abertos.has(a.id)} className={`grid transition-[grid-template-rows] duration-200 ease-out ${abertos.has(a.id) ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                      <div className="overflow-hidden"><div className="pl-14 pr-3 pb-2.5 pt-0.5"><DescricaoRH c={perfilDe(a)} fallback={a.cargo} /></div></div>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -204,18 +250,37 @@ export default function ChatPage() {
       <section className="flex-1 min-w-0 min-h-0 flex flex-col">
         <header className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-3 flex-wrap bg-[var(--bg-secondary)]">
           <Avatar a={agente} tamanho={40} />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-48">
             <h1 className="text-base font-semibold text-[var(--text-primary)] leading-tight">{agente?.nome ?? "Chat"}</h1>
-            <p className="text-xs text-[var(--text-secondary)] truncate">{agente?.cargo}</p>
-            {agente && dicaAberta && <p className="text-[11px] text-[var(--text-muted)] leading-snug mt-0.5">Chame quando: {minuscula(agente.quando)}</p>}
+            <p className="text-xs text-[var(--text-secondary)] truncate">{perfilDe(agente)?.specialization || agente?.cargo}</p>
+            {agente && dicaAberta && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <p className="text-[11px] text-[var(--text-muted)] leading-snug mt-0.5">{perfilDe(agente)?.bio || perfilDe(agente)?.skills}</p>}
           </div>
-          {agente && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher dica" : "ver dica"}</button>}
+          {agente && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher descrição" : "ver descrição"}</button>}
+          <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <span className="sr-only md:not-sr-only">Modelo</span>
+            <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado} aria-label="Modelo que responde nesta conversa"
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1.5 text-xs text-[var(--text-primary)] cursor-pointer disabled:opacity-50">
+              <optgroup label="Claude">
+                {modelos.filter((m) => m.motor === "claude").map((m) => <option key={m.chave} value={m.chave}>{m.rotulo.replace(/^Claude /, "")}{m.chave === (agenteId === "jarbas" ? "sonnet" : "haiku") ? " (padrão)" : ""}</option>)}
+              </optgroup>
+              {modelos.some((m) => m.motor === "codex") && (
+                <optgroup label="GPT (Codex)">
+                  {modelos.filter((m) => m.motor === "codex").map((m) => <option key={m.chave} value={m.chave} disabled={!!m.indisponivel} title={m.indisponivel || undefined}>{m.rotulo}{m.indisponivel ? " (indisponível)" : ""}</option>)}
+                </optgroup>
+              )}
+            </select>
+          </label>
           {uso && (
             <span className={`text-xs px-2 py-1 rounded-lg border ${uso.aviso ? "border-[var(--warning)] bg-[var(--warning)]/15" : "border-[var(--border)]"} text-[var(--text-secondary)]`}
               title="Cada mensagem gasta uma parte da assinatura do Claude">
               Hora {uso.hora.usadas}/{uso.hora.limite} · Hoje {uso.dia.usadas}/{uso.dia.limite}
             </span>
           )}
+          {agente?.assuntosAuto ? (
+            <button onClick={() => setPainelAssuntos(!painelAssuntos)} aria-expanded={painelAssuntos} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer">
+              📁 Assuntos ({assuntos.filter((a) => !a.arquivado).length})
+            </button>
+          ) : (
           <div className="relative">
             <button onClick={() => setHistoricoAberto(!historicoAberto)} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer">Conversas ({conversas.length})</button>
             {historicoAberto && (
@@ -232,11 +297,16 @@ export default function ChatPage() {
               </div>
             )}
           </div>
+          )}
         </header>
 
         {uso?.aviso && <div role="status" className="px-4 py-2 text-sm bg-[var(--warning)]/20 text-[var(--text-primary)] border-b border-[var(--warning)]">⚠️ {uso.aviso}</div>}
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite">
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+        {agente?.assuntosAuto && painelAssuntos && (
+          <PainelAssuntos assuntos={assuntos} msgs={msgs} fixado={fixarAssunto} onFixar={setFixarAssunto} onArquivar={arquivarAssunto} />
+        )}
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite">
           {!msgs.length && !ocupado && agente && (
             <div className="max-w-xl mx-auto text-center text-[var(--text-secondary)] mt-10">
               <div className="flex justify-center mb-2"><Avatar a={agente} tamanho={72} /></div>
@@ -244,13 +314,14 @@ export default function ChatPage() {
             </div>
           )}
           {msgs.map((m) => (
-            <Balao key={m.id} m={m} agente={agente} ocupado={ocupado} onEscolha={enviar} onAcao={(i, c) => decidir(m, i, c)} />
+            <Balao key={m.id} m={m} agente={agente} ocupado={ocupado} onEscolha={enviar} onAcao={(i, c) => decidir(m, i, c)}
+              assuntos={agente?.assuntosAuto ? assuntos : undefined} onMover={moverMsg} />
           ))}
           {(ocupado || fluxo) && (
             <div className="flex gap-2 items-start">
               <span className="mt-1"><Avatar a={agente} tamanho={28} /></span>
               <div className="max-w-[min(48rem,100%)] rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
-                {fluxo ? <Resposta texto={fluxo} andamento onEscolha={enviar} desativado /> : <p className="text-sm text-[var(--text-muted)] animate-pulse">{status || "pensando…"}</p>}
+                {fluxo ? <Resposta texto={fluxo} andamento onEscolha={(t) => enviar(t)} desativado /> : <p className="text-sm text-[var(--text-muted)] animate-pulse">{status || "pensando…"}</p>}
                 {fluxo && status && <p className="text-xs text-[var(--text-muted)] mt-1 animate-pulse">{status}</p>}
               </div>
             </div>
@@ -258,9 +329,14 @@ export default function ChatPage() {
           {erro && <p role="alert" className="text-sm text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/30 rounded-lg px-3 py-2">{erro}</p>}
           <div ref={fim} />
         </div>
+        </div>
 
         {/* ===== CAIXA DE ENVIO ===== */}
         <footer className="border-t border-[var(--border)] bg-[var(--bg-secondary)] p-3">
+          {fixarAssunto && (
+            <p className="text-xs mb-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent-hover)]">📁 A próxima mensagem vai para: {assuntos.find((a) => a.id === fixarAssunto)?.titulo}
+              <button onClick={() => setFixarAssunto(null)} aria-label="Tirar a fixação do assunto" className="cursor-pointer">×</button></p>
+          )}
           {anexos.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
               {anexos.map((a) => (
@@ -304,7 +380,11 @@ function Resposta({ texto, andamento, onEscolha, desativado }: { texto: string; 
   );
 }
 
-function Balao({ m, agente, ocupado, onEscolha, onAcao }: { m: Mensagem; agente?: Agente; ocupado: boolean; onEscolha: (t: string) => void; onAcao: (i: number, cancelar: boolean) => void }) {
+function Balao({ m, agente, ocupado, onEscolha, onAcao, assuntos, onMover }: {
+  m: Mensagem; agente?: Agente; ocupado: boolean; onEscolha: (t: string, assuntoId?: string) => void; onAcao: (i: number, cancelar: boolean) => void;
+  assuntos?: Assunto[]; onMover: (mensagemId: string, assuntoId: string, titulo?: string) => void;
+}) {
+  if (m.papel === "sistema") return <p className="text-center text-xs text-[var(--text-muted)]">{m.texto}</p>;
   if (m.papel === "user") {
     return (
       <div className="flex justify-end">
@@ -315,15 +395,76 @@ function Balao({ m, agente, ocupado, onEscolha, onAcao }: { m: Mensagem; agente?
       </div>
     );
   }
+  const assunto = assuntos?.find((a) => a.id === m.assuntoId);
   return (
     <div className="flex gap-2 items-start">
       <span className="mt-1"><Avatar a={agente} tamanho={28} /></span>
-      <div className="max-w-[min(48rem,100%)] min-w-0 rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
-        <Resposta texto={m.texto} onEscolha={onEscolha} desativado={ocupado} />
-        {m.acoes?.map((a, i) => <CartaoAcao key={i} a={a} ocupado={ocupado} onDecidir={(c) => onAcao(i, c)} />)}
-        <p className="text-[10px] text-[var(--text-muted)] mt-1">{hora(m.ts)}</p>
+      <div className="max-w-[min(48rem,100%)] min-w-0">
+        {assunto && m.respostaDe && <EtiquetaAssunto atual={assunto} assuntos={assuntos!} onMover={(id, t) => onMover(m.respostaDe!, id, t)} />}
+        <div className="rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
+          <Resposta texto={m.texto} onEscolha={(t) => onEscolha(t, m.assuntoId)} desativado={ocupado} />
+          {m.acoes?.map((a, i) => <CartaoAcao key={i} a={a} ocupado={ocupado} onDecidir={(c) => onAcao(i, c)} />)}
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">{hora(m.ts)}{m.modeloRotulo ? ` · ${m.modeloRotulo}` : ""}</p>
+        </div>
       </div>
     </div>
+  );
+}
+
+// Etiqueta "📁 assunto" acima da resposta; clicar permite corrigir (mover para outro assunto ou criar um novo).
+function EtiquetaAssunto({ atual, assuntos, onMover }: { atual: Assunto; assuntos: Assunto[]; onMover: (assuntoId: string, titulo?: string) => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [novo, setNovo] = useState("");
+  return (
+    <div className="relative mb-1">
+      <button onClick={() => setAberto(!aberto)} aria-expanded={aberto} title="Assunto desta conversa. Clique para corrigir."
+        className="text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] px-1.5 py-0.5 rounded-md hover:bg-[var(--bg-tertiary)] cursor-pointer max-w-full truncate">📁 {atual.titulo}</button>
+      {aberto && (
+        <div className="absolute left-0 top-full mt-1 z-20 w-64 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg p-1.5">
+          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Mover esta conversa para</p>
+          {assuntos.filter((a) => a.id !== atual.id && !a.arquivado).map((a) => (
+            <button key={a.id} onClick={() => { onMover(a.id); setAberto(false); }} className="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer truncate">📁 {a.titulo}</button>
+          ))}
+          <form onSubmit={(e) => { e.preventDefault(); onMover("novo", novo.trim() || undefined); setNovo(""); setAberto(false); }} className="flex gap-1 mt-1 px-1">
+            <input value={novo} onChange={(e) => setNovo(e.target.value)} maxLength={60} placeholder="Novo assunto…" aria-label="Título do novo assunto"
+              className="flex-1 min-w-0 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1" />
+            <button type="submit" className="text-sm px-2 rounded-lg bg-[var(--accent)] text-white cursor-pointer">Criar</button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Lista lateral recolhível: retomar (fixa a próxima mensagem no assunto) e arquivar/reabrir.
+function PainelAssuntos({ assuntos, msgs, fixado, onFixar, onArquivar }: {
+  assuntos: Assunto[]; msgs: Mensagem[]; fixado: string | null; onFixar: (id: string | null) => void; onArquivar: (id: string, arquivado: boolean) => void;
+}) {
+  const [verArquivados, setVerArquivados] = useState(false);
+  const conta = (id: string) => msgs.filter((m) => m.papel === "user" && m.assuntoId === id).length;
+  const abertos = assuntos.filter((a) => !a.arquivado); const arq = assuntos.filter((a) => a.arquivado);
+  return (
+    <aside className="md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)]/60 overflow-y-auto max-h-48 md:max-h-none p-2" aria-label="Assuntos">
+      <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Assuntos abertos</p>
+      {!abertos.length && <p className="px-2 text-xs text-[var(--text-muted)]">Os assuntos aparecem aqui sozinhos conforme você conversa.</p>}
+      <ul className="space-y-0.5">
+        {abertos.map((a) => (
+          <li key={a.id} className={`flex items-center gap-1 rounded-lg ${fixado === a.id ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)]"}`}>
+            <button onClick={() => onFixar(fixado === a.id ? null : a.id)} aria-pressed={fixado === a.id} title="Retomar: a próxima mensagem vai para este assunto"
+              className="flex-1 min-w-0 text-left px-2 py-1.5 cursor-pointer"><span className="block text-sm truncate">📁 {a.titulo}</span><span className="block text-[10px] text-[var(--text-muted)]">{conta(a.id)} msgs{fixado === a.id ? " · retomando" : ""}</span></button>
+            <button onClick={() => onArquivar(a.id, true)} aria-label={`Arquivar ${a.titulo}`} title="Arquivar" className="px-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">⌫</button>
+          </li>
+        ))}
+      </ul>
+      {arq.length > 0 && (
+        <div className="mt-2">
+          <button onClick={() => setVerArquivados(!verArquivados)} aria-expanded={verArquivados} className="px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">{verArquivados ? "▾" : "▸"} Arquivados ({arq.length})</button>
+          {verArquivados && <ul>{arq.map((a) => (
+            <li key={a.id} className="flex items-center gap-1 px-2 py-1 text-xs text-[var(--text-muted)]"><span className="flex-1 min-w-0 truncate">{a.titulo}</span>
+              <button onClick={() => onArquivar(a.id, false)} className="underline cursor-pointer">reabrir</button></li>))}</ul>}
+        </div>
+      )}
+    </aside>
   );
 }
 

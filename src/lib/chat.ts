@@ -6,7 +6,9 @@
 
 import { squadFetch, squadUrlComToken } from "./squadFetch";
 
-export interface Agente { id: string; nome: string; emoji: string; cargo: string; quando: string; modelo: string }
+export interface Agente { id: string; nome: string; emoji: string; cargo: string; quando: string; modelo: string; assuntosAuto?: boolean }
+export interface Assunto { id: string; titulo: string; arquivado: boolean; criada: string }
+export interface ModeloOpcao { chave: string; rotulo: string; motor: "claude" | "codex"; aviso?: string | null; indisponivel?: string | null }
 export interface Acao {
   acao: string; parametros: Record<string, unknown>; resumo: string;
   estado: "pendente" | "executando" | "feita" | "erro" | "cancelada";
@@ -15,6 +17,7 @@ export interface Acao {
 export interface Mensagem {
   id: string; papel: "user" | "assistant" | "sistema"; texto: string; ts: string;
   anexos?: { id: string; nome: string }[]; acoes?: Acao[];
+  assuntoId?: string; modeloRotulo?: string; respostaDe?: string;
 }
 export interface ConversaResumo { id: string; agente: string; titulo: string; criada: string; atualizada: string; mensagens: number }
 export interface Uso {
@@ -33,7 +36,14 @@ export const chatApi = {
   uso: async () => json<Uso>(await squadFetch("/api/chat/uso")),
   conversas: async (agente: string) =>
     (await json<{ conversas: ConversaResumo[] }>(await squadFetch(`/api/chat/conversas?agente=${encodeURIComponent(agente)}`))).conversas,
-  conversa: async (id: string) => json<{ conversa: { id: string; agente: string; titulo: string }; mensagens: Mensagem[] }>(await squadFetch(`/api/chat/conversas/${id}`)),
+  conversa: async (id: string) => json<{ conversa: { id: string; agente: string; titulo: string }; mensagens: Mensagem[]; assuntos: Assunto[]; modelo: string; assuntosAuto: boolean }>(await squadFetch(`/api/chat/conversas/${id}`)),
+  modelos: async () => (await json<{ modelos: ModeloOpcao[] }>(await squadFetch("/api/chat/modelos"))).modelos,
+  trocarModelo: async (conversaId: string, modelo: string) =>
+    json<{ ok: boolean; modelo: string; texto: string }>(await squadFetch("/api/chat/modelo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversaId, modelo }) })),
+  mover: async (conversaId: string, mensagemId: string, assuntoId: string, titulo?: string) =>
+    json<{ ok: boolean; assuntos: Assunto[]; mensagens: Mensagem[] }>(await squadFetch("/api/chat/mover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversaId, mensagemId, assuntoId, titulo }) })),
+  assunto: async (conversaId: string, assuntoId: string, p: { arquivado?: boolean; titulo?: string }) =>
+    (await json<{ ok: boolean; assuntos: Assunto[] }>(await squadFetch("/api/chat/assunto", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversaId, assuntoId, ...p }) }))).assuntos,
   apagar: async (id: string) => json<{ ok: boolean }>(await squadFetch(`/api/chat/conversas/${id}`, { method: "DELETE" })),
   anexo: async (arq: File) => {
     const fd = new FormData(); fd.append("files", arq);
@@ -53,15 +63,17 @@ export const chatApi = {
 
 // ── Envio com resposta aparecendo aos poucos (SSE lido do corpo do fetch) ──
 export interface EventosEnvio {
-  onMeta: (m: { conversaId: string; mensagemId: string }) => void;
+  onMeta: (m: { conversaId: string; mensagemId: string | null; assuntoId?: string | null }) => void;
+  onAssunto?: (a: { id: string; titulo: string; novo: boolean }) => void;
+  onModelo?: (m: { chave: string; mensagem: Mensagem }) => void;
   onDelta: (t: string) => void;
   onStatus: (t: string) => void;
-  onDone: (d: { mensagem: Mensagem; uso: Uso; aviso: string | null }) => void;
+  onDone: (d: { mensagem: Mensagem | null; uso: Uso; aviso: string | null }) => void;
   onErro: (e: string) => void;
 }
 
 export async function enviarMensagem(
-  corpo: { agente: string; conversaId?: string; mensagem: string; anexos?: string[] },
+  corpo: { agente: string; conversaId?: string; mensagem: string; anexos?: string[]; modelo?: string; assuntoId?: string },
   ev: EventosEnvio, sinal: AbortSignal,
 ) {
   let r: Response;
@@ -89,6 +101,7 @@ export async function enviarMensagem(
         if (!nome || !dados) continue;
         let d: any; try { d = JSON.parse(dados); } catch { continue; }
         if (nome === "meta") ev.onMeta(d); else if (nome === "delta") ev.onDelta(d.texto);
+        else if (nome === "assunto") ev.onAssunto?.(d); else if (nome === "modelo") ev.onModelo?.(d);
         else if (nome === "status") ev.onStatus(d.texto); else if (nome === "done") ev.onDone(d);
         else if (nome === "erro") ev.onErro(d.erro);
       }
