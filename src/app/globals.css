@@ -442,6 +442,8 @@ body {
 .esc-ag img { width: var(--w); height: auto; filter: drop-shadow(0 .45cqw .4cqw rgba(60, 40, 10, .35)); pointer-events: none; }
 .esc-ag.sel img { filter: drop-shadow(0 0 .8cqw rgba(255, 200, 80, .95)); }
 .esc-ag:focus-visible { outline: 2px solid #1F5C5C; outline-offset: 2px; border-radius: 8px; }
+.esc-ag.arr { outline: 2px dotted #1F5C5C; outline-offset: 3px; border-radius: 12px; background: rgba(255, 255, 255, .38); cursor: grab; touch-action: none; }
+.esc-ag.arr.arrastando { cursor: grabbing; transition: none; outline-color: #A0583C; background: rgba(255, 244, 214, .6); }
 .esc-nome { margin-top: -.45cqw; font-size: clamp(8px, .85cqw, 13px); font-weight: 800; background: #EDEBE6; color: #5E6B69; border-radius: 999px; padding: .08em .75em; box-shadow: 0 2px 0 rgba(0, 0, 0, .18); white-space: nowrap; }
 .esc-ag.trab .esc-nome { background: #1F5C5C; color: #fff; }
 .esc-luz { position: absolute; bottom: .25cqw; width: 88%; height: 1.2cqw; border-radius: 50%; background: radial-gradient(rgba(255, 214, 120, .9), transparent 70%); z-index: -1; pointer-events: none; }

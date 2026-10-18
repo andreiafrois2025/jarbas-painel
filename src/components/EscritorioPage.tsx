@@ -17,8 +17,8 @@ import { usePainel } from "@/lib/painel-context";
 import { ehColaboradorOculto, ehPessoal } from "@/lib/modo";
 import {
   AGENTES, ALTURA, arrumaBaloes, CAFE, CP_DURACAO, CP_ESPERA, POS_ANDREIA, LARGURA, ROTEIROS, SALAS, SOFA,
-  buscaEscritorio, liberaSom, perfil, somDoisTons, somPlim, somTecla,
-  type AgenteVivo, type DadosEscritorio, type EventoMural, type PerfilAgente,
+  buscaEscritorio, buscaPosicoes, liberaSom, perfil, salvaPosicoes, somDoisTons, somPlim, somTecla,
+  type AgenteVivo, type DadosEscritorio, type EventoMural, type PerfilAgente, type PosicoesRel, type PosRel,
 } from "@/lib/escritorio";
 
 const TZ = "America/Sao_Paulo";
@@ -29,6 +29,9 @@ const PERMANENCIA_SOFA = 4 * 60_000;
 const SEM_TAREFA_SOFA = 24 * 3600_000;
 const ATUALIZA_MS = 25_000;
 const CHAVE_SOM = "escritorioSom";
+
+type Alvo = "trab" | "livre";
+const SEM_ARRASTE = 0.0005;
 
 type Lugar = { tipo: "cafe" | "sofa"; idx: number; ate: number };
 
@@ -67,6 +70,25 @@ export default function EscritorioPage() {
   const [entregaBal, setEntregaBal] = useState<Record<string, { texto: string; ate: number }>>({});
   const raiz = useRef<HTMLDivElement>(null);
   const palco = useRef<HTMLDivElement>(null);
+
+  // ── posições arrumadas (global, vêm da squad-api) e modo "Arrumar posições" ──
+  const [pos, setPos] = useState<PosicoesRel>({});
+  const [arrumar, setArrumar] = useState(false);
+  const [alvo, setAlvo] = useState<Alvo>("trab");
+  const [rascunho, setRascunho] = useState<PosicoesRel>({});
+  const [arrastando, setArrastando] = useState<string | null>(null);
+  const [confirmaPadrao, setConfirmaPadrao] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erroPos, setErroPos] = useState("");
+  const [celular, setCelular] = useState(false);
+  const grab = useRef<{ dx: number; dy: number } | null>(null);
+  useEffect(() => { buscaPosicoes().then(setPos).catch(() => { /* sem posições salvas: padrão do código */ }); }, []);
+  useEffect(() => {
+    const m = window.matchMedia("(max-width: 767px)");
+    const f = () => setCelular(m.matches);
+    f(); m.addEventListener("change", f);
+    return () => m.removeEventListener("change", f);
+  }, []);
 
   // ── agentes que aparecem ──────────────────────────────────────────────
   const visiveis = useMemo<PerfilAgente[]>(
@@ -251,6 +273,7 @@ export default function EscritorioPage() {
   const eraFull = useRef(false);
   const entrarAula = () => {
     setSel(null); setEntregaBal({}); setLugar({}); setRoteiroId(null);
+    setArrumar(false); setConfirmaPadrao(false);
     setAula(true);
     try { void raiz.current?.requestFullscreen?.().catch(() => { /* sem tela cheia: fica sobreposto */ }); } catch { /* idem */ }
   };
@@ -297,16 +320,69 @@ export default function EscritorioPage() {
   }, [aula, aulaT, trechos, dados, visiveis, nTrabalhando]);
 
   // ── posição de cada agente ────────────────────────────────────────────
+  const padraoRel = (a: PerfilAgente, k: Alvo): PosRel => ({ x: a[k].x / LARGURA, y: a[k].y / ALTURA });
+  const efetivaRel = (a: PerfilAgente, k: Alvo, fonte: PosicoesRel): PosRel => fonte[a.id]?.[k] ?? padraoRel(a, k);
+  const abs = (r: PosRel) => ({ x: r.x * LARGURA, y: r.y * ALTURA });
   const ondeEsta = (a: PerfilAgente) => {
-    if (vivos[a.id]?.estado === "trabalhando") return { ...a.trab, modo: "trab" as const };
+    if (arrumar) return { ...abs(efetivaRel(a, alvo, rascunho)), modo: alvo === "trab" ? ("trab" as const) : ("livre" as const) };
+    if (vivos[a.id]?.estado === "trabalhando") return { ...abs(efetivaRel(a, "trab", pos)), modo: "trab" as const };
     const l = lugar[a.id];
     if (l?.tipo === "cafe") return { ...CAFE[l.idx], modo: "cafe" as const };
     if (l?.tipo === "sofa") return { ...SOFA[l.idx], modo: "sofa" as const };
-    return { ...a.livre, modo: "livre" as const };
+    return { ...abs(efetivaRel(a, "livre", pos)), modo: "livre" as const };
   };
   const ordenados = [...visiveis].sort((a, b) => ondeEsta(a).y - ondeEsta(b).y);
 
   const selPerfil = sel ? perfil(sel) : undefined;
+
+  // ── modo arrumar: abrir, arrastar, salvar ─────────────────────────────
+  const abrirArrumar = () => {
+    const r: PosicoesRel = {};
+    for (const a of AGENTES) r[a.id] = { trab: efetivaRel(a, "trab", pos), livre: efetivaRel(a, "livre", pos) };
+    setRascunho(r); setAlvo("trab"); setSel(null); setErroPos(""); setConfirmaPadrao(false); setArrumar(true);
+  };
+  const fecharArrumar = () => { setArrumar(false); setArrastando(null); setConfirmaPadrao(false); setErroPos(""); };
+  const voltarPadrao = () => {
+    const r: PosicoesRel = {};
+    for (const a of AGENTES) r[a.id] = { trab: padraoRel(a, "trab"), livre: padraoRel(a, "livre") };
+    setRascunho(r); setConfirmaPadrao(false);
+  };
+  const salvar = async () => {
+    // só grava o que difere do padrão do código (assim ajustes futuros do padrão continuam valendo)
+    const fora: PosicoesRel = {};
+    for (const a of AGENTES) {
+      const item: { trab?: PosRel; livre?: PosRel } = {};
+      for (const k of ["trab", "livre"] as Alvo[]) {
+        const r = rascunho[a.id]?.[k]; const d = padraoRel(a, k);
+        if (r && (Math.abs(r.x - d.x) > SEM_ARRASTE || Math.abs(r.y - d.y) > SEM_ARRASTE)) item[k] = { x: Math.min(1, Math.max(0, r.x)), y: Math.min(1, Math.max(0, r.y)) };
+      }
+      if (item.trab || item.livre) fora[a.id] = item;
+    }
+    setSalvando(true); setErroPos("");
+    try { setPos(await salvaPosicoes(fora)); fecharArrumar(); }
+    catch { setErroPos("Não consegui salvar agora. As posições continuam como você deixou aqui; tente de novo."); }
+    finally { setSalvando(false); }
+  };
+  const comecaArraste = (e: React.PointerEvent<HTMLButtonElement>, a: PerfilAgente) => {
+    if (!arrumar || !palco.current) return;
+    e.preventDefault(); e.stopPropagation();
+    const r = palco.current.getBoundingClientRect();
+    const p = efetivaRel(a, alvo, rascunho);
+    grab.current = { dx: e.clientX - (r.left + p.x * r.width), dy: e.clientY - (r.top + p.y * r.height) };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* sem captura */ }
+    setArrastando(a.id);
+  };
+  const moveArraste = (e: React.PointerEvent<HTMLButtonElement>, a: PerfilAgente) => {
+    if (arrastando !== a.id || !grab.current || !palco.current) return;
+    const r = palco.current.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (e.clientX - grab.current.dx - r.left) / r.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - grab.current.dy - r.top) / r.height));
+    setRascunho((d) => ({ ...d, [a.id]: { ...d[a.id], [alvo]: { x, y } } }));
+  };
+  const fimArraste = (e: React.PointerEvent<HTMLButtonElement>) => {
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* idem */ }
+    grab.current = null; setArrastando(null);
+  };
 
   return (
     <div ref={raiz} className={aula ? "fixed inset-0 z-[200] flex flex-col bg-[var(--bg-primary)]" : "flex-1 min-h-0 flex flex-col"}>
@@ -326,7 +402,34 @@ export default function EscritorioPage() {
       <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
         {/* Coluna do prédio */}
         <div className="flex-1 min-w-0 md:min-h-0 md:overflow-y-auto p-3 md:p-4 flex flex-col gap-3">
-          {!aula && (
+          {!aula && arrumar && (
+            <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-bold mr-1">✋ Arrumar posições</span>
+                <div className="flex gap-1.5" role="group" aria-label="Qual posição arrumar">
+                  {([["trab", "🪑 Trabalhando (na mesa)"], ["livre", "🧍 Livre"]] as [Alvo, string][]).map(([k, r]) => (
+                    <button key={k} onClick={() => setAlvo(k)} aria-pressed={alvo === k}
+                      className={`text-sm font-semibold rounded-full border px-3.5 py-1.5 cursor-pointer ${alvo === k ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border-light)] hover:bg-[var(--bg-tertiary)]"}`}>{r}</button>
+                  ))}
+                </div>
+                <span className="ml-auto flex flex-wrap gap-2">
+                  <button onClick={() => setConfirmaPadrao(true)} disabled={salvando} className="text-sm font-semibold rounded-full border border-[var(--border-light)] px-3.5 py-1.5 hover:bg-[var(--bg-tertiary)] cursor-pointer">↺ Voltar ao padrão</button>
+                  <button onClick={fecharArrumar} disabled={salvando} className="text-sm font-semibold rounded-full border border-[var(--border-light)] px-3.5 py-1.5 hover:bg-[var(--bg-tertiary)] cursor-pointer">Cancelar</button>
+                  <button onClick={salvar} disabled={salvando} className="text-sm font-bold rounded-full border border-[var(--accent)] bg-[var(--accent)] text-white px-4 py-1.5 cursor-pointer disabled:opacity-60">{salvando ? "Salvando…" : "Salvar"}</button>
+                </span>
+              </div>
+              <p className="m-0 text-[13px] text-[var(--text-secondary)]">Arraste cada mascote para onde ele deve ficar quando estiver <b>{alvo === "trab" ? "trabalhando" : "livre"}</b>. O ponto é o pé do mascote. Os balões ficam escondidos enquanto você arruma.</p>
+              {confirmaPadrao && (
+                <div role="alertdialog" aria-label="Confirmar voltar ao padrão" className="flex flex-wrap items-center gap-2 rounded-lg bg-[var(--bg-tertiary)] px-3 py-2 text-sm">
+                  <span className="mr-auto">Voltar todos os mascotes às posições de fábrica? Só vale depois de clicar em Salvar.</span>
+                  <button onClick={voltarPadrao} className="text-sm font-bold rounded-full border border-[var(--accent)] bg-[var(--accent)] text-white px-3.5 py-1 cursor-pointer">Sim, voltar</button>
+                  <button onClick={() => setConfirmaPadrao(false)} className="text-sm font-semibold rounded-full border border-[var(--border-light)] px-3.5 py-1 cursor-pointer">Não</button>
+                </div>
+              )}
+              {erroPos && <p role="alert" className="m-0 text-sm text-[#B3402A]">{erroPos}</p>}
+            </div>
+          )}
+          {!aula && !arrumar && (
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm text-[var(--text-secondary)] mr-auto">
                 {erro ? "Sem resposta da central agora: mostrando todos livres." : "A equipe ao vivo. Clique num agente para ver o que ele faz."}
@@ -335,6 +438,12 @@ export default function EscritorioPage() {
                 className={`text-sm font-semibold rounded-full border px-3.5 py-1.5 cursor-pointer ${som ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"}`}>
                 {som ? "🔊 Sons" : "🔇 Sons"}
               </button>
+              <button onClick={abrirArrumar} disabled={celular}
+                title={celular ? "Arrume pelo computador" : "Arraste os mascotes para onde quiser"}
+                className="text-sm font-semibold rounded-full border border-[var(--border-light)] px-3.5 py-1.5 hover:bg-[var(--bg-tertiary)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                ✋ Arrumar posições
+              </button>
+              {celular && <span className="text-xs text-[var(--text-muted)]">Arrume pelo computador.</span>}
               <button onClick={entrarAula} title="Tela cheia com uma cena de exemplo, sem dado real"
                 className="text-sm font-semibold rounded-full border border-[var(--border-light)] px-3.5 py-1.5 hover:bg-[var(--bg-tertiary)] cursor-pointer">
                 🎬 Modo aula
@@ -395,20 +504,21 @@ export default function EscritorioPage() {
                   const v = vivos[a.id];
                   const trab = p.modo === "trab";
                   const ent = entregaBal[a.id];
-                  const verEntrega = ent && ent.ate > Date.now();
-                  const verOcio = p.modo === "livre" && ocioVis[a.id] > Date.now();
-                  const temBalao = verEntrega || trab || verOcio || p.modo === "cafe" || p.modo === "sofa";
+                  const verEntrega = !arrumar && ent && ent.ate > Date.now();
+                  const verOcio = !arrumar && p.modo === "livre" && ocioVis[a.id] > Date.now();
+                  const temBalao = !arrumar && (verEntrega || trab || verOcio || p.modo === "cafe" || p.modo === "sofa");
                   return (
                     <button key={a.id} type="button" data-id={a.id} data-sala={a.sala} data-x={p.x} data-y={p.y}
-                      className={`esc-ag ${trab ? "trab" : "livre"} ${sel === a.id ? "sel" : ""}`}
-                      style={{ left: `${(p.x / LARGURA) * 100}%`, top: `${(p.y / ALTURA) * 100}%`, ["--w" as string]: `${(a.tam / LARGURA) * 100}cqw`, zIndex: Math.round(p.y) + (temBalao ? 700 : 0) }}
+                      className={`esc-ag ${trab ? "trab" : "livre"} ${sel === a.id ? "sel" : ""} ${arrumar ? "arr" : ""} ${arrastando === a.id ? "arrastando" : ""}`}
+                      style={{ left: `${(p.x / LARGURA) * 100}%`, top: `${(p.y / ALTURA) * 100}%`, ["--w" as string]: `${(a.tam / LARGURA) * 100}cqw`, zIndex: arrastando === a.id ? 3000 : Math.round(p.y) + (temBalao ? 700 : 0) }}
+                      onPointerDown={(e) => comecaArraste(e, a)} onPointerMove={(e) => moveArraste(e, a)} onPointerUp={fimArraste} onPointerCancel={fimArraste}
                       aria-label={`${a.nome}, ${a.cargo}: ${trab ? (v?.tarefaTxt ?? "trabalhando") : "livre"}`}
-                      onClick={(e) => { e.stopPropagation(); setSel(sel === a.id ? null : a.id); }}>
+                      onClick={(e) => { e.stopPropagation(); if (!arrumar) setSel(sel === a.id ? null : a.id); }}>
                       {trab && <span className="esc-luz" />}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={`/mascotes/${a.id}-${a.id === "jarbas" ? 512 : 256}.webp`} alt="" draggable={false} />
                       <span className="esc-nome">{a.nome}</span>
-                      {verEntrega ? (
+                      {arrumar ? null : verEntrega ? (
                         <span key="ent" data-prio={1} className="esc-fala ok">{ent.texto}</span>
                       ) : trab ? (
                         <span key="trab" data-prio={2} className="esc-fala">

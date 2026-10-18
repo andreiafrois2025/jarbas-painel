@@ -89,6 +89,34 @@ export async function buscaEscritorio(servidora: boolean): Promise<DadosEscritor
   return r.json();
 }
 
+// ── Posições arrumadas pela Andréia (GET/POST /api/escritorio/posicoes) ─────
+// Relativas ao prédio (0 a 1). O que não estiver aqui fica no padrão do código.
+export type PosRel = { x: number; y: number };
+export type PosicoesRel = Record<string, { trab?: PosRel; livre?: PosRel }>;
+
+async function tokenSessao(): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("sem sessão");
+  return token;
+}
+
+export async function buscaPosicoes(): Promise<PosicoesRel> {
+  const token = await tokenSessao();
+  const r = await fetch(`${SQUAD_API_BASE}/api/escritorio/posicoes`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error(String(r.status));
+  return ((await r.json()).agentes ?? {}) as PosicoesRel;
+}
+
+export async function salvaPosicoes(agentes: PosicoesRel): Promise<PosicoesRel> {
+  const token = await tokenSessao();
+  const r = await fetch(`${SQUAD_API_BASE}/api/escritorio/posicoes`, {
+    method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ agentes }),
+  });
+  if (!r.ok) throw new Error(String(r.status));
+  return ((await r.json()).agentes ?? {}) as PosicoesRel;
+}
+
 // ── Roteiros do modo aula (SÓ exemplo, nada de dado real) ──────────────────
 // Dois roteiros de ~90 s que repetem, seguindo o fluxo real da squad, com
 // CHECKPOINTS HUMANOS: a Andréia aparece no Comando ("Esperando você: ..."),
