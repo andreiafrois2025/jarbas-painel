@@ -5,6 +5,7 @@ import { Squad, SquadDocument, Collaborator, CONTEXTS } from "@/lib/types";
 import { getSquads, addSquad, updateSquad, deleteSquad, getCollaborators } from "@/lib/storage";
 import { useUI } from "./ui";
 import { supabase } from "@/lib/supabase";
+import { refDocumento, abrirDocumento } from "@/lib/documentos";
 import { SQUAD_API_BASE } from "@/lib/config";
 import StartSquadModal from "./StartSquadModal";
 
@@ -145,10 +146,9 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
           .from("squad-documents")
           .upload(path, file, { cacheControl: "3600", upsert: false });
         if (upErr) throw new Error(`Erro ao subir ${file.name}: ${upErr.message}`);
-        const { data: pub } = supabase.storage.from("squad-documents").getPublicUrl(path);
         uploaded.push({
           name: file.name,
-          url: pub.publicUrl,
+          url: refDocumento(path),
           path,
           size: file.size,
           mime_type: file.type,
@@ -471,9 +471,8 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
                             : "📄"}
                         </span>
                         <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          href="#"
+                          onClick={(e) => { e.preventDefault(); abrirDocumento(doc.path).catch(() => setUploadError("Não consegui abrir o arquivo agora.")); }}
                           className="flex-1 truncate text-[var(--text-primary)] hover:text-[var(--accent)] no-underline"
                           title={doc.name}
                         >

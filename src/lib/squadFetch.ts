@@ -28,3 +28,16 @@ export async function squadUrlComToken(path: string): Promise<string> {
   const sep = path.includes("?") ? "&" : "?";
   return `${SQUAD_API_BASE}${path}${token ? `${sep}token=${encodeURIComponent(token)}` : ""}`;
 }
+
+// Pede à squad-api um link assinado (curta duração) para abrir um arquivo de
+// /outputs, /uploads-tmp ou /estudio-files, que não aceitam mais acesso sem login.
+export async function linkArquivo(caminho: string, validadeS?: number): Promise<string> {
+  const r = await squadFetch("/api/link-arquivo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ caminho, validade_s: validadeS }),
+  });
+  if (!r.ok) throw new Error(`link-arquivo ${r.status}`);
+  const { url } = await r.json();
+  return url as string;
+}
