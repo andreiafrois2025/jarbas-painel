@@ -2,3 +2,6 @@ node_modules/
 .next/ 
 .env.local 
 tsconfig.tsbuildinfo
+
+# 18/10: sem a barra, para ignorar também o atalho (symlink) dos worktrees
+node_modules
