@@ -77,7 +77,7 @@ function Vazio({ children }: { children: React.ReactNode }) {
 
 function BlocoHoje({ dados, erro }: { dados: DadosHoje | null; erro: boolean }) {
   const hoje = lerAgenda(dados?.agenda);
-  const proximos = hoje.length === 0 ? lerAgenda(dados?.agenda_semana, true).slice(0, 3) : [];
+  const proximos = hoje.length === 0 ? lerAgenda(dados?.agenda_semana, true).slice(0, 2) : [];
   return (
     <section>
       <Titulo extra={<a href="https://calendar.google.com/calendar/u/0/r" target="_blank" rel="noreferrer" className="normal-case tracking-normal font-bold text-[var(--ac)] no-underline">agenda</a>}>Hoje</Titulo>
@@ -85,13 +85,14 @@ function BlocoHoje({ dados, erro }: { dados: DadosHoje | null; erro: boolean }) 
         : !dados ? <Vazio>carregando…</Vazio>
         : <>
           {hoje.length === 0 && <Vazio>Sem compromissos hoje.</Vazio>}
+          {proximos.length > 0 && <p className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mt-1">Próximos dias</p>}
           {[...hoje, ...proximos].map((a, i) => (
             <div key={i} className="flex gap-2.5 items-baseline py-[7px] border-b border-dashed border-[var(--border)] last:border-0 text-[13.5px]">
               <span className="font-extrabold text-[var(--ac)] w-[52px] shrink-0 tabular-nums">
                 {a.hora}
                 {a.quando && <span className="block text-[10px] font-semibold text-[var(--text-secondary)] capitalize">{a.quando}</span>}
               </span>
-              <span className="min-w-0 break-words">{a.titulo}</span>
+              <span className="min-w-0 break-words line-clamp-2">{a.titulo}</span>
             </div>
           ))}
         </>}
@@ -101,7 +102,7 @@ function BlocoHoje({ dados, erro }: { dados: DadosHoje | null; erro: boolean }) 
 
 function BlocoEsperando({ caixa, carregado }: { caixa: CardCaixa[]; carregado: boolean }) {
   const router = useRouter();
-  const mostrar = caixa.slice(0, 4);
+  const mostrar = caixa.slice(0, 3);
   return (
     <section>
       <Titulo extra={carregado ? <span className="normal-case tracking-normal font-bold text-[var(--ac)]">{caixa.length}</span> : null}>Esperando você</Titulo>
@@ -114,7 +115,7 @@ function BlocoEsperando({ caixa, carregado }: { caixa: CardCaixa[]; carregado: b
               {/* Quem pediu: a caixa vem do Radar, que é a curadoria do Mike */}
               <Mascote nome="mike" emoji="🔍" tamanho={30} />
               <span className="min-w-0">
-                <span className="block break-words">{semPrefixo(c.titulo)}</span>
+                <span className="block break-words line-clamp-2">{semPrefixo(c.titulo)}</span>
                 <small className="block text-[11.5px] text-[var(--text-secondary)]">{ehUau(c) ? "UAU · " : ""}Radar · ler e decidir no Notion</small>
               </span>
             </a>
