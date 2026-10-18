@@ -112,11 +112,11 @@ function BlocoEsperando({ caixa, carregado }: { caixa: CardCaixa[]; carregado: b
           {mostrar.map((c) => (
             <a key={c.id} href={c.url} target="_blank" rel="noreferrer"
               className="flex gap-2.5 items-center rounded-[10px] px-2.5 py-[9px] mb-[7px] text-[13px] no-underline text-[var(--text-primary)] bg-[var(--bg-tertiary)] hover:brightness-95 transition">
-              {/* Quem pediu: a caixa vem do Radar, que é a curadoria do Mike */}
-              <Mascote nome="mike" emoji="🔍" tamanho={30} />
+              {/* Quem pediu: vem do /api/hoje (campo agente); sem pista, o Jarbas */}
+              <Mascote nome={c.agente || "jarbas"} emoji="⚡" tamanho={30} />
               <span className="min-w-0">
                 <span className="block break-words line-clamp-2">{semPrefixo(c.titulo)}</span>
-                <small className="block text-[11.5px] text-[var(--text-secondary)]">{ehUau(c) ? "UAU · " : ""}Radar · ler e decidir no Notion</small>
+                <small className="block text-[11.5px] text-[var(--text-secondary)]">{ehUau(c) ? "UAU · " : ""}{c.origem || "Caixa de aprovação"} · ler e decidir no Notion</small>
               </span>
             </a>
           ))}

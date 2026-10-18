@@ -9,6 +9,11 @@ export interface CardCaixa {
   titulo: string;
   coluna: string;
   url: string;
+  /** id do agente que pediu (mike, izzy, louis...); ausente = não sei */
+  agente?: string | null;
+  /** de onde veio, em palavras (ex.: Radar de notícias) */
+  origem?: string;
+  tipo?: string;
 }
 
 export interface ItemEscola {
