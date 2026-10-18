@@ -28,12 +28,13 @@ export function usePainel(): PainelData {
 
 // Mapeia os nomes de página legados (onNavigate) para as rotas novas.
 export const PAGE_PATHS: Record<string, string> = {
-  inicio: "/inicio",
+  inicio: "/conversa",
+  office: "/equipe?aba=escritorio",
   equipe: "/equipe",
-  producao: "/producao/squads",
+  producao: "/maquina?aba=squads",
   config: "/config",
 };
 
 export function pageToPath(page: string): string {
-  return PAGE_PATHS[page] || "/inicio";
+  return PAGE_PATHS[page] || "/conversa";
 }

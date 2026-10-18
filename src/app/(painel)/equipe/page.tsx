@@ -1,17 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import HRPage from "@/components/HRPage";
-import { usePainel, pageToPath } from "@/lib/painel-context";
+import { Suspense } from "react";
+import EquipePage from "@/components/EquipePage";
 
-export default function EquipePage() {
-  const router = useRouter();
-  const { reload } = usePainel();
-
-  return (
-    <HRPage
-      onNavigate={(p) => router.push(pageToPath(p))}
-      onDataChanged={reload}
-    />
-  );
+// Suspense: as abas leem o ?aba= do endereço.
+export default function EquipeRoute() {
+  return <Suspense fallback={null}><EquipePage /></Suspense>;
 }

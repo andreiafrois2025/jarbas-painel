@@ -684,7 +684,7 @@ function PonteiroAutomacoes() {
         como cada uma funciona e o sinal de vida (se rodou mesmo).
       </p>
       <a
-        href="/producao/automacoes"
+        href="/maquina?aba=mapa"
         className="inline-block mt-3 text-sm px-4 py-2 rounded-full font-medium text-white hover:opacity-90"
         style={{ background: "var(--accent, #2D6B6B)" }}
       >

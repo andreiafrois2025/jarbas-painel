@@ -13,6 +13,10 @@ import {
 } from "@/lib/storage";
 import type { Category as CategoryType } from "@/lib/types";
 import JobsMonitor from "./JobsMonitor";
+import BuscaGlobal from "./BuscaGlobal";
+import BotaoTema from "./BotaoTema";
+import Mascote from "./Mascote";
+import { PORTAS, PORTA_CONFIG, portaAtiva } from "@/lib/navegacao";
 import { PainelContext } from "@/lib/painel-context";
 import { ProvedorUI } from "./ui";
 import {
@@ -26,22 +30,6 @@ interface DashboardProps {
   children: ReactNode;
 }
 
-// 25/07/2026 (F4.6): o menu ganhou NOME. Antes eram 7 emojis sem legenda, e o
-// nome só aparecia parando o mouse em cima por um segundo — o que no celular,
-// onde a barra vai pra baixo, é impossível. Funcionava pra ela porque ela
-// construiu; não funcionaria pra mais ninguém, nem pra ela daqui a 3 meses.
-const NAV_ITEMS: { path: string; icon: string; nome: string; title: string; match: string; pessoal?: boolean }[] = [
-  { path: "/inicio", icon: "🏠", nome: "Hoje", title: "Hoje — agenda, tarefas e a caixa de aprovação", match: "/inicio" },
-  { path: "/chat", icon: "💬", nome: "Chat", title: "Chat — converse com o Jarbas e com cada funcionário", match: "/chat" },
-  { path: "/equipe", icon: "👥", nome: "Equipe", title: "Equipe — colaboradores, setores e assistentes", match: "/equipe" },
-  { path: "/producao/automacoes", icon: "🚀", nome: "Produção", title: "Produção — squads, automações, fluxos e estúdio", match: "/producao" },
-  { path: "/saude", icon: "🩺", nome: "Saúde", title: "Saúde — do sistema e das integrações", match: "/saude" },
-  { path: "/pessoal", icon: "🤎", nome: "Pessoal", title: "Pessoal — escola do Luiz e finanças", match: "/pessoal", pessoal: true },
-  { path: "/metricas", icon: "📊", nome: "Métricas", title: "Métricas — números e diário de bordo", match: "/metricas" },
-  { path: "/biblioteca", icon: "📚", nome: "Biblioteca", title: "Biblioteca — criações, skills, prompts e grafo", match: "/biblioteca" },
-  { path: "/config", icon: "⚙️", nome: "Config", title: "Config — sua conta", match: "/config" },
-];
-
 // Shell do painel: sidebar + JobsMonitor + dados compartilhados.
 // Vive no layout de rota, então navegar entre páginas não recarrega os dados.
 export default function Dashboard({ session, children }: DashboardProps) {
@@ -53,7 +41,6 @@ export default function Dashboard({ session, children }: DashboardProps) {
   const [categories, setCategories] = useState<CategoryType[]>([]);
   const [quickLinks, setQuickLinks] = useState<QuickLink[]>([]);
   const [loading, setLoading] = useState(true);
-  const [aberto, setAberto] = useState(false);
   // Modo Servidora/Tudo (Fase 5-A). Abre sempre em "Tudo" numa aba nova; a
   // escolha vale até fechar o navegador (sessionStorage), pra não esquecer
   // ligada. Este componente só monta no navegador (o layout espera o login),
@@ -65,13 +52,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
     setModoState(m);
   }, []);
 
-  // Lembra se ela deixou o menu aberto — é preferência, não estado de tela.
-  useEffect(() => {
-    setAberto(window.localStorage.getItem("menuAberto") === "1");
-  }, []);
-  useEffect(() => {
-    window.localStorage.setItem("menuAberto", aberto ? "1" : "0");
-  }, [aberto]);
+  const [menuAvatar, setMenuAvatar] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -135,88 +116,93 @@ export default function Dashboard({ session, children }: DashboardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center dashboard-bg">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
         <div className="flex flex-col items-center gap-3">
-          <span className="text-4xl animate-pulse">⚡</span>
-          <span className="text-[var(--text-secondary)]">Carregando escritório...</span>
+          <Mascote nome="jarbas" emoji="⚡" tamanho={56} className="animate-pulse" />
+          <span className="text-[var(--text-secondary)]">Carregando…</span>
         </div>
       </div>
     );
   }
 
+  const portaBtn = (p: typeof PORTAS[number], extra = "") => {
+    const ativo = portaAtiva(pathname, p);
+    return (
+      <button
+        key={p.id}
+        onClick={() => router.push(p.path)}
+        title={p.title}
+        aria-label={p.rotulo}
+        aria-current={ativo ? "page" : undefined}
+        className={`flex flex-col items-center justify-center gap-1 rounded-xl cursor-pointer transition-colors w-16 md:w-[62px] py-1.5 md:py-2.5 ${extra} ${
+          ativo ? "bg-[var(--accent-soft)] text-[var(--ac)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+        }`}
+      >
+        <span className="text-xl leading-none" aria-hidden>{p.icone}</span>
+        <span className="text-[10.5px] font-bold leading-none">{p.rotulo}</span>
+      </button>
+    );
+  };
+
   return (
     <PainelContext.Provider value={{ ...visivel, modo, servidora, setModo, reload: loadData }}>
       <ProvedorUI>
-      <div className="h-screen flex flex-col md:flex-row dashboard-bg">
-        {/* ===== SIDEBAR ===== */}
-        <aside
-          className={`order-2 md:order-none w-full ${aberto ? "md:w-52" : "md:w-16"} bg-[var(--bg-secondary)]/95 backdrop-blur-sm border-t md:border-t-0 md:border-r border-[var(--border)] flex md:flex-col items-center md:items-stretch justify-around md:justify-start py-2 md:py-4 gap-1 md:gap-1 shrink-0 transition-[width] duration-150`}
-          aria-label="Menu principal"
-        >
-          <button
-            onClick={() => setAberto(!aberto)}
-            className="hidden md:flex items-center gap-2 px-3 mb-3 text-2xl cursor-pointer"
-            title={aberto ? "Encolher o menu" : "Expandir o menu"}
-            aria-label={aberto ? "Encolher o menu" : "Expandir o menu"}
-          >
-            <span>⚡</span>
-            {aberto && <span className="text-sm font-semibold text-[var(--text-primary)]">Jarbas</span>}
+      <div className="h-dvh flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]">
+        {/* ===== BARRA DO TOPO ===== */}
+        <header className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-2 px-3 md:px-5 py-2 md:py-0 md:h-[60px] border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+          <button onClick={() => router.push("/conversa")} className="order-1 flex items-center gap-2.5 cursor-pointer" title="Ir para a Conversa">
+            <Mascote nome="jarbas" emoji="⚡" tamanho={36} />
+            <span className="fonte-maquina text-[22px] leading-none text-[var(--ac)]">Jarbas</span>
           </button>
-          {NAV_ITEMS.filter((item) => !(servidora && item.pessoal)).map((item) => {
-            const ativo = pathname?.startsWith(item.match);
-            return (
-              <button
-                key={item.path}
-                onClick={() => router.push(item.path)}
-                className={`flex md:w-full flex-col md:flex-row items-center md:gap-2.5 md:px-3 py-1.5 md:py-2 rounded-xl cursor-pointer transition-all ${
-                  ativo ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--bg-tertiary)] opacity-70 hover:opacity-100"
-                }`}
-                title={item.title}
-                aria-current={ativo ? "page" : undefined}
-              >
-                <span className="text-lg leading-none">{item.icon}</span>
-                {/* No celular o nome fica embaixo do ícone, pequeno: lá não
-                    existe parar o mouse em cima pra descobrir o que é. */}
-                <span className={`text-[10px] md:text-sm md:font-medium ${aberto ? "md:inline" : "md:hidden"} ${ativo ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
-                  {item.nome}
-                </span>
+          <div className="order-2 md:order-3 flex-1" />
+          <div className="order-3 md:order-5"><BotaoTema /></div>
+          <div className="order-4 md:order-6 relative">
+            <button onClick={() => setMenuAvatar((v) => !v)} aria-label="Menu da conta" aria-expanded={menuAvatar}
+              className="w-[34px] h-[34px] rounded-full grid place-items-center text-[13px] font-extrabold cursor-pointer text-white"
+              style={{ background: "var(--ouro)" }}>AF</button>
+            {menuAvatar && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuAvatar(false)} />
+                <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg p-1 text-sm">
+                  <button onClick={() => { setMenuAvatar(false); router.push("/config"); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer">🔧 Ajustes</button>
+                  <button onClick={handleLogout} className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer">🚪 Sair da conta</button>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="order-5 basis-full md:hidden" />
+          <div className="order-6 md:order-2 flex-1 md:flex-none md:w-[280px] min-w-0"><BuscaGlobal /></div>
+          {/* Só Igam / Tudo: liga o modo servidora/tudo, que vale em todas as páginas */}
+          <div role="group" aria-label="O que mostrar"
+            className="order-7 md:order-4 flex shrink-0 rounded-full p-1 gap-0.5 text-[13px] font-bold bg-[var(--bg-tertiary)]">
+            {([["servidora", "🏛️ Só Igam", "Só Igam: esconde finanças, Luiz, casa e agentes pessoais (para projetar em aula)"], ["tudo", "✨ Tudo", "Tudo: mostra o painel completo"]] as const).map(([m, rotulo, dica]) => (
+              <button key={m} onClick={() => setModo(m)} aria-pressed={modo === m} title={dica}
+                className={`px-3 md:px-3.5 py-1.5 rounded-full cursor-pointer whitespace-nowrap transition-colors ${
+                  modo === m ? "bg-[var(--ac)] text-[var(--on-ac)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}>
+                {rotulo}
               </button>
-            );
-          })}
-          <div className="hidden md:block flex-1" />
-          <button
-            onClick={handleLogout}
-            className="flex md:w-full flex-col md:flex-row items-center md:gap-2.5 md:px-3 py-1.5 md:py-2 rounded-xl cursor-pointer opacity-70 hover:opacity-100 hover:bg-[var(--bg-tertiary)]"
-            title="Sair da conta"
-          >
-            <span className="text-lg leading-none">🚪</span>
-            <span className={`text-[10px] md:text-sm ${aberto ? "md:inline" : "md:hidden"} text-[var(--text-secondary)]`}>Sair</span>
-          </button>
-        </aside>
+            ))}
+          </div>
+        </header>
 
-        {/* ===== CONTEÚDO PRINCIPAL ===== */}
-        <main className="flex-1 flex flex-col overflow-hidden order-1 md:order-none min-h-0">
-          {servidora && (
-            <div
-              className="shrink-0 px-3 py-1 text-xs font-semibold text-center text-white flex items-center justify-center gap-3"
-              style={{ background: "var(--af-teal, #2D6B6B)" }}
-              role="status"
-            >
-              <span>🎓 Modo Servidora: dados pessoais ocultos</span>
-              <button
-                onClick={() => setModo("tudo")}
-                className="underline underline-offset-2 hover:brightness-125 cursor-pointer"
-                title="Voltar a mostrar tudo"
-              >
-                voltar para Tudo
-              </button>
-            </div>
-          )}
-          <JobsMonitor />
-          {/* A chave faz as páginas recomeçarem ao trocar de modo: nada do que
-              foi carregado em "Tudo" sobra na tela depois de ligar Servidora. */}
-          <Fragment key={modo}>{children}</Fragment>
-        </main>
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+          {/* ===== MENU: 5 portas + ajustes ===== */}
+          <nav aria-label="Menu principal"
+            className="order-2 md:order-none shrink-0 md:w-[76px] border-t md:border-t-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)] flex md:flex-col items-center justify-around md:justify-start md:pt-[18px] md:gap-2 py-1 md:py-0 pb-[max(0.25rem,env(safe-area-inset-bottom))] md:pb-0">
+            {PORTAS.map((p) => portaBtn(p))}
+            <div className="hidden md:block flex-1" />
+            {portaBtn(PORTA_CONFIG, "md:mb-[18px]")}
+          </nav>
+
+          {/* ===== CONTEÚDO ===== */}
+          <main className="flex-1 min-w-0 flex flex-col overflow-hidden order-1 md:order-none min-h-0 bg-[var(--bg-primary)]">
+            <JobsMonitor />
+            {/* A chave faz as páginas recomeçarem ao trocar de modo: nada do que
+                foi carregado em "Tudo" sobra na tela depois de ligar Só Igam. */}
+            <Fragment key={modo}>{children}</Fragment>
+          </main>
+        </div>
       </div>
       </ProvedorUI>
     </PainelContext.Provider>

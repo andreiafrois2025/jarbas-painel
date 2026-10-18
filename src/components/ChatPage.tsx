@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { chatApi, dividirResposta, enviarMensagem, type Acao, type Agente, type Assunto, type ConversaResumo, type Mensagem, type ModeloOpcao, type Uso } from "@/lib/chat";
 import { usePainel } from "@/lib/painel-context";
 import type { Collaborator } from "@/lib/types";
+import { ehColaboradorOculto } from "@/lib/modo";
 import TextoSeguro from "./chat/TextoSeguro";
 import Visuais from "./chat/Visuais";
 
@@ -43,7 +44,11 @@ function DescricaoRH({ c, fallback }: { c?: Collaborator; fallback: string }) {
   return <div className="space-y-1.5">{bloco("🎓 Especialização", c.specialization)}{bloco("🛠️ Habilidades", c.skills)}{bloco("🧠 Personalidade", c.personality)}{bloco("📋 Bio", c.bio)}</div>;
 }
 
-export default function ChatPage() {
+// `compacto`: usado na tela Conversa (painel v2). Sem a lista lateral de pessoas
+// (a escolha vira um seletor no topo), caixa de texto grande embaixo.
+// `servidora` (modo Só Igam): sem agentes pessoais e sem abrir conversa antiga,
+// porque o histórico pode citar assunto de casa.
+export default function ChatPage({ compacto = false, servidora = false }: { compacto?: boolean; servidora?: boolean }) {
   const { collaborators } = usePainel();
   const perfilDe = useCallback((a?: Agente) => (a ? collaborators.find((c) => c.name.trim().toLowerCase() === a.nome.toLowerCase()) : undefined), [collaborators]);
   const [abertos, setAbertos] = useState<Set<string>>(new Set()); // itens da lista com a descrição aberta
@@ -90,7 +95,7 @@ export default function ChatPage() {
   // inicial: lista de pessoas, uso e o último funcionário usado neste aparelho
   useEffect(() => {
     try { const s = window.localStorage.getItem("chatAgente"); if (s) setAgenteId(s); } catch { /* sem storage */ }
-    chatApi.agentes().then(setAgentes).catch((e) => setErro(e.message));
+    chatApi.agentes().then((as) => setAgentes(servidora ? as.filter((a) => !ehColaboradorOculto(a.nome) && a.id !== "louis") : as)).catch((e) => setErro(e.message));
     chatApi.uso().then(setUso).catch(() => {});
     chatApi.modelos().then(setModelos).catch(() => {});
   }, []);
@@ -105,8 +110,8 @@ export default function ChatPage() {
     try { window.localStorage.setItem("chatAgente", agenteId); } catch { /* sem storage */ }
     setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null);
     setModeloSel(agenteId === "jarbas" ? "sonnet" : "haiku");
-    chatApi.conversas(agenteId).then((cs) => { setConversas(cs); if (cs[0]) abrirConversa(cs[0].id); }).catch((e) => setErro(e.message));
-  }, [agenteId, agentes.length, abrirConversa]);
+    chatApi.conversas(agenteId).then((cs) => { setConversas(cs); if (cs[0] && !servidora) abrirConversa(cs[0].id); }).catch((e) => setErro(e.message));
+  }, [agenteId, agentes.length, abrirConversa, servidora]);
 
   useEffect(() => { fim.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [msgs, fluxo, status]);
 
@@ -206,7 +211,7 @@ export default function ChatPage() {
   return (
     <div className="flex-1 min-h-0 flex flex-col md:flex-row">
       {/* ===== LISTA DE PESSOAS ===== */}
-      <aside className="md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col min-h-0 md:max-h-none">
+      {!compacto && <aside className="md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col min-h-0 md:max-h-none">
         <button className="md:hidden flex items-center justify-between px-4 py-2 text-sm cursor-pointer" onClick={() => setListaAberta(!listaAberta)} aria-expanded={listaAberta}>
           <span className="flex items-center gap-2">{agente ? <><Avatar a={agente} tamanho={28} />{agente.nome}</> : "Escolher"}</span><span>{listaAberta ? "▲" : "▼ trocar"}</span>
         </button>
@@ -240,11 +245,25 @@ export default function ChatPage() {
           ))}
           {!agentes.length && !erro && <p className="p-3 text-sm text-[var(--text-muted)]">Carregando equipe…</p>}
         </div>
-      </aside>
+      </aside>}
 
       {/* ===== CONVERSA ===== */}
       <section className="flex-1 min-w-0 min-h-0 flex flex-col">
-        <header className="px-4 py-2.5 border-b border-[var(--border)] flex items-center gap-3 flex-wrap bg-[var(--bg-secondary)]">
+        <header className={`flex items-center gap-3 flex-wrap ${compacto ? "px-4 md:px-10 py-1.5" : "px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]"}`}>
+          {compacto ? (
+            <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] flex-1 basis-40 min-w-0">
+              <Avatar a={agente} tamanho={24} />
+              <span className="sr-only md:not-sr-only">Falando com</span>
+              <select value={agenteId} onChange={(e) => setAgenteId(e.target.value)} aria-label="Com quem você quer falar"
+                className="min-w-0 max-w-full rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1.5 text-xs font-semibold text-[var(--text-primary)] cursor-pointer">
+                {grupos.map((g, gi) => (
+                  <optgroup key={gi} label={g.rotulo || "Orquestrador"}>
+                    {g.itens.map((a) => <option key={a.id} value={a.id}>{a.nome}{perfilDe(a)?.specialization ? ` · ${perfilDe(a)!.specialization!.slice(0, 28)}` : ""}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+          ) : <>
           <Avatar a={agente} tamanho={40} />
           <div className="min-w-0 flex-1 basis-48">
             <h1 className="text-base font-semibold text-[var(--text-primary)] leading-tight">{agente?.nome ?? "Chat"}</h1>
@@ -252,6 +271,7 @@ export default function ChatPage() {
             {agente && dicaAberta && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <p className="text-[11px] text-[var(--text-muted)] leading-snug mt-0.5">{perfilDe(agente)?.bio || perfilDe(agente)?.skills}</p>}
           </div>
           {agente && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher descrição" : "ver descrição"}</button>}
+          </>}
           <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
             <span className="sr-only md:not-sr-only">Modelo</span>
             <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado} aria-label="Modelo que responde nesta conversa"
@@ -272,7 +292,7 @@ export default function ChatPage() {
               Hora {uso.hora.usadas}/{uso.hora.limite} · Hoje {uso.dia.usadas}/{uso.dia.limite}
             </span>
           )}
-          {agente?.assuntosAuto ? (
+          {servidora ? null : agente?.assuntosAuto ? (
             <button onClick={() => setPainelAssuntos(!painelAssuntos)} aria-expanded={painelAssuntos} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer">
               📁 Assuntos ({assuntos.filter((a) => !a.arquivado).length})
             </button>
@@ -302,12 +322,15 @@ export default function ChatPage() {
         {agente?.assuntosAuto && painelAssuntos && (
           <PainelAssuntos assuntos={assuntos} msgs={msgs} fixado={fixarAssunto} onFixar={setFixarAssunto} onArquivar={arquivarAssunto} />
         )}
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto px-4 py-4 space-y-4" aria-live="polite">
+        <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-10" : "px-4"}`} aria-live="polite">
           {!msgs.length && !ocupado && agente && (
+            compacto ? (
+              <p className="text-sm text-[var(--text-secondary)] mt-2">Fale ou escreva abaixo. {agente.nome} responde aqui, e o que precisar da sua aprovação aparece como cartão.</p>
+            ) : (
             <div className="max-w-xl mx-auto text-center text-[var(--text-secondary)] mt-10">
               <div className="flex justify-center mb-2"><Avatar a={agente} tamanho={72} /></div>
               <p className="font-semibold text-[var(--text-primary)]">Converse com {agente.nome}</p>
-            </div>
+            </div>)
           )}
           {msgs.map((m) => (
             <Balao key={m.id} m={m} agente={agente} ocupado={ocupado} onEscolha={enviar} onAcao={(i, c) => decidir(m, i, c)}
@@ -328,7 +351,7 @@ export default function ChatPage() {
         </div>
 
         {/* ===== CAIXA DE ENVIO ===== */}
-        <footer className="border-t border-[var(--border)] bg-[var(--bg-secondary)] p-3">
+        <footer className={compacto ? "px-4 md:px-10 pt-2 pb-4 md:pb-5" : "border-t border-[var(--border)] bg-[var(--bg-secondary)] p-3"}>
           {fixarAssunto && (
             <p className="text-xs mb-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent-hover)]">📁 A próxima mensagem vai para: {assuntos.find((a) => a.id === fixarAssunto)?.titulo}
               <button onClick={() => setFixarAssunto(null)} aria-label="Tirar a fixação do assunto" className="cursor-pointer">×</button></p>
@@ -342,6 +365,23 @@ export default function ChatPage() {
               ))}
             </div>
           )}
+          {compacto ? (
+          <div className="flex items-center gap-2.5 rounded-[18px] border-[1.5px] border-[var(--border)] bg-[var(--bg-secondary)] pl-4 pr-2.5 py-2.5 shadow-[0_6px_24px_var(--sombra)] focus-within:border-[var(--ac)]">
+            <input ref={fileRef} type="file" hidden multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.csv,.json" onChange={(e) => anexar(e.target.files)} />
+            <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={1} maxLength={8000}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(texto); } }}
+              placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… toque no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : `Fale ou escreva para ${agente?.nome ?? "o Jarbas"}…`}
+              disabled={limiteBatido}
+              className="flex-1 min-w-0 resize-none bg-transparent px-0 py-2.5 text-[15px] leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none max-h-40" aria-label="Mensagem" />
+            {(texto.trim() || ocupado) && (ocupado
+              ? <button onClick={parar} className="h-11 px-4 rounded-xl bg-[var(--danger)] text-white text-sm font-bold cursor-pointer">Parar</button>
+              : <button onClick={() => enviar(texto)} disabled={limiteBatido} className="h-11 px-4 rounded-xl bg-[var(--ac)] text-[var(--on-ac)] text-sm font-bold disabled:opacity-40 cursor-pointer">Enviar</button>)}
+            <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 3} title="Anexar PDF, imagem, texto ou planilha CSV (até 10 MB)" aria-label="Anexar arquivo"
+              className="h-11 w-11 shrink-0 text-xl leading-none rounded-xl bg-[var(--bg-tertiary)] hover:brightness-95 disabled:opacity-40 cursor-pointer">📎</button>
+            <button onClick={alternarGravacao} disabled={transcrevendo} title={gravando ? "Parar e transcrever" : "Gravar áudio"} aria-label={gravando ? "Parar gravação" : "Gravar áudio"}
+              className={`h-11 w-11 shrink-0 text-xl leading-none rounded-xl cursor-pointer ${gravando ? "bg-[var(--danger)] text-white animate-pulse" : "bg-[var(--ac)] text-[var(--on-ac)]"} disabled:opacity-40`}>{gravando ? "⏹" : "🎙️"}</button>
+          </div>
+          ) : (
           <div className="flex items-end gap-2">
             <input ref={fileRef} type="file" hidden multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.csv,.json" onChange={(e) => anexar(e.target.files)} />
             <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 3} title="Anexar PDF, imagem, texto ou planilha CSV (até 10 MB)" aria-label="Anexar arquivo"
@@ -357,7 +397,8 @@ export default function ChatPage() {
               ? <button onClick={parar} className="h-12 px-4 rounded-xl bg-[var(--danger)] text-white text-sm font-medium cursor-pointer">Parar</button>
               : <button onClick={() => enviar(texto)} disabled={!texto.trim() || limiteBatido} className="h-12 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium disabled:opacity-40 cursor-pointer">Enviar</button>}
           </div>
-          <p className="text-[11px] text-[var(--text-muted)] mt-1.5">Uma conversa por vez · 20 mensagens por hora e 100 por dia · o áudio vira texto na caixa para você conferir antes de enviar.</p>
+          )}
+          <p className={`text-[11px] text-[var(--text-muted)] mt-1.5 ${compacto ? "px-2" : ""}`}>Uma conversa por vez · 20 mensagens por hora e 100 por dia · o áudio vira texto na caixa para você conferir antes de enviar.</p>
         </footer>
       </section>
     </div>
@@ -384,7 +425,7 @@ function Balao({ m, agente, ocupado, onEscolha, onAcao, assuntos, onMover }: {
   if (m.papel === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[min(40rem,90%)] rounded-2xl rounded-tr-sm bg-[var(--accent)] text-white px-4 py-2.5">
+        <div className="max-w-[min(40rem,90%)] rounded-2xl rounded-tr-sm bg-[var(--ac)] text-[var(--on-ac)] px-4 py-2.5">
           <p className="text-sm whitespace-pre-wrap break-words">{m.texto}</p>
           {m.anexos?.map((a) => <p key={a.id} className="text-xs opacity-80 mt-1">📎 {a.nome}</p>)}
         </div>
@@ -396,6 +437,7 @@ function Balao({ m, agente, ocupado, onEscolha, onAcao, assuntos, onMover }: {
     <div className="flex gap-2 items-start">
       <span className="mt-1"><Avatar a={agente} tamanho={32} /></span>
       <div className="max-w-[min(48rem,100%)] min-w-0">
+        <p className="text-[11.5px] font-bold text-[var(--text-secondary)] mb-0.5">{agente?.nome}</p>
         {assunto && m.respostaDe && <EtiquetaAssunto atual={assunto} assuntos={assuntos!} onMover={(id, t) => onMover(m.respostaDe!, id, t)} />}
         <div className="rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
           <Resposta texto={m.texto} onEscolha={(t) => onEscolha(t, m.assuntoId)} desativado={ocupado} />

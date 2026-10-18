@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import type { FlowDoc } from "@/lib/types";
 import { getFlowDocs, duplicateFlowDoc, updateFlowDoc } from "@/lib/storage";
 import { fetchCatalogo, type AutomacaoApiItem } from "@/lib/biblioteca";
@@ -21,7 +21,8 @@ import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 // =============================================
 
 export default function FlowsPageV2() {
-  const router = useRouter();
+  const sp = useSearchParams();
+  const fluxoParam = sp.get("fluxo");
   const { avisar } = useUI();
   const { servidora } = usePainel();
   const [flows, setFlows] = useState<FlowDoc[]>([]);
@@ -85,6 +86,17 @@ export default function FlowsPageV2() {
     });
   }, []);
 
+  // Painel v2: a página agora vive dentro de Máquina › Mapa e não é remontada
+  // quando o endereço troca (busca do topo, lista abaixo). Então o ?fluxo= é
+  // acompanhado aqui, não só lido na montagem.
+  useEffect(() => { setSelectedId(fluxoParam); }, [fluxoParam]);
+
+  const abrirFluxo = (id: string | null) => {
+    setSelectedId(id);
+    // só troca o endereço (sem empilhar histórico), pra o F5 manter o fluxo
+    window.history.replaceState(null, "", id ? `/maquina?aba=mapa&fluxo=${id}` : "/maquina?aba=mapa");
+  };
+
   // 25/07/2026 — sobre o "voltar" do navegador.
   //
   // Primeira tentativa (de manhã): eu tinha posto um ouvinte de "popstate" aqui
@@ -132,10 +144,10 @@ export default function FlowsPageV2() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-4 py-2 flex items-center gap-3 shrink-0">
           <button
-            onClick={() => router.push("/producao/automacoes")}
+            onClick={() => abrirFluxo(null)}
             className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
           >
-            ← Voltar pras Automações
+            ← Voltar ao mapa
           </button>
           <h2 className="text-base font-semibold truncate flex-1">{selected.title}</h2>
           {selected.is_seed && (
@@ -234,26 +246,42 @@ export default function FlowsPageV2() {
   // Agora a porta de entrada é Produção › Automações, que lista os mesmos
   // fluxos agrupados por categoria (como ela procura) e tem o botão de criar.
   // Esta tela ficou sendo o que ela sempre foi de fato: o lugar de desenhar.
+  // Painel v2: a lista de fluxos voltou a morar aqui (é o "Mapa" da Máquina),
+  // agrupada pela categoria que cada fluxo traz na descrição: "[Categoria] texto".
+  const grupos = new Map<string, FlowDoc[]>();
+  for (const f of flows) {
+    const cat = /^\[([^\]]+)\]/.exec(f.description || "")?.[1] || "Outros";
+    grupos.set(cat, [...(grupos.get(cat) || []), f]);
+  }
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center">
-      <span className="text-3xl">🗺️</span>
-      <div>
-        <p className="font-semibold text-[var(--text-primary)]">Escolha um fluxo pra desenhar</p>
-        <p className="text-sm text-[var(--text-secondary)] max-w-md mt-1">
-          Os fluxos moram em <strong>Automações</strong>, agrupados por categoria. Clique num card de
-          lá e o desenho abre aqui — é também de onde se cria um fluxo novo.
+    <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex items-baseline gap-3 mb-4">
+        <h2 className="text-lg font-semibold">🗺️ O que roda por trás</h2>
+        <p className="text-sm text-[var(--text-secondary)]">
+          {flows.length} fluxos desenhados. Clique em um para ver como funciona por dentro.
         </p>
       </div>
-      <button
-        onClick={() => router.push("/producao/automacoes")}
-        className="text-sm px-4 py-2 rounded-full font-medium text-white hover:opacity-90 cursor-pointer"
-        style={{ background: "var(--accent, #2D6B6B)" }}
-      >
-        Ir pra Automações
-      </button>
-      {!loading && flows.length > 0 && (
-        <p className="text-xs text-[var(--text-muted)]">{flows.length} fluxos desenhados</p>
-      )}
+      {flows.length === 0 && <p className="text-sm text-[var(--text-secondary)]">Nenhum fluxo desenhado ainda.</p>}
+      <div className="space-y-6">
+        {[...grupos.entries()].map(([cat, lista]) => (
+          <section key={cat}>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">{cat}</h3>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {lista.map((f) => (
+                <button key={f.id} onClick={() => abrirFluxo(f.id)}
+                  className="text-left rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3.5 cursor-pointer hover:border-[var(--ac)] transition-colors">
+                  <span className="block text-sm font-semibold text-[var(--text-primary)]">{f.title}</span>
+                  {f.description && (
+                    <span className="block text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
+                      {f.description.replace(/^\[[^\]]+\]\s*/, "")}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
@@ -288,7 +316,7 @@ function EsqueletoFluxo({ pedido }: { pedido: boolean }) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-4 py-3 flex items-center gap-3 shrink-0">
-        <span className="text-sm text-[var(--text-muted)]">← Voltar pras Automações</span>
+        <span className="text-sm text-[var(--text-muted)]">← Voltar ao mapa</span>
         <div className="flex-1">{barra("40%", 16)}</div>
       </div>
       {pedido && (

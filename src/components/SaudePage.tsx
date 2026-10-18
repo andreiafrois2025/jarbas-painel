@@ -128,7 +128,7 @@ function AbaSaude() {
               </li>
             ))}
           </ul>
-          <a href="/producao/automacoes" className="text-xs underline decoration-dotted text-[var(--text-secondary)] mt-2 inline-block">
+          <a href="/maquina?aba=mapa" className="text-xs underline decoration-dotted text-[var(--text-secondary)] mt-2 inline-block">
             ver todas as automações →
           </a>
         </div>

@@ -60,7 +60,7 @@ export default function StatusSemaforo() {
             </ul>
           )}
           <button
-            onClick={() => { setOpen(false); router.push("/saude"); }}
+            onClick={() => { setOpen(false); router.push("/maquina?aba=saude"); }}
             className="mt-3 w-full text-xs px-3 py-2 rounded-lg font-medium text-white hover:opacity-90 cursor-pointer"
             style={{ background: "var(--accent, #2D6B6B)" }}
           >

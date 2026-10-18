@@ -1,14 +1,20 @@
 import type { Metadata, Viewport } from "next";
 import RegistrarSW from "@/components/RegistrarSW";
-import { Inter, Kalam } from "next/font/google";
+import { Manrope, Special_Elite, Kalam } from "next/font/google";
 import "./globals.css";
 
-// carrega as fontes via next/font pra garantir que Inter/Kalam existam de fato
-// (antes eram só citadas no CSS sem nenhum <link>, então caíam no fallback do sistema)
-const inter = Inter({
+// Fontes via next/font. Manrope é o texto de tudo; Special Elite (máquina de
+// escrever) fica só para a saudação e o nome "Jarbas". Kalam é do desenho dos fluxos.
+const manrope = Manrope({
   subsets: ["latin"],
-  weight: ["400", "600", "700"],
-  variable: "--font-inter",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-manrope",
+  display: "swap",
+});
+const elite = Special_Elite({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-elite",
   display: "swap",
 });
 const kalam = Kalam({
@@ -26,7 +32,17 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Jarbas", statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { themeColor: "#2D6B6B" };
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAFAF7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F2A2E" },
+  ],
+};
+
+// Roda antes da primeira pintura: lê a escolha de tema e marca o <html>, pra
+// a tela não piscar clara quando ela escolheu noturno. Sem escolha = nada marcado
+// (o CSS segue o sistema).
+const SCRIPT_TEMA = `try{var t=localStorage.getItem("tema");if(t==="claro"||t==="escuro")document.documentElement.setAttribute("data-theme",t)}catch(e){}`;
 
 export default function RootLayout({
   children,
@@ -35,7 +51,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body suppressHydrationWarning className={`${inter.variable} ${kalam.variable}`}>{children}<RegistrarSW /></body>
+      <head><script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} /></head>
+      <body suppressHydrationWarning className={`${manrope.variable} ${elite.variable} ${kalam.variable}`}>{children}<RegistrarSW /></body>
     </html>
   );
 }

@@ -18,11 +18,11 @@ const AGENDA_URL = "https://calendar.google.com/calendar/u/0/r";
 const REVISAO_DIARIA_URL = "https://www.notion.so/2fbb90b9061d81f8910aca4a14eb484e";
 
 // Só notícias entram na caixa da home (pedido 18/07): dica e reel não.
-const COLUNAS_CAIXA = new Set(["Pra avaliar - Prioridade", "Pra avaliar - Notícia"]);
+export const COLUNAS_CAIXA = new Set(["Pra avaliar - Prioridade", "Pra avaliar - Notícia"]);
 
 // UAU agora é marcado no título com [Prioridade] (colunas de Prioridade
 // foram extintas do Radar em 18/07; a checagem de coluna cobre a transição)
-const ehUau = (c: CardCaixa) =>
+export const ehUau = (c: CardCaixa) =>
   c.titulo.includes("[Prioridade]") || c.coluna === "Pra avaliar - Prioridade";
 
 // 25/07/2026 (F6.4) — a primeira linha da home.
@@ -36,9 +36,9 @@ function PrimeiroOlhar({ naCaixa, paraLer }: { naCaixa: number; paraLer: number 
 
   const nivel = mudo ? "vermelho" : status?.nivel;
   const saude =
-    nivel === "verde" ? { txt: "tudo saudável", cor: "text-emerald-700", ir: "/saude" }
-    : nivel === "amarelo" ? { txt: `${status?.problemas?.length ?? 1} ponto(s) de atenção`, cor: "text-amber-700", ir: "/saude" }
-    : nivel === "vermelho" ? { txt: "algo caiu", cor: "text-red-700", ir: "/saude" }
+    nivel === "verde" ? { txt: "tudo saudável", cor: "text-emerald-700", ir: "/maquina?aba=saude" }
+    : nivel === "amarelo" ? { txt: `${status?.problemas?.length ?? 1} ponto(s) de atenção`, cor: "text-amber-700", ir: "/maquina?aba=saude" }
+    : nivel === "vermelho" ? { txt: "algo caiu", cor: "text-red-700", ir: "/maquina?aba=saude" }
     : null;
 
   // 25/07 — o aviso mais importante da linha: ela marcou mais posts pro dia do
@@ -121,7 +121,7 @@ function PrimeiroOlhar({ naCaixa, paraLer }: { naCaixa: number; paraLer: number 
 //
 // Botão que decide o destino de um texto que você não leu é armadilha, não
 // atalho. O card agora só mostra e leva pro Notion, que é onde dá pra ler.
-function CardAprovacao({ card }: { card: CardCaixa }) {
+export function CardAprovacao({ card }: { card: CardCaixa }) {
   const uau = ehUau(card);
   const meta = uau ? { rotulo: "🔥 UAU", cor: "#A0583C" } : { rotulo: "Notícia", cor: "#456B74" };
   return (
@@ -150,7 +150,7 @@ function CardAprovacao({ card }: { card: CardCaixa }) {
 // 📰 "Pra você ficar por dentro" (F4): notícias de IA que NÃO foram pro grupo,
 // só pra ela se manter antenada do mercado. Leitura, não decisão — separado da
 // caixa de aprovação de propósito.
-function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProConteudo }: {
+export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProConteudo }: {
   itens: ItemParaMim[];
   onToggleLido: (url: string, lido: boolean) => void;
   onProGrupo: (url: string) => void;
