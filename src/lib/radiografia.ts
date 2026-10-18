@@ -11,6 +11,7 @@
 // =============================================================
 
 import type { FlowDoc, FlowDocEdge, FlowDocNode } from "./types";
+import { arestasDeVolta } from "./flow/layout";
 
 export type Nivel = 1 | 2 | 3;
 
@@ -104,7 +105,8 @@ function agrupaParaLeigo(nodes: FlowDocNode[], edges: FlowDocEdge[], limite: num
 function rotuloGrupo(membros: FlowDocNode[]): string {
   if (membros.length === 1) return membros[0].data.label;
   if (membros.length === 2) return `${membros[0].data.label} + ${membros[1].data.label}`;
-  return `${membros[0].data.label} … ${membros[membros.length - 1].data.label}`;
+  // 3 ou mais: o primeiro passo e quantos vêm junto (o resto aparece ao clicar)
+  return `${membros[0].data.label} (+${membros.length - 1} etapas)`;
 }
 
 /** Monta o desenho de um nível. */
@@ -154,7 +156,9 @@ export function montaDesenho(flow: FlowDoc, nivel: Nivel, limiteLeigo = 7): Dese
 
   // ── camadas: caminho mais longo a partir do início, ignorando retornos ──
   const ids = new Set(pecasBase.map((p) => p.id));
-  const fwd = edges.filter((e) => !e.isReturn && ids.has(e.source) && ids.has(e.target));
+  // ligações que voltam (ex.: A→B e B→A): por busca em profundidade, não pela ordem dos números
+  const voltas = arestasDeVolta(pecasBase.map((p) => p.id), edges.map((e) => ({ source: e.source, target: e.target, retorno: e.isReturn })));
+  const fwd = edges.filter((e, i) => !e.isReturn && !voltas.has(i) && ids.has(e.source) && ids.has(e.target));
   const camada = new Map<string, number>(pecasBase.map((p) => [p.id, 0]));
   for (let volta = 0; volta < pecasBase.length; volta++) {
     let mudou = false;
@@ -176,7 +180,7 @@ export function montaDesenho(flow: FlowDoc, nivel: Nivel, limiteLeigo = 7): Dese
       source: e.source,
       target: e.target,
       label: e.label,
-      isReturn: e.isReturn || (camada.get(e.target) ?? 0) <= (camada.get(e.source) ?? 0),
+      isReturn: e.isReturn || voltas.has(edges.indexOf(e)) || (camada.get(e.target) ?? 0) <= (camada.get(e.source) ?? 0),
     }));
 
   // Fim sempre na última camada ligada; notas soltas ficam na primeira

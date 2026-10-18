@@ -10,16 +10,17 @@ import type { FlowDoc, FlowDocNode } from "@/lib/types";
 import type { AutomacaoApiItem } from "@/lib/biblioteca";
 import { interpretaCron } from "@/lib/cron";
 import { avaliaSaude, SELO_SAUDE, ehAposentada, descricaoLimpa, primeiraFrase, montaDesenho, caminhoDeArquivo, type Nivel } from "@/lib/radiografia";
-import { layoutHorizontal, pontasHorizontal, tamanhoDoTipo } from "@/lib/flow/layout";
+import { layoutHorizontal, pontasHorizontal } from "@/lib/flow/layout";
+import { medePeca, larguraRotuloSeta } from "@/lib/flow/medida";
+import { aplicaLeigo, leigoDoFluxo, quemNoBalao } from "@/lib/flow/leigo";
 import { nomeDoFluxo, type MacroMontado } from "@/lib/flow/macro-fluxos";
 import RoughNode from "./RoughNode";
 import { estiloSeta } from "./estilo";
-import { BotoesNivel, FaixaComeca, BlocoProcesso, useMedida, type Bolinha } from "./PaginaPartes";
+import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha } from "./PaginaPartes";
 
 // =============================================
 // Página de um GRUPO (v3): mesma estrutura da página do fluxo
-//   cabeçalho do grupo, 3 níveis, "Começa em", "O processo do início ao fim"
-//   (bolinhas = cada rotina do grupo, clicáveis) e, embaixo, o diagrama em FAIXAS:
+//   cabeçalho do grupo, 3 níveis, a lista numerada das rotinas (clicáveis) e, embaixo, o diagrama em FAIXAS:
 //   uma raia por rotina, as etapas deitadas dentro dela, e setas entre as raias
 //   onde macro-fluxos.ts declara que uma rotina alimenta a outra.
 // =============================================
@@ -27,7 +28,9 @@ import { BotoesNivel, FaixaComeca, BlocoProcesso, useMedida, type Bolinha } from
 const PAD = 14;
 const CABECA = 40;
 const ENTRE = 44;
-const MARGEM = 96; // corredor à esquerda das raias, por onde passam as setas entre elas
+const MARGEM_MIN = 72; // corredor mínimo à esquerda das raias, por onde passam as setas entre elas
+const OFFSET_SETA = 24; // cada seta entre raias usa uma "pista" própria: 24, 38, 52…
+const PASSO_SETA = 14;
 
 interface DadosFaixa extends Record<string, unknown> {
   flowId: string;
@@ -87,6 +90,7 @@ type Escolha = { flowId: string; nodeId: string } | null;
 function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
   const [areaRef, area] = useMedida<HTMLDivElement>();
   const [escolha, setEscolha] = useState<Escolha>(null);
+  const fv = useFontes();
 
   const fluxos = useMemo(() => macro.fluxos.filter((f) => !ehAposentada(f)), [macro]);
   const porId = useMemo(() => new Map(fluxos.map((f) => [f.id, f])), [fluxos]);
@@ -108,6 +112,12 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
     return feitos.map((id) => porId.get(id)!);
   }, [fluxos, macro, porId]);
 
+  // o corredor das setas entre raias cresce conforme o maior rótulo (senão ele sai cortado à esquerda)
+  const MARGEM = useMemo(() => {
+    const folga = macro.def.ligacoes.map(([, , rot], k) => OFFSET_SETA + PASSO_SETA * k + (rot ? larguraRotuloSeta(rot) / 2 : 0) + 14);
+    return Math.max(MARGEM_MIN, Math.round(Math.max(0, ...folga)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [macro, fv]);
   const larguraFaixa = Math.max(520, area.w / 0.82 - 2 * PAD - MARGEM - 30);
 
   const montagem = useMemo(() => {
@@ -116,21 +126,22 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
     const raias = ordenados.map((f) => {
       type No = { id: string; type: FlowDocNode["type"]; label: string; icon?: string; details?: string; executor?: string };
       let nos: No[]; let ligs: { id: string; source: string; target: string; label?: string; isReturn?: boolean }[];
+      const ft = aplicaLeigo(f, nivel); // textos simples nos níveis 1 e 2; originais no 3
       if (nivel === 1) {
-        const d = montaDesenho(f, 1, 4);
+        const d = montaDesenho(ft, 1, 4);
         nos = d.pecas.map((p) => ({ id: p.id, type: p.type, label: p.label, icon: p.icon, details: p.membros[0]?.data.details }));
-        ligs = d.setas.map((s) => ({ id: s.id, source: s.source, target: s.target, label: s.label }));
+        ligs = d.setas.map((sa) => ({ id: sa.id, source: sa.source, target: sa.target, label: sa.label }));
       } else {
-        const ns = f.nodes.filter((n) => n.type !== "note");
+        const ns = ft.nodes.filter((n) => n.type !== "note");
         const ids = new Set(ns.map((n) => n.id));
         nos = ns.map((n) => {
           const ex = n.data.executor;
-          return { id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, details: n.data.details, executor: nivel === 3 ? (caminhoDeArquivo(ex) || ex || "").split("/").pop() : ex };
+          return { id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, details: n.data.details, executor: nivel === 3 ? (caminhoDeArquivo(ex) || ex || "").split("/").pop() : quemNoBalao(ex) };
         });
-        ligs = f.edges.filter((e) => ids.has(e.source) && ids.has(e.target)).map((e) => ({ id: e.id, source: e.source, target: e.target, label: e.label, isReturn: e.isReturn }));
+        ligs = ft.edges.filter((e) => ids.has(e.source) && ids.has(e.target)).map((e) => ({ id: e.id, source: e.source, target: e.target, label: e.label, isReturn: e.isReturn }));
       }
-      const caixas = nos.map((n, i) => ({ id: n.id, ...tamanhoDoTipo(n.type), ordem: i }));
-      const pos = layoutHorizontal(caixas, ligs.map((l) => ({ source: l.source, target: l.target, retorno: l.isReturn })), larguraFaixa);
+      const caixas = nos.map((n, i) => ({ id: n.id, ...medePeca(n.type, n.label, n.executor, n.icon), ordem: i }));
+      const pos = layoutHorizontal(caixas, ligs.map((l) => ({ source: l.source, target: l.target, retorno: l.isReturn, rotulo: l.label })), larguraFaixa);
       let w = 0, h = 0;
       for (const c of caixas) { const p = pos.get(c.id)!; w = Math.max(w, p.x + c.w); h = Math.max(h, p.y + c.h); }
       const inicio = nos.find((n) => n.type === "start") || nos[0];
@@ -159,7 +170,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
         ns.push({
           id: `${r.f.id}:${n.id}`, type: "rough", parentId: `lane:${r.f.id}`, draggable: false, zIndex: 2,
           position: { x: PAD + p.x, y: CABECA + p.y },
-          data: { label: n.label, icon: n.icon, details: n.details, executor: n.executor, _flowType: n.type },
+          data: { label: n.label, icon: n.icon, details: n.details, executor: n.executor, _flowType: n.type, semRotuloTipo: true },
         });
       }
       for (const l of r.ligs) {
@@ -175,33 +186,32 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
       if (!A || !B) return;
       const e = estiloSeta({ id: `liga-${k}`, source: `lane:${A.f.id}`, target: `lane:${B.f.id}`, sourceHandle: "left", targetHandle: "left" }, false, rot);
       e.zIndex = 5;
-      (e as Edge & { pathOptions?: { offset: number } }).pathOptions = { offset: 36 };
+      (e as Edge & { pathOptions?: { offset: number } }).pathOptions = { offset: OFFSET_SETA + PASSO_SETA * k };
       e.style = { ...e.style, stroke: "#2D6B6B", strokeWidth: 2.2 };
       es.push(e);
     });
+    // peça invisível na ponta esquerda: o "encaixar na tela" conta ela e o corredor das setas (com os rótulos) fica à vista
+    ns.push({ id: "margem", type: "default", position: { x: 0, y: 0 }, data: {}, style: { width: 1, height: 1, opacity: 0, pointerEvents: "none" }, draggable: false, selectable: false, focusable: false });
     return { ns, es, W: W + MARGEM, H: y - ENTRE, raias };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordenados, nivel, larguraFaixa, area.w, macro]);
+  }, [ordenados, nivel, larguraFaixa, area.w, macro, MARGEM, fv]);
 
   // altura do quadro: o desenho cabe em zoom legível e a página rola (não o desenho)
   const zoomAlvo = montagem ? Math.min(1, Math.max(0.45, area.w / (montagem.W + 40))) : 1;
   const altura = montagem ? Math.max(420, Math.round(montagem.H * zoomAlvo + 70)) : 420;
 
   // ── textos da estrutura ──
-  const sub = (f: FlowDoc) => primeiraFrase(descricaoLimpa(f)) || `${f.nodes.length} etapas`;
+  const sub = (f: FlowDoc) => leigoDoFluxo(f)?.frase || primeiraFrase(descricaoLimpa(f)) || `${f.nodes.length} etapas`;
   const bolinhas: Bolinha[] = ordenados.map((f) => {
     const a = automacaoDe(f);
     const cron = a ? interpretaCron(a.agenda) : null;
     return {
       id: f.id,
       titulo: nomeDoFluxo(f),
-      frase: nivel === 1 ? sub(f) : `${sub(f)}${cron ? ` · ⏰ ${cron.descricao}` : ""} · ${f.nodes.filter((n) => n.type !== "note").length} etapas`,
+      frase: nivel === 1 ? sub(f) : `${sub(f)}${cron ? ` ⏰ ${cron.descricao}` : ""}`,
       codigo: nivel === 3 ? [a?.agenda ? `cron ${a.agenda} UTC` : "", a?.script || ""].filter(Boolean).join(" · ") || undefined : undefined,
     };
   });
-  const primeiro = ordenados[0];
-  const ultimo = ordenados[ordenados.length - 1];
-  const textoDe = (f?: FlowDoc) => (f ? `${nomeDoFluxo(f)}${sub(f) ? ` — ${sub(f)}` : ""}` : "—");
 
   const etapa = escolha ? porId.get(escolha.flowId)?.nodes.find((n) => n.id === escolha.nodeId) : null;
   const fEtapa = escolha ? porId.get(escolha.flowId) : null;
@@ -210,20 +220,13 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
     <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="px-3 md:px-6 pt-4 pb-24 space-y-3 max-w-[2000px]">
         <div>
-          <p className="text-xs text-[var(--text-muted)]">Grupo de fluxos · {ordenados.length} rotinas</p>
           <h2 className="text-xl md:text-2xl font-semibold leading-tight">{macro.def.icone} {macro.def.titulo}</h2>
           <p className="text-sm text-[var(--text-secondary)] mt-1 max-w-[90ch]">{macro.def.resumo}</p>
-          <p className="text-xs text-[var(--text-muted)] mt-1 max-w-[110ch]">Por que ficam juntos: {macro.def.porque}</p>
         </div>
 
         <BotoesNivel nivel={nivel} onMuda={onNivel} />
-        <FaixaComeca texto={primeiro ? nomeDoFluxo(primeiro) : "—"} />
         <BlocoProcesso
-          titulo="As rotinas do grupo, do início ao fim"
-          rotuloComeca="Começa com:"
-          rotuloTermina="Termina com:"
-          comeca={textoDe(primeiro)}
-          termina={textoDe(ultimo)}
+          titulo="As rotinas deste grupo, na ordem"
           bolinhas={bolinhas}
           onEscolher={(id) => { const f = porId.get(id); if (f) onAbrirFluxo(f); }}
         />
@@ -231,7 +234,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
         <div ref={areaRef} className="relative rounded-xl overflow-hidden border border-[var(--border)]" style={{ height: altura }}>
           {montagem && (
             <div className="absolute inset-0">
-              <style>{`.grupo-canvas .react-flow__pane{cursor:grab}.grupo-canvas .react-flow__node-rough{cursor:pointer}`}</style>
+              <style>{`.grupo-canvas .react-flow__pane{cursor:grab}.grupo-canvas .react-flow__node-rough{cursor:pointer}.grupo-canvas .react-flow__handle{opacity:0;pointer-events:none}`}</style>
               <ReactFlow
                 className="grupo-canvas"
                 key={`${macro.def.slug}-${nivel}-${Math.round(larguraFaixa / 40)}`}
@@ -268,9 +271,9 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo }: Props) {
                   <button onClick={() => setEscolha(null)} aria-label="Fechar" className="float-right text-lg leading-none text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">×</button>
                   <div className="space-y-2 text-sm">
                     <p className="text-xs text-[var(--text-muted)]">{nomeDoFluxo(fEtapa)}</p>
-                    <h3 className="text-base font-semibold">{etapa.data.icon} {etapa.data.label}</h3>
-                    <p className="text-[var(--text-secondary)] whitespace-pre-line">{etapa.data.details || "Sem descrição ainda."}</p>
-                    {etapa.data.executor && <p className="text-xs"><span className="text-[var(--text-muted)]">Quem faz: </span>{etapa.data.executor}</p>}
+                    <h3 className="text-base font-semibold">{etapa.data.icon} {nivel < 3 ? etapa.data.leigo?.rotulo || etapa.data.label : etapa.data.label}</h3>
+                    <p className="text-[var(--text-secondary)] whitespace-pre-line">{(nivel < 3 ? etapa.data.leigo?.frase : null) || etapa.data.details || "Sem descrição ainda."}</p>
+                    {(etapa.data.leigo?.quem || (nivel === 3 ? etapa.data.executor : undefined)) && <p className="text-xs"><span className="text-[var(--text-muted)]">Quem faz: </span>{etapa.data.leigo?.quem || etapa.data.executor}</p>}
                     {etapa.data.tags?.length ? <p className="text-xs"><span className="text-[var(--text-muted)]">Ferramentas: </span>{etapa.data.tags.join(", ")}</p> : null}
                     <button className="text-xs px-3 py-1.5 rounded-lg text-white cursor-pointer" style={{ background: "var(--accent, #2D6B6B)" }} onClick={() => onAbrirFluxo(fEtapa)}>Abrir este fluxo ↗</button>
                   </div>

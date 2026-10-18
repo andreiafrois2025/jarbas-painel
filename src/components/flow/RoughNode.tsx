@@ -3,7 +3,7 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { FlowDocNode } from "@/lib/types";
-import { tamanhoDoTipo } from "@/lib/flow/layout";
+import { medePeca } from "@/lib/flow/medida";
 
 // =============================================
 // Nodes desenhados à mão (estilo excalidraw) usando rough.js.
@@ -53,6 +53,8 @@ interface RoughData extends Record<string, unknown> {
   executor?: string;
   tags?: string[];
   _flowType?: FlowDocNode["type"];
+  /** páginas de leitura (Mapa/Grupo) não mostram a etiqueta pequena do tipo (AÇÃO, DECISÃO…) */
+  semRotuloTipo?: boolean;
 }
 
 function stringSeed(s: string): number {
@@ -77,8 +79,9 @@ export default function RoughNode({ id, data, selected }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [roughFailed, setRoughFailed] = useState(false);
 
-  // Peças compactas (v3): mesmo texto de ~13px, bem menos espaço na tela
-  const { w: width, h: height } = tamanhoDoTipo(type);
+  // v3.1: o tamanho vem do TEXTO (medido e quebrado em linhas): nada vaza para fora do balão.
+  // O auto-layout usa a mesma função, então peça e espaçamento sempre concordam.
+  const { w: width, h: height, textoW, linhas } = medePeca(type, d.label, d.executor, d.icon);
 
   const seed = useMemo(() => stringSeed(id), [id]);
 
@@ -182,7 +185,7 @@ export default function RoughNode({ id, data, selected }: Props) {
           style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
         />
       )}
-      <div
+      {!d.semRotuloTipo && <div
         style={{
           position: "absolute",
           top: 3,
@@ -199,16 +202,19 @@ export default function RoughNode({ id, data, selected }: Props) {
         }}
       >
         {TYPE_LABEL[type]}
-      </div>
+      </div>}
       <div
-        className="relative z-10 flex flex-col items-center justify-center h-full px-3 text-center overflow-hidden"
+        className="relative z-10 flex flex-col items-center justify-center h-full text-center overflow-hidden"
         style={{ fontFamily: 'var(--font-kalam), "Comic Sans MS", cursive', color: "#2D3B3B" }}
       >
-        {d.icon && <span className="text-base leading-none mb-0.5">{d.icon}</span>}
-        <span className="text-[13px] leading-[1.15] font-semibold" style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label || "sem título"}</span>
-        {d.executor && (
-          <span className="text-[10px] mt-0.5 opacity-70 italic w-full truncate">{d.executor}</span>
-        )}
+        {/* caixa de texto com a mesma largura usada na medição */}
+        <div className="flex flex-col items-center" style={{ width: textoW, maxWidth: "100%" }}>
+          {d.icon && <span className="text-base leading-none mb-0.5">{d.icon}</span>}
+          <span className="text-[13px] leading-[1.15] font-semibold" style={{ display: "-webkit-box", WebkitLineClamp: linhas, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{d.label || "sem título"}</span>
+          {d.executor && (
+            <span className="text-[10px] mt-0.5 opacity-70 italic w-full truncate">{d.executor}</span>
+          )}
+        </div>
       </div>
 
       {/* Handles em todas as 4 direções — connectionMode="loose" torna cada um source+target */}

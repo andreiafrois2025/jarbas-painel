@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FlowDoc, FlowDocEdge, FlowDocNode } from "@/lib/types";
 import { rascunhosApi, type Rascunho } from "@/lib/flow/rascunhos";
-import { layoutVertical, tamanhoDoTipo, verticaliza } from "@/lib/flow/layout";
+import { layoutVertical, verticaliza } from "@/lib/flow/layout";
+import { medePeca } from "@/lib/flow/medida";
 import FlowCanvas from "./FlowCanvas";
 import FlowViewer, { type Selecao } from "./FlowViewer";
 import VozNovoFluxo from "./VozNovoFluxo";
@@ -40,7 +41,7 @@ export default function RascunhoFluxo({ id, onVoltar, avisar }: Props) {
   const [sel, setSel] = useState<Selecao>(null);
 
   const carrega = (d: Rascunho) => {
-    const v = verticaliza({ nodes: d.nodes, edges: d.edges });
+    const v = verticaliza({ nodes: d.nodes, edges: d.edges }, new Map(d.nodes.map((n) => [n.id, medePeca(n.type, n.data.label, n.data.executor, n.data.icon)])));
     setR(d);
     setTitulo(d.titulo);
     setDesenho({ nodes: v.nodes, edges: v.edges });
@@ -110,7 +111,7 @@ export default function RascunhoFluxo({ id, onVoltar, avisar }: Props) {
   // visão só-leitura (aprovado)
   const nosLeitura = desenho.nodes.map((n) => ({ id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, details: n.data.details, position: n.position }));
   const setasLeitura = desenho.edges.map((e) => ({ ...e, isReturn: !!e.isReturn }));
-  const posAuto = layoutVertical(desenho.nodes.map((n) => ({ id: n.id, ...tamanhoDoTipo(n.type) })), desenho.edges.map((e) => ({ source: e.source, target: e.target, retorno: e.isReturn })));
+  const posAuto = layoutVertical(desenho.nodes.map((n) => ({ id: n.id, ...medePeca(n.type, n.data.label, n.data.executor, n.data.icon) })), desenho.edges.map((e) => ({ source: e.source, target: e.target, retorno: e.isReturn })));
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">

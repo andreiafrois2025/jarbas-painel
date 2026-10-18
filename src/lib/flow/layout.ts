@@ -5,24 +5,62 @@
 // =============================================================
 
 import type { FlowDoc, FlowDocEdge, FlowDocNode } from "../types";
+import { larguraRotuloSeta, type Medida } from "./medida";
 
 export interface Caixa { id: string; w: number; h: number; ordem?: number }
-export interface Lig { source: string; target: string; retorno?: boolean }
+export interface Lig { source: string; target: string; retorno?: boolean; rotulo?: string }
 export interface PosCaixa { x: number; y: number; camada: number }
 
-/** Tamanho real de cada peça (o mesmo desenhado pelo RoughNode). */
+/** Tamanho-padrão por tipo (peça sem texto conhecido). O tamanho de verdade vem de medePeca(), pelo texto. */
 export function tamanhoDoTipo(type: FlowDocNode["type"]): { w: number; h: number } {
   if (type === "start" || type === "end") return { w: 108, h: 108 };
   if (type === "condition") return { w: 180, h: 104 };
   return { w: 190, h: 84 };
 }
 
+/** Tamanho medido (se houver) ou o padrão do tipo. */
+export function tamanhoReal(type: FlowDocNode["type"], m?: Pick<Medida, "w" | "h">): { w: number; h: number } {
+  return m ? { w: m.w, h: m.h } : tamanhoDoTipo(type);
+}
+
 const GAP_X = 44;
 const GAP_Y = 76; // espaço pra seta e pro rótulo dela
 
-export function layoutVertical(caixas: Caixa[], ligs: Lig[]): Map<string, PosCaixa> {
+/**
+ * Quais ligações "voltam" (apontam para uma peça que já está no caminho): busca em profundidade a partir
+ * dos inícios. Sem isso, duas peças que se chamam uma à outra (ex.: "Quer ajustar?" ↔ "Escreve o roteiro")
+ * viravam as duas "retorno" e a peça de baixo ia parar no topo do desenho. Devolve os índices.
+ */
+export function arestasDeVolta(ids: string[], ligs: { source: string; target: string; retorno?: boolean }[]): Set<number> {
+  const conhecidos = new Set(ids);
+  const saem = new Map<string, number[]>(ids.map((id) => [id, []]));
+  const entradas = new Map<string, number>(ids.map((id) => [id, 0]));
+  ligs.forEach((l, i) => {
+    if (l.retorno || !conhecidos.has(l.source) || !conhecidos.has(l.target) || l.source === l.target) return;
+    saem.get(l.source)!.push(i);
+    entradas.set(l.target, (entradas.get(l.target) || 0) + 1);
+  });
+  const volta = new Set<number>();
+  const estado = new Map<string, 0 | 1 | 2>(); // 1 = no caminho atual, 2 = terminado
+  const visita = (id: string) => {
+    estado.set(id, 1);
+    for (const i of saem.get(id) || []) {
+      const alvo = ligs[i].target;
+      const e = estado.get(alvo);
+      if (e === 1) volta.add(i);
+      else if (!e) visita(alvo);
+    }
+    estado.set(id, 2);
+  };
+  const raizes = ids.filter((id) => !(entradas.get(id) || 0));
+  for (const id of [...raizes, ...ids]) if (!estado.get(id)) visita(id);
+  return volta;
+}
+
+export function layoutVertical(caixas: Caixa[], ligs: Lig[], gapDe?: (l: Lig) => number): Map<string, PosCaixa> {
   const ids = new Set(caixas.map((c) => c.id));
-  const fwd = ligs.filter((l) => !l.retorno && ids.has(l.source) && ids.has(l.target) && l.source !== l.target);
+  const voltas = arestasDeVolta(caixas.slice().sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0)).map((c) => c.id), ligs);
+  const fwd = ligs.filter((l, i) => !l.retorno && !voltas.has(i) && ids.has(l.source) && ids.has(l.target) && l.source !== l.target);
   const n = caixas.length;
 
   // 1) camadas: caminho mais longo; trava em n-1 pra laço sem marca não rodar pra sempre
@@ -69,17 +107,21 @@ export function layoutVertical(caixas: Caixa[], ligs: Lig[]): Map<string, PosCai
   const tam = new Map(caixas.map((c) => [c.id, c]));
   const out = new Map<string, PosCaixa>();
   let y = 0;
+  // espaço entre uma camada e a seguinte: o padrão, ou mais se alguma seta que sai dela tem rótulo largo
+  const gapApos = (c: number) =>
+    gapDe ? Math.max(GAP_Y, ...util.filter((l) => (camada.get(l.source) ?? 0) === c).map(gapDe)) : GAP_Y;
   linhas.forEach((ids2, c) => {
     const largura = ids2.reduce((s, id) => s + tam.get(id)!.w, 0) + GAP_X * Math.max(0, ids2.length - 1);
     let x = -largura / 2;
     let alt = 0;
+    for (const id of ids2) alt = Math.max(alt, tam.get(id)!.h);
     for (const id of ids2) {
       const t = tam.get(id)!;
-      out.set(id, { x, y, camada: c });
+      // peças de alturas diferentes na mesma camada ficam centradas entre si (a seta sai do meio)
+      out.set(id, { x, y: y + (alt - t.h) / 2, camada: c });
       x += t.w + GAP_X;
-      alt = Math.max(alt, t.h);
     }
-    y += alt + GAP_Y;
+    y += alt + gapApos(c);
   });
   return out;
 }
@@ -102,9 +144,9 @@ export function limites(pos: Map<string, PosCaixa>, caixas: Caixa[]) {
  * e entrando por cima (as de retorno contornam pela direita).
  * Se o fluxo já foi arrumado/salvo na vertical (marca `layoutV`), respeita as posições salvas.
  */
-export function verticaliza(flow: Pick<FlowDoc, "nodes" | "edges">): { nodes: FlowDocNode[]; edges: FlowDocEdge[]; salvo: boolean } {
+export function verticaliza(flow: Pick<FlowDoc, "nodes" | "edges">, medidas?: Map<string, Medida>): { nodes: FlowDocNode[]; edges: FlowDocEdge[]; salvo: boolean } {
   const salvo = flow.nodes.length > 0 && flow.nodes.every((n) => n.data.layoutV);
-  const caixas: Caixa[] = flow.nodes.map((n) => ({ id: n.id, ...tamanhoDoTipo(n.type), ordem: n.position?.y ?? 0 }));
+  const caixas: Caixa[] = flow.nodes.map((n) => ({ id: n.id, ...tamanhoReal(n.type, medidas?.get(n.id)), ordem: n.position?.y ?? 0 }));
   const pos = layoutVertical(caixas, flow.edges.map((e) => ({ source: e.source, target: e.target, retorno: e.isReturn })));
   const nodes = flow.nodes.map((n) => {
     if (salvo) return n;
@@ -133,9 +175,11 @@ export interface PosH extends PosCaixa { fila: number }
  * pra o desenho continuar legível sem precisar encolher.
  */
 export function layoutHorizontal(caixas: Caixa[], ligs: Lig[], larguraMax = Infinity): Map<string, PosH> {
+  // na vista deitada a distância entre camadas é horizontal: rótulo de seta largo pede mais espaço
+  const gapDe = (l: Lig) => (l.rotulo ? larguraRotuloSeta(l.rotulo) + 36 : 0);
   const tam = new Map(caixas.map((c) => [c.id, c]));
   const girado = caixas.map((c) => ({ ...c, w: c.h, h: c.w }));
-  const v = layoutVertical(girado, ligs);
+  const v = layoutVertical(girado, ligs, gapDe);
   // nesta altura: v.y = posição ao longo do fluxo; v.x = posição na transversal
   const camadas = new Map<number, string[]>();
   for (const [id, p] of v) camadas.set(p.camada, [...(camadas.get(p.camada) || []), id]);
@@ -161,7 +205,8 @@ export function layoutHorizontal(caixas: Caixa[], ligs: Lig[], larguraMax = Infi
   for (const c of ordem) {
     const doCamada = camadas.get(c)!;
     const compr = Math.max(...doCamada.map((id) => tam.get(id)!.w));
-    const aoLongo = v.get(doCamada[0])!.y;
+    // início da camada (a peça mais alta fica colada nele; as outras são centradas e começam depois)
+    const aoLongo = Math.min(...doCamada.map((id) => v.get(id)!.y));
     if (ids.length && aoLongo - inicioFila + compr > larguraMax) {
       fecha();
       inicioFila = aoLongo;
@@ -186,10 +231,10 @@ export function pontasHorizontal(origem: PosH | undefined, destino: PosH | undef
 /**
  * O fluxo "deitado": posições esquerda → direita (ou as que ela salvou no modo Editar, em `data.posH`).
  */
-export function horizontaliza(flow: Pick<FlowDoc, "nodes" | "edges">, larguraMax: number): { nodes: FlowDocNode[]; edges: FlowDocEdge[]; salvo: boolean; auto: Record<string, { x: number; y: number }> } {
+export function horizontaliza(flow: Pick<FlowDoc, "nodes" | "edges">, larguraMax: number, medidas?: Map<string, Medida>, rotulos?: Record<string, string | undefined>): { nodes: FlowDocNode[]; edges: FlowDocEdge[]; salvo: boolean; auto: Record<string, { x: number; y: number }> } {
   const salvo = flow.nodes.length > 0 && flow.nodes.every((n) => n.data.posH);
-  const caixas: Caixa[] = flow.nodes.map((n) => ({ id: n.id, ...tamanhoDoTipo(n.type), ordem: n.position?.y ?? 0 }));
-  const pos = layoutHorizontal(caixas, flow.edges.map((e) => ({ source: e.source, target: e.target, retorno: e.isReturn })), larguraMax);
+  const caixas: Caixa[] = flow.nodes.map((n) => ({ id: n.id, ...tamanhoReal(n.type, medidas?.get(n.id)), ordem: n.position?.y ?? 0 }));
+  const pos = layoutHorizontal(caixas, flow.edges.map((e) => ({ source: e.source, target: e.target, retorno: e.isReturn, rotulo: rotulos ? rotulos[e.id] : e.label })), larguraMax);
   const auto = Object.fromEntries(flow.nodes.map((n) => [n.id, { x: Math.round(pos.get(n.id)!.x), y: Math.round(pos.get(n.id)!.y) }]));
   const nodes = flow.nodes.map((n) => ({ ...n, position: salvo ? n.data.posH! : auto[n.id] }));
   const edges = flow.edges.map((e) => {

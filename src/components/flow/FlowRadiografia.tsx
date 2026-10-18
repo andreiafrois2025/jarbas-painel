@@ -9,18 +9,23 @@ import {
   descricaoLimpa, avaliaSaude, SELO_SAUDE, tempoDesde, primeiraFrase,
   type Nivel, type Peca, type Desenho,
 } from "@/lib/radiografia";
-import { layoutVertical, layoutHorizontal, pontasHorizontal, tamanhoDoTipo, verticaliza, horizontaliza } from "@/lib/flow/layout";
+import { layoutVertical, layoutHorizontal, pontasHorizontal, verticaliza, horizontaliza } from "@/lib/flow/layout";
+import { medePeca, type Medida } from "@/lib/flow/medida";
+import { aplicaLeigo, leigoDoFluxo, quemNoBalao } from "@/lib/flow/leigo";
 import { nomeDoFluxo } from "@/lib/flow/macro-fluxos";
 import FlowViewer, { type Selecao, type NoVis, type SetaVis } from "./FlowViewer";
 import FlowCanvas from "./FlowCanvas";
-import { BotoesNivel, FaixaComeca, BlocoProcesso, useMedida, type Bolinha } from "./PaginaPartes";
+import { BotoesNivel, BlocoProcesso, useMedida, useFontes, type Bolinha } from "./PaginaPartes";
 import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 import { TYPE_LABEL, STROKE_BY_TYPE } from "./RoughNode";
 
 // =============================================
 // A página de UM fluxo (v3, 18/10/2026), na estrutura do mapa radiografado:
-//   título + subtítulo + 3 botões de nível + "Começa em" + "O processo do início ao fim"
+//   nome simples + 1 frase + quando roda/saúde, 3 botões de nível, "O processo do início ao fim"
 //   (Começa / Termina / bolinhas numeradas) e, embaixo, o diagrama.
+//  - v3.1: níveis Leigo e Intermediário falam em português simples (textos do curador, em data.leigo);
+//    nome de arquivo, comando e horário em UTC só aparecem no nível Código
+//  - cada peça tem o tamanho do texto que carrega (medida em lib/flow/medida.ts)
 //  - o diagrama é HORIZONTAL no computador e vertical só quando a área tem menos de 700px
 //  - fora do modo Editar, arrastar só passeia; no modo Editar move peças e setas e salva sozinho
 //  - clicar numa bolinha destaca a peça no desenho (e vice-versa); o detalhe abre à direita só ao clicar
@@ -58,10 +63,19 @@ export default function FlowRadiografia({
   const desatualizado = !!(relogioMudouEm && flow.updated_at && new Date(relogioMudouEm) > new Date(flow.updated_at));
   const saude = automacao && cron ? avaliaSaude(automacao.ultima_execucao, cron.frequenciaMin) : null;
 
-  const d1 = useMemo(() => montaDesenho(flow, 1), [flow]);
-  const d2 = useMemo(() => montaDesenho(flow, 2), [flow]);
+  const fv = useFontes(); // sobe quando a fonte do desenho carrega (as peças são remedidas)
+  const lf = useMemo(() => leigoDoFluxo(flow), [flow]);
+  // textos mostrados: simples nos níveis 1 e 2, originais no 3. Só para MOSTRAR: nunca é o que se salva.
+  const flowTxt = useMemo(() => aplicaLeigo(flow, nivel), [flow, nivel]);
+  const flowSimples = useMemo(() => aplicaLeigo(flow, 1), [flow]);
+  const d1 = useMemo(() => montaDesenho(flowSimples, 1), [flowSimples]);
+  const d2 = useMemo(() => montaDesenho(flowTxt, 2), [flowTxt]);
   const desenho: Desenho = nivel === 1 ? d1 : d2; // o nível 3 usa o desenho do 2 (mesmas peças)
-  const resumo = useMemo(() => montaResumo(desenho, nivel, 99), [desenho, nivel]);
+  const resumo = useMemo(() => {
+    const r = montaResumo(desenho, nivel, 99);
+    // nos níveis 1 e 2, "começa" e "termina" são os textos simples do curador
+    return nivel < 3 && lf ? { ...r, inicio: lf.comeca, fim: lf.termina } : r;
+  }, [desenho, nivel, lf]);
   const modoEditar = editando && nivel !== 1;
 
   // texto de "arquivo/comando" de uma peça (nível 3)
@@ -84,29 +98,48 @@ export default function FlowRadiografia({
 
   // ── Vista vertical (celular) e horizontal (computador) ──
   const larguraMax = Math.max(480, area.w / 0.8 - 80);
-  const flowV = useMemo(() => verticaliza(flow), [flow]);
-  const auto2V = useMemo(
-    () => verticaliza({ nodes: flow.nodes.map((n) => ({ ...n, data: { ...n.data, layoutV: undefined } })), edges: flow.edges.map((e) => ({ ...e, sourceHandle: undefined, targetHandle: undefined })) }),
-    [flow],
-  );
-  const flowParaEditar = useMemo<FlowDoc>(() => ({ ...flow, nodes: flowV.nodes, edges: flowV.edges }), [flow, flowV]);
-  const hSalvo = useMemo(() => (area.w ? horizontaliza(flow, larguraMax) : null), [flow, larguraMax, area.w]);
-  const hAuto = useMemo(
-    () => (area.w ? horizontaliza({ nodes: flow.nodes.map((n) => ({ ...n, data: { ...n.data, posH: undefined } })), edges: flow.edges.map((e) => ({ ...e, sourceHandleH: undefined, targetHandleH: undefined })) }, larguraMax) : null),
-    [flow, larguraMax, area.w],
-  );
 
-  const vista = useMemo(() => {
-    if (!area.w) return null;
-    const rotulo3 = (n: FlowDocNode["data"], tipo: FlowDocNode["type"], id: string) => {
-      if (nivel !== 3) return n.executor;
+  // o que cada peça mostra (nível 3: o nome do arquivo no lugar do "quem faz") e o tamanho que o texto pede
+  const { txt, medidas, rotulos } = useMemo(() => {
+    const rotulo3 = (tipo: FlowDocNode["type"], id: string) => {
       const pe = d2.pecas.find((p) => p.id === id);
       const s = pe ? arquivoDe(pe) : "";
       return tipo === "start" ? (automacao?.script ? automacao.script.split("/").pop() : s) : (s.split("/").pop() || s || undefined);
     };
+    const t = new Map<string, { label: string; icon?: string; details?: string; executor?: string }>();
+    const m = new Map<string, Medida>();
+    for (const n of flowTxt.nodes) {
+      const executor = nivel === 3 ? rotulo3(n.type, n.id) : quemNoBalao(n.data.executor);
+      t.set(n.id, { label: n.data.label, icon: n.data.icon, details: n.data.details, executor });
+      m.set(n.id, medePeca(n.type, n.data.label, executor, n.data.icon));
+    }
+    return { txt: t, medidas: m, rotulos: Object.fromEntries(flowTxt.edges.map((e) => [e.id, e.label])) as Record<string, string | undefined> };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowTxt, nivel, d2, automacao, fv]);
+
+  const flowV = useMemo(() => verticaliza(flow, medidas), [flow, medidas]);
+  const auto2V = useMemo(
+    () => verticaliza({ nodes: flow.nodes.map((n) => ({ ...n, data: { ...n.data, layoutV: undefined } })), edges: flow.edges.map((e) => ({ ...e, sourceHandle: undefined, targetHandle: undefined })) }, medidas),
+    [flow, medidas],
+  );
+  const flowParaEditar = useMemo<FlowDoc>(() => ({ ...flow, nodes: flowV.nodes, edges: flowV.edges }), [flow, flowV]);
+  const hSalvo = useMemo(() => (area.w ? horizontaliza(flow, larguraMax, medidas, rotulos) : null), [flow, larguraMax, area.w, medidas, rotulos]);
+  const hAuto = useMemo(
+    () => (area.w ? horizontaliza({ nodes: flow.nodes.map((n) => ({ ...n, data: { ...n.data, posH: undefined } })), edges: flow.edges.map((e) => ({ ...e, sourceHandleH: undefined, targetHandleH: undefined })) }, larguraMax, medidas, rotulos) : null),
+    [flow, larguraMax, area.w, medidas, rotulos],
+  );
+
+  const vista = useMemo(() => {
+    if (!area.w) return null;
+    // monta a peça do desenho com o texto que ela mostra neste nível (o desenho salvo continua com os textos originais)
+    const noDe = (n: FlowDocNode, position: { x: number; y: number }): NoVis => {
+      const t = txt.get(n.id)!;
+      return { id: n.id, type: n.type, label: t.label, icon: t.icon, details: t.details, executor: t.executor, position };
+    };
+    const setaDe = (e: FlowDocEdge): SetaVis => ({ id: e.id, source: e.source, target: e.target, label: rotulos[e.id], isReturn: !!e.isReturn, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle });
     if (nivel === 1) {
-      const caixas = d1.pecas.map((p) => ({ id: p.id, ...tamanhoDoTipo(p.type), ordem: p.y }));
-      const ligs = d1.setas.map((s) => ({ source: s.source, target: s.target, retorno: s.isReturn }));
+      const caixas = d1.pecas.map((p) => ({ id: p.id, ...medePeca(p.type, p.label, undefined, p.icon), ordem: p.y }));
+      const ligs = d1.setas.map((s) => ({ source: s.source, target: s.target, retorno: s.isReturn, rotulo: s.label }));
       if (vertical) {
         const pos = layoutVertical(caixas, ligs);
         const nos: NoVis[] = d1.pecas.map((p) => ({ id: p.id, type: p.type, label: p.label, icon: p.icon, details: p.membros[0]?.data.details, position: pos.get(p.id)! }));
@@ -122,18 +155,15 @@ export default function FlowRadiografia({
       return { nos, setas, auto: Object.fromEntries(nos.map((n) => [n.id, n.position])), setasAuto: setas };
     }
     if (vertical) {
-      const nos: NoVis[] = flowV.nodes.map((n) => ({ id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, details: n.data.details, executor: rotulo3(n.data, n.type, n.id), position: n.position }));
-      const setas: SetaVis[] = flowV.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, label: e.label, isReturn: !!e.isReturn, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle }));
-      const setasAuto: SetaVis[] = auto2V.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, label: e.label, isReturn: !!e.isReturn, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle }));
-      return { nos, setas, auto: Object.fromEntries(auto2V.nodes.map((n) => [n.id, n.position])), setasAuto };
+      const nos: NoVis[] = flowV.nodes.map((n) => noDe(n, n.position));
+      const setas: SetaVis[] = flowV.edges.map(setaDe);
+      return { nos, setas, auto: Object.fromEntries(auto2V.nodes.map((n) => [n.id, n.position])), setasAuto: auto2V.edges.map(setaDe) };
     }
     const h = hSalvo!;
-    const nos: NoVis[] = h.nodes.map((n) => ({ id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, details: n.data.details, executor: rotulo3(n.data, n.type, n.id), position: n.position }));
-    const setas: SetaVis[] = h.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, label: e.label, isReturn: !!e.isReturn, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle }));
-    const setasAuto: SetaVis[] = hAuto!.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, label: e.label, isReturn: !!e.isReturn, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle }));
-    return { nos, setas, auto: hAuto!.auto, setasAuto };
+    const nos: NoVis[] = h.nodes.map((n) => noDe(n, n.position));
+    return { nos, setas: h.edges.map(setaDe), auto: hAuto!.auto, setasAuto: hAuto!.edges.map(setaDe) };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nivel, vertical, d1, d2, flowV, auto2V, hSalvo, hAuto, larguraMax, area.w, automacao]);
+  }, [nivel, vertical, d1, txt, rotulos, flowV, auto2V, hSalvo, hAuto, larguraMax, area.w]);
 
   // grava (chamado pelo viewer, com atraso, só no modo Editar)
   const salvarPosicoes = (pos: { id: string; x: number; y: number }[], ss: SetaVis[]) => {
@@ -144,7 +174,8 @@ export default function FlowRadiografia({
       });
       const edges: FlowDocEdge[] = ss.map((s) => {
         const velha = flow.edges.find((e) => e.id === s.id);
-        return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: s.label, isReturn: s.isReturn, sourceHandle: s.sourceHandle, targetHandle: s.targetHandle };
+        // o rótulo mostrado pode ser o simples: ao salvar, o original é o que vale
+        return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: velha ? velha.label : s.label, isReturn: s.isReturn, sourceHandle: s.sourceHandle, targetHandle: s.targetHandle };
       });
       onCanvasChange({ nodes, edges });
       return;
@@ -155,7 +186,7 @@ export default function FlowRadiografia({
     });
     const edges: FlowDocEdge[] = ss.map((s) => {
       const velha = flow.edges.find((e) => e.id === s.id);
-      return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: s.label, isReturn: velha ? velha.isReturn : s.isReturn, sourceHandleH: s.sourceHandle, targetHandleH: s.targetHandle };
+      return { ...(velha || {}), id: s.id, source: s.source, target: s.target, label: velha ? velha.label : s.label, isReturn: velha ? velha.isReturn : s.isReturn, sourceHandleH: s.sourceHandle, targetHandleH: s.targetHandle };
     });
     onCanvasChange({ nodes, edges });
   };
@@ -208,7 +239,7 @@ export default function FlowRadiografia({
   const setaSel = sel?.tipo === "seta" ? desenho.setas.find((s) => s.id === sel.id) || null : null;
   const painelAberto = !!(pecaSel || setaSel);
   const titulo = nomeDoFluxo(flow);
-  const sub = descricaoLimpa(flow);
+  const sub = nivel < 3 && lf ? lf.frase : descricaoLimpa(flow);
 
   const itemMenu = "w-full text-left text-sm px-3 py-2 hover:bg-[var(--bg-tertiary)] cursor-pointer whitespace-nowrap";
 
@@ -228,13 +259,19 @@ export default function FlowRadiografia({
             <p className="text-xs mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 items-center">
               {cron && <span className="text-[var(--text-secondary)]">⏰ {cron.descricao}</span>}
               {aposentada ? (
-                <span style={{ color: "var(--danger)" }} title="A curadoria viu que esta automação saiu do relógio da VPS">⛔ não roda mais</span>
+                <span style={{ color: "var(--danger)" }} title="A revisão semanal viu que esta rotina não está mais no relógio do servidor">⛔ não roda mais</span>
               ) : saude ? (
-                <span style={{ color: SELO_SAUDE[saude].cor }} title="Último sinal de vida vs. a frequência esperada.">{SELO_SAUDE[saude].bolinha} {SELO_SAUDE[saude].texto}</span>
+                <span style={{ color: SELO_SAUDE[saude].cor }} title={automacao ? `Último sinal de vida: ${tempoDesde(automacao.ultima_execucao)}` : undefined}>{SELO_SAUDE[saude].bolinha} {SELO_SAUDE[saude].texto}</span>
               ) : null}
-              {automacao && <span className="text-[var(--text-muted)]">última: {tempoDesde(automacao.ultima_execucao)}</span>}
-              {desatualizado && !aposentada && <span style={{ color: "var(--warning)" }} title="O relógio da VPS mudou depois da última vez que este desenho foi mexido">✏️ desenho pode estar atrasado</span>}
             </p>
+            {/* detalhes de bastidor: só no nível Código */}
+            {nivel === 3 && (
+              <p className="text-[11px] mt-1 flex flex-wrap gap-x-3 gap-y-0.5 items-center text-[var(--text-muted)]">
+                {flow.title !== titulo && <span className="font-mono break-all">{flow.title}</span>}
+                {automacao && <span>última execução: {tempoDesde(automacao.ultima_execucao)}</span>}
+                {desatualizado && !aposentada && <span style={{ color: "var(--warning)" }} title="O relógio da VPS mudou depois da última vez que este desenho foi mexido">✏️ desenho pode estar atrasado</span>}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -271,7 +308,6 @@ export default function FlowRadiografia({
         </div>
 
         <BotoesNivel nivel={nivel} onMuda={trocaNivel} />
-        <FaixaComeca texto={resumo.inicio} />
         <BlocoProcesso
           comeca={resumo.inicio}
           termina={resumo.fim}
@@ -378,10 +414,10 @@ export function PainelPeca({ peca, nivel, flow, desenho, d1, automacao, cronDesc
   const vem = desenho.setas.filter((s) => s.target === peca.id);
   const vai = desenho.setas.filter((s) => s.source === peca.id);
   const porId = new Map(desenho.pecas.map((p) => [p.id, p]));
-  const tags = [...new Set(peca.membros.flatMap((m) => m.data.tags || []))];
+  const tags = [...new Set(peca.membros.flatMap((m) => m.data.tags || []))].filter((t) => nivel === 3 || !/^(rss|supabase|cron|api|painel)$/i.test(t));
   const executores = [...new Set(peca.membros.map((m) => m.data.executor).filter(Boolean) as string[])];
   const textos = peca.membros.flatMap((m) => [m.data.label, m.data.details, m.data.executor, ...(m.data.tags || [])]);
-  if (m0.type === "start" && cronDescricao) textos.push("cron UTC");
+  if (nivel === 3 && m0.type === "start" && cronDescricao) textos.push("cron UTC");
   const extras = peca.membros.flatMap((m) => m.data.glossario || []);
   const termos = termosDoTexto(textos, extras);
   const lider = nivel > 1 ? d1.mapa.get(peca.id) : null;
@@ -497,7 +533,7 @@ export function PainelPeca({ peca, nivel, flow, desenho, d1, automacao, cronDesc
           )}
         </div>
       )}
-      <p className="mt-4 text-[10px] text-[var(--text-muted)]">Fluxo: {flow.title}</p>
+      {nivel === 3 && <p className="mt-4 text-[10px] text-[var(--text-muted)] break-all">Fluxo: {flow.title}</p>}
     </div>
   );
 }

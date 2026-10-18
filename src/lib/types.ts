@@ -58,6 +58,10 @@ export interface FlowDocNode {
     layoutV?: number;
     /** Posição na vista HORIZONTAL (computador), gravada no modo Editar. A `position` continua sendo a vertical (celular). */
     posH?: { x: number; y: number };
+    /** Texto em linguagem simples desta etapa (gerado pelo curador; níveis Leigo e Intermediário) */
+    leigo?: { rotulo: string; frase: string; quem?: string };
+    /** Textos simples do fluxo inteiro; fica na etapa de início. `h` = impressão do desenho quando foi escrito */
+    leigoFluxo?: { nome: string; frase: string; comeca: string; termina: string; setas?: Record<string, string>; h?: string };
   };
 }
 

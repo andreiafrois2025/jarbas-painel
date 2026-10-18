@@ -13,6 +13,7 @@ import RascunhoFluxo from "./RascunhoFluxo";
 import VozNovoFluxo from "./VozNovoFluxo";
 import { rascunhosApi, type RascunhoResumo } from "@/lib/flow/rascunhos";
 import { montaMacros, nomeDoFluxo } from "@/lib/flow/macro-fluxos";
+import { leigoDoFluxo } from "@/lib/flow/leigo";
 import { useNivel, lerUltimaVista, guardarUltimaVista } from "@/lib/flow/nivel";
 import { useUI } from "../ui";
 import { usePainel } from "@/lib/painel-context";
@@ -196,7 +197,7 @@ export default function FlowsPageV2() {
       <button
         key={f.id}
         onClick={() => abrirFluxo(f)}
-        title={nomeDoFluxo(f)}
+        title={leigoDoFluxo(f)?.frase || nomeDoFluxo(f)}
         className={`w-full text-left flex items-center gap-2 pl-7 pr-2 py-1.5 rounded-md text-[13px] cursor-pointer hover:bg-[var(--bg-tertiary)] ${ativo ? ativoClasse : ""}`}
       >
         <span className="w-2 h-2 rounded-full shrink-0" style={s ? { background: COR_SAUDE[s] } : { border: "1.5px solid var(--text-muted)" }} aria-label={s ? `saúde: ${s}` : "sem horário fixo"} />

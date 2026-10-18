@@ -9,7 +9,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import RoughNode, { STROKE_BY_TYPE } from "./RoughNode";
 import { estiloSeta } from "./estilo";
-import { tamanhoDoTipo } from "@/lib/flow/layout";
+import { medePeca } from "@/lib/flow/medida";
 import type { FlowDocNode } from "@/lib/types";
 
 // =============================================
@@ -69,7 +69,7 @@ function paraRF(nos: NoVis[]): Node[] {
     id: n.id,
     type: "rough",
     position: n.position,
-    data: { label: n.label, icon: n.icon, executor: n.executor, details: n.details, _flowType: n.type },
+    data: { label: n.label, icon: n.icon, executor: n.executor, details: n.details, _flowType: n.type, semRotuloTipo: true },
   }));
 }
 function paraRFSetas(setas: SetaVis[]): Edge[] {
@@ -100,7 +100,7 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
     if (!el || !nos.length) return rf.fitView({ padding: 0.1, maxZoom: 1.15 });
     let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
     for (const n of nos) {
-      const t = tamanhoDoTipo(n.type);
+      const t = medePeca(n.type, n.label, n.executor, n.icon);
       x1 = Math.min(x1, n.position.x); y1 = Math.min(y1, n.position.y);
       x2 = Math.max(x2, n.position.x + t.w); y2 = Math.max(y2, n.position.y + t.h);
     }
@@ -124,7 +124,8 @@ function Interno({ nos, setas, selecao, onSelect, editando, onSalvar, posicoesAu
     if (!foco) return;
     const n = ultimo.current.nodes.find((x) => x.id === foco.id);
     if (!n) return;
-    const t = tamanhoDoTipo((n.data as { _flowType?: FlowDocNode["type"] })._flowType || "action");
+    const dn = n.data as { _flowType?: FlowDocNode["type"]; label?: string; executor?: string; icon?: string };
+    const t = medePeca(dn._flowType || "action", dn.label, dn.executor, dn.icon);
     rf.setCenter(n.position.x + t.w / 2, n.position.y + t.h / 2, { zoom: Math.max(rf.getZoom(), 0.85), duration: 350 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [foco?.n]);
