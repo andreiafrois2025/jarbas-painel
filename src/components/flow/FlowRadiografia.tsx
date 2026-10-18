@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { FlowDoc, FlowDocNode } from "@/lib/types";
+import type { FlowDoc, FlowDocEdge, FlowDocNode } from "@/lib/types";
 import type { AutomacaoApiItem } from "@/lib/biblioteca";
 import { interpretaCron, formataProxima } from "@/lib/cron";
 import {
@@ -9,15 +9,18 @@ import {
   descricaoLimpa, avaliaSaude, SELO_SAUDE, tempoDesde, primeiraFrase,
   type Nivel, type Peca, type Desenho,
 } from "@/lib/radiografia";
-import FlowDiagram, { type Selecao } from "./FlowDiagram";
+import { layoutVertical, tamanhoDoTipo, verticaliza } from "@/lib/flow/layout";
+import { nomeDoFluxo } from "@/lib/flow/macro-fluxos";
+import FlowViewer, { type Selecao, type NoVis, type SetaVis } from "./FlowViewer";
 import FlowCanvas from "./FlowCanvas";
 import { toMermaid, toPrompt, copy, download } from "./FlowExport";
 import { TYPE_LABEL, STROKE_BY_TYPE } from "./RoughNode";
 
 // =============================================
-// A radiografia de UM fluxo: três níveis + a aba de edição.
-// Esquerda: o diagrama. Direita: o painel (resumo, ou o detalhe do que foi
-// clicado). Largura total, sem coluna estreita no meio.
+// A radiografia de UM fluxo (v2, 18/10/2026): tela limpa, canvas em tela cheia.
+//  - Cabeçalho de uma linha: voltar, nome, horário, saúde, os 3 níveis e um menu "⋯"
+//  - O diagrama (React Flow, de cima para baixo) ocupa a largura toda
+//  - O painel só aparece ao clicar numa peça/seta (ou no botão Resumo)
 // =============================================
 
 type Aba = Nivel | "editar";
@@ -39,6 +42,8 @@ export default function FlowRadiografia({
 }: Props) {
   const [aba, setAba] = useState<Aba>(abaInicial);
   const [sel, setSel] = useState<Selecao>(null);
+  const [resumoAberto, setResumoAberto] = useState(false);
+  const [menu, setMenu] = useState(false);
   const nivel: Nivel = aba === "editar" ? 2 : aba;
 
   const cron = automacao ? interpretaCron(automacao.agenda) : null;
@@ -50,13 +55,44 @@ export default function FlowRadiografia({
   const d2 = useMemo(() => montaDesenho(flow, 2), [flow]);
   const desenho: Desenho = nivel === 1 ? d1 : d2; // o nível 3 usa o desenho do 2 (mesmas peças)
   const resumo = useMemo(() => montaResumo(desenho, nivel), [desenho, nivel]);
-  const inicioId = desenho.pecas.find((p) => p.type === "start")?.id;
+
+  // o fluxo "em pé" (de cima pra baixo), respeitando o que ela já salvou
+  const flowV = useMemo(() => verticaliza(flow), [flow]);
+  const auto2 = useMemo(
+    () => verticaliza({ nodes: flow.nodes.map((n) => ({ ...n, data: { ...n.data, layoutV: undefined } })), edges: flow.edges.map((e) => ({ ...e, sourceHandle: undefined, targetHandle: undefined })) }),
+    [flow],
+  );
+  const flowParaEditar = useMemo<FlowDoc>(() => ({ ...flow, nodes: flowV.nodes, edges: flowV.edges }), [flow, flowV]);
+
+  const { nos, setas, auto } = useMemo(() => {
+    if (nivel === 1) {
+      const pos = layoutVertical(
+        d1.pecas.map((p) => ({ id: p.id, ...tamanhoDoTipo(p.type), ordem: p.y })),
+        d1.setas.map((s) => ({ source: s.source, target: s.target, retorno: s.isReturn })),
+      );
+      const nosL: NoVis[] = d1.pecas.map((p) => ({ id: p.id, type: p.type, label: p.label, icon: p.icon, details: p.membros[0]?.data.details, position: pos.get(p.id)! }));
+      const setasL: SetaVis[] = d1.setas.map((s) => ({ ...s, isReturn: !!s.isReturn, sourceHandle: s.isReturn ? "right" : "bottom", targetHandle: s.isReturn ? "right" : "top" }));
+      return { nos: nosL, setas: setasL, auto: Object.fromEntries(nosL.map((n) => [n.id, n.position])) };
+    }
+    const nosL: NoVis[] = flowV.nodes.map((n) => ({ id: n.id, type: n.type, label: n.data.label, icon: n.data.icon, details: n.data.details, position: n.position }));
+    const setasL: SetaVis[] = flowV.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, label: e.label, isReturn: !!e.isReturn, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle }));
+    return { nos: nosL, setas: setasL, auto: Object.fromEntries(auto2.nodes.map((n) => [n.id, n.position])) };
+  }, [nivel, d1, flowV, auto2]);
+
+  const salvarPosicoes = (pos: { id: string; x: number; y: number }[], ss: SetaVis[]) => {
+    const nodes: FlowDocNode[] = flowV.nodes.map((n) => {
+      const p = pos.find((x) => x.id === n.id);
+      return p ? { ...n, position: { x: p.x, y: p.y }, data: { ...n.data, layoutV: 1 } } : n;
+    });
+    const edges: FlowDocEdge[] = ss.map((s) => ({ id: s.id, source: s.source, target: s.target, label: s.label, isReturn: s.isReturn, sourceHandle: s.sourceHandle, targetHandle: s.targetHandle }));
+    onCanvasChange({ nodes, edges });
+    avisar("Posições salvas.");
+  };
 
   const trocaAba = (nova: Aba) => {
     // mantém a peça escolhida ao trocar de nível (leigo agrupa, então mapeia)
     if (sel?.tipo === "peca" && nova !== "editar") {
-      const alvoNivel: Nivel = nova;
-      if (alvoNivel === 1) {
+      if (nova === 1) {
         const lider = d1.mapa.get(sel.id);
         setSel(lider ? { tipo: "peca", id: lider } : null);
       } else if (nivel === 1) {
@@ -67,6 +103,7 @@ export default function FlowRadiografia({
       setSel(null);
     }
     setAba(nova);
+    setMenu(false);
     try {
       const u = new URL(window.location.href);
       u.searchParams.set("nivel", nova === "editar" ? "editar" : String(nova));
@@ -74,14 +111,14 @@ export default function FlowRadiografia({
     } catch { /* sem URL, sem problema */ }
   };
 
-  // atalhos: 1/2/3 trocam o nível, Esc fecha o detalhe
+  // atalhos: 1/2/3 trocam o nível, Esc fecha o painel
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       const alvo = e.target as HTMLElement | null;
       if (alvo && /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName)) return;
       if (aba === "editar") return;
       if (e.key === "1" || e.key === "2" || e.key === "3") trocaAba(Number(e.key) as Nivel);
-      else if (e.key === "Escape") setSel(null);
+      else if (e.key === "Escape") { setSel(null); setResumoAberto(false); setMenu(false); }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -90,143 +127,166 @@ export default function FlowRadiografia({
 
   const pecaSel = sel?.tipo === "peca" ? desenho.pecas.find((p) => p.id === sel.id) || null : null;
   const setaSel = sel?.tipo === "seta" ? desenho.setas.find((s) => s.id === sel.id) || null : null;
+  const painelAberto = !!(pecaSel || setaSel || resumoAberto);
+  const titulo = nomeDoFluxo(flow);
+
+  const itemMenu = "w-full text-left text-sm px-3 py-2 hover:bg-[var(--bg-tertiary)] cursor-pointer whitespace-nowrap";
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-      {/* ── Cabeçalho ── */}
-      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-3 md:px-4 py-2 flex flex-wrap items-center gap-x-3 gap-y-2 shrink-0">
+      {/* ── Cabeçalho de uma linha ── */}
+      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-3 md:px-4 py-2 flex items-center gap-x-3 gap-y-1 flex-wrap shrink-0 relative">
         <button onClick={onVoltar} className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap">
           ← Voltar
         </button>
-        <h2 className="text-base font-semibold truncate min-w-0 flex-1 basis-48">{flow.title}</h2>
-        {aposentada && <Selo cor="var(--danger)" titulo="A curadoria viu que esta automação saiu do relógio da VPS">⛔ não roda mais</Selo>}
-        {saude && !aposentada && (
-          <Selo cor={SELO_SAUDE[saude].cor} titulo="Último sinal de vida vs. a frequência esperada">
-            {SELO_SAUDE[saude].bolinha} {SELO_SAUDE[saude].texto}
-          </Selo>
-        )}
-        {desatualizado && !aposentada && (
-          <Selo cor="var(--warning)" titulo="O relógio da VPS mudou depois da última vez que este desenho foi mexido. Não prova que está errado, só que pode ter ficado pra trás.">
-            ✏️ desenho pode estar atrasado
-          </Selo>
-        )}
-        {flow.is_seed && <Selo cor="var(--af-teal)" titulo="Veio dos seeds / do curador. Duplique pra editar sem o curador mexer.">seed</Selo>}
+        <h2 className="text-base font-semibold truncate min-w-0 flex-1 basis-40">{titulo}</h2>
+        {cron && <span className="text-xs text-[var(--text-secondary)] whitespace-nowrap hidden md:inline">⏰ {cron.descricao}</span>}
+        {aposentada ? (
+          <span className="text-xs whitespace-nowrap" style={{ color: "var(--danger)" }} title="A curadoria viu que esta automação saiu do relógio da VPS">⛔ não roda mais</span>
+        ) : saude ? (
+          <span className="text-xs whitespace-nowrap" style={{ color: SELO_SAUDE[saude].cor }} title={`${SELO_SAUDE[saude].texto}. Último sinal de vida vs. a frequência esperada.`}>
+            {SELO_SAUDE[saude].bolinha} <span className="hidden sm:inline">{SELO_SAUDE[saude].texto}</span>
+          </span>
+        ) : null}
+
+        <div className="flex rounded-lg border border-[var(--border)] overflow-hidden" role="tablist" aria-label="Nível de leitura">
+          {NIVEIS.map((n) => (
+            <button
+              key={n.n}
+              role="tab"
+              aria-selected={aba === n.n}
+              onClick={() => trocaAba(n.n)}
+              title={`${n.dica} (tecla ${n.n})`}
+              className={`px-3 py-1.5 text-sm cursor-pointer transition-colors ${aba === n.n ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"}`}
+              style={aba === n.n ? { background: "var(--accent, #2D6B6B)" } : undefined}
+            >
+              {n.rotulo}
+            </button>
+          ))}
+        </div>
+
         {saveState === "saving" && <span className="text-[11px] text-[var(--text-muted)]">salvando…</span>}
         {saveState === "saved" && <span className="text-[11px] text-[var(--success)]">salvo ✓</span>}
-      </div>
 
-      {/* ── Abas dos níveis ── */}
-      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] px-3 md:px-4 flex flex-wrap items-center gap-1 shrink-0">
-        {NIVEIS.map((n) => (
-          <button
-            key={n.n}
-            onClick={() => trocaAba(n.n)}
-            title={`${n.dica} (tecla ${n.n})`}
-            className={`px-3 py-2 text-sm font-medium cursor-pointer border-b-2 -mb-px transition-colors ${
-              aba === n.n ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            }`}
-          >
-            <span className="text-[10px] opacity-60 mr-1">{n.n}</span>{n.rotulo}
-          </button>
-        ))}
-        <button
-          onClick={() => trocaAba("editar")}
-          title="Arrastar, renomear, apagar e ligar etapas"
-          className={`px-3 py-2 text-sm font-medium cursor-pointer border-b-2 -mb-px transition-colors ${
-            aba === "editar" ? "border-[var(--accent)] text-[var(--accent)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          }`}
-        >
-          ✏️ Editar desenho
-        </button>
-        <div className="flex-1" />
-        <div className="flex flex-wrap gap-1 py-1">
-          <Botao onClick={async () => { await copy(toMermaid(flow)); avisar("Mermaid copiado, cola em qualquer IA."); }} titulo="Copia como Mermaid">📋 Mermaid</Botao>
-          <Botao onClick={async () => { await copy(toPrompt(flow)); avisar("Descrição copiada, cola em qualquer IA."); }} titulo="Copia como prompt textual">📝 Prompt</Botao>
-          <Botao onClick={() => download(`${flow.title}.json`, JSON.stringify(flow, null, 2), "application/json")} titulo="Baixa JSON">💾 JSON</Botao>
-          <a
-            href={`https://claude.ai/new?q=${encodeURIComponent(`Me explique este fluxo como se eu fosse leiga e depois em detalhes técnicos, e diga o que pode dar errado:\n\n${toPrompt(flow)}`.slice(0, 6000))}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Abre o claude.ai com o fluxo já escrito (usa a sua assinatura, sem custo extra)"
-            className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--bg-tertiary)] whitespace-nowrap"
-          >
-            ↗ Perguntar no claude.ai
-          </a>
-          {flow.is_seed && (
-            <button onClick={onDuplicate} title="Duplica pra editar sem o curador mexer" className="text-xs px-2 py-1 rounded bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] cursor-pointer">
-              ⎘ Duplicar
-            </button>
+        <div className="relative">
+          <button onClick={() => setMenu((v) => !v)} aria-label="Mais opções" aria-expanded={menu} className="px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-sm hover:bg-[var(--bg-tertiary)] cursor-pointer">⋯</button>
+          {menu && (
+            <div className="absolute right-0 top-full mt-1 z-40 min-w-[220px] rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-xl py-1">
+              <button className={itemMenu} onClick={() => trocaAba("editar")}>✏️ Editar desenho (renomear, adicionar, apagar)</button>
+              <button className={itemMenu} onClick={async () => { await copy(toMermaid(flow)); avisar("Mermaid copiado, cola em qualquer IA."); setMenu(false); }}>📋 Copiar como Mermaid</button>
+              <button className={itemMenu} onClick={async () => { await copy(toPrompt(flow)); avisar("Descrição copiada, cola em qualquer IA."); setMenu(false); }}>📝 Copiar como texto (prompt)</button>
+              <button className={itemMenu} onClick={() => { download(`${flow.title}.json`, JSON.stringify(flow, null, 2), "application/json"); setMenu(false); }}>💾 Baixar JSON</button>
+              <a
+                href={`https://claude.ai/new?q=${encodeURIComponent(`Me explique este fluxo como se eu fosse leiga e depois em detalhes técnicos, e diga o que pode dar errado:\n\n${toPrompt(flow)}`.slice(0, 6000))}`}
+                target="_blank" rel="noopener noreferrer"
+                className={`${itemMenu} block`}
+              >↗ Perguntar no claude.ai</a>
+              {flow.is_seed && <button className={itemMenu} onClick={() => { onDuplicate(); setMenu(false); }}>⎘ Duplicar (para editar sem o curador mexer)</button>}
+            </div>
           )}
         </div>
       </div>
 
-      {descricaoLimpa(flow) && aba !== "editar" && (
-        <div className="bg-[var(--bg-tertiary)] px-4 py-2 text-xs text-[var(--text-secondary)] shrink-0 border-b border-[var(--border)]">
-          {descricaoLimpa(flow)}
-        </div>
-      )}
-
-      {/* ── Faixa do relógio (vínculo com o crontab real) ── */}
-      {automacao && cron && aba !== "editar" && (
-        <div className="shrink-0 border-b border-[var(--border)] bg-[var(--bg-primary)] px-4 py-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[var(--text-secondary)]">
-          <span>⏰ <strong className="text-[var(--text-primary)]">{cron.descricao}</strong></span>
-          {nivel >= 2 && <span>próxima: {formataProxima(cron.proxima)}</span>}
-          <span>última: {tempoDesde(automacao.ultima_execucao)}{!automacao.log ? " (não deixa registro)" : automacao.log_compartilhado ? " (sinal indireto)" : ""}</span>
-          <span>{automacao.usa_ia ? "🤖 usa IA" : "🐍 sem IA"}{automacao.custo_execucao ? ` · ${automacao.custo_execucao}` : ""}</span>
-        </div>
-      )}
-
-      {/* ── Corpo ── */}
-      {aba === "editar" ? (
-        <div className="flex-1 min-h-[420px] relative">
-          <FlowCanvas flow={flow} onChange={onCanvasChange} />
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
-          <div className="lg:flex-1 min-w-0 overflow-auto p-3 md:p-4 min-h-[320px]">
-            <p className="text-[11px] text-[var(--text-muted)] mb-1">
-              {NIVEIS[nivel - 1].dica}. Clique numa peça ou numa seta. Teclas 1, 2 e 3 trocam o nível.
-            </p>
-            <FlowDiagram desenho={desenho} selecao={sel} onSelect={setSel} inicioId={inicioId} />
-          </div>
-          <aside className="lg:w-[360px] xl:w-[400px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] bg-[var(--bg-secondary)] overflow-y-auto p-4">
-            {pecaSel ? (
-              <PainelPeca
-                key={pecaSel.id + nivel}
-                peca={pecaSel}
-                nivel={nivel}
-                flow={flow}
-                desenho={desenho}
-                d1={d1}
-                automacao={automacao}
-                cronDescricao={cron?.descricao}
-                onSelect={setSel}
-                onIrParaLeigo={(id) => { setAba(1); setSel({ tipo: "peca", id }); }}
-                avisar={avisar}
-              />
-            ) : setaSel ? (
-              <PainelSeta key={setaSel.id} seta={setaSel} desenho={desenho} onSelect={setSel} />
-            ) : (
-              <PainelResumo resumo={resumo} nivel={nivel} automacao={automacao} onSelect={setSel} avisar={avisar} />
+      {/* ── Corpo: o canvas ocupa tudo; o painel aparece por cima, só quando pedido ── */}
+      <div className="flex-1 min-h-0 relative" onClick={() => menu && setMenu(false)}>
+        {aba === "editar" ? (
+          <>
+            <FlowCanvas flow={flowParaEditar} onChange={onCanvasChange} />
+            <button
+              onClick={() => trocaAba(nivel)}
+              className="absolute top-3 right-3 z-30 text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer"
+            >
+              ← Voltar ao diagrama
+            </button>
+          </>
+        ) : (
+          <>
+            <FlowViewer
+              key={nivel === 1 ? "leigo" : "completo"}
+              nos={nos}
+              setas={setas}
+              selecao={sel}
+              onSelect={(s) => { setSel(s); if (s) setResumoAberto(false); }}
+              editavel={nivel !== 1}
+              salvando={saveState === "saving"}
+              onSalvar={salvarPosicoes}
+              posicoesAuto={auto}
+              extras={
+                <button
+                  onClick={() => { setResumoAberto((v) => !v); setSel(null); }}
+                  className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer whitespace-nowrap"
+                  title="O que é este fluxo, quando roda e os passos em ordem"
+                >
+                  🧭 Resumo
+                </button>
+              }
+            />
+            {painelAberto && (
+              <aside className="absolute z-20 bg-[var(--bg-secondary)] shadow-2xl overflow-y-auto p-4 border-[var(--border)] inset-x-0 bottom-0 max-h-[62%] border-t rounded-t-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[380px] sm:max-h-none sm:border-t-0 sm:border-l sm:rounded-none">
+                {pecaSel ? (
+                  <PainelPeca
+                    key={pecaSel.id + nivel}
+                    peca={pecaSel}
+                    nivel={nivel}
+                    flow={flow}
+                    desenho={desenho}
+                    d1={d1}
+                    automacao={automacao}
+                    cronDescricao={cron?.descricao}
+                    onSelect={setSel}
+                    onIrParaLeigo={(id) => { setAba(1); setSel({ tipo: "peca", id }); }}
+                    avisar={avisar}
+                  />
+                ) : setaSel ? (
+                  <PainelSeta key={setaSel.id} seta={setaSel} desenho={desenho} onSelect={setSel} />
+                ) : (
+                  <PainelResumo
+                    resumo={resumo}
+                    nivel={nivel}
+                    automacao={automacao}
+                    onSelect={setSel}
+                    avisar={avisar}
+                    onFechar={() => setResumoAberto(false)}
+                    topo={
+                      <div className="mb-3 space-y-1.5 text-xs text-[var(--text-secondary)]">
+                        {descricaoLimpa(flow) && <p className="text-sm">{descricaoLimpa(flow)}</p>}
+                        {automacao && cron && (
+                          <>
+                            <p>⏰ <strong className="text-[var(--text-primary)]">{cron.descricao}</strong>{nivel >= 2 && <> · próxima: {formataProxima(cron.proxima)}</>}</p>
+                            <p>última: {tempoDesde(automacao.ultima_execucao)}{!automacao.log ? " (não deixa registro)" : automacao.log_compartilhado ? " (sinal indireto)" : ""} · {automacao.usa_ia ? "🤖 usa IA" : "🐍 sem IA"}{automacao.custo_execucao ? ` · ${automacao.custo_execucao}` : ""}</p>
+                          </>
+                        )}
+                        {desatualizado && !aposentada && <p style={{ color: "var(--warning)" }}>✏️ O relógio da VPS mudou depois da última vez que este desenho foi mexido: ele pode ter ficado pra trás.</p>}
+                      </div>
+                    }
+                  />
+                )}
+              </aside>
             )}
-          </aside>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
 // ── Painéis ─────────────────────────────────────────────────────────────
-function PainelResumo({ resumo, nivel, automacao, onSelect, avisar }: {
+function PainelResumo({ resumo, nivel, automacao, onSelect, avisar, onFechar, topo }: {
   resumo: ReturnType<typeof montaResumo>;
   nivel: Nivel;
   automacao: AutomacaoApiItem | null;
   onSelect: (s: Selecao) => void;
   avisar: (m: string) => void;
+  onFechar: () => void;
+  topo?: React.ReactNode;
 }) {
   return (
     <div>
-      <h3 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">🧭 {nivel === 1 ? "A história, do começo ao fim" : "Resumo do processo"}</h3>
+      <div className="flex items-start mb-2">
+        <h3 className="flex-1 text-[10px] uppercase tracking-wider text-[var(--text-muted)]">🧭 {nivel === 1 ? "A história, do começo ao fim" : "Resumo do processo"}</h3>
+        <button onClick={onFechar} aria-label="Fechar resumo" className="text-lg leading-none text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">×</button>
+      </div>
+      {topo}
       <div className="space-y-2 mb-3 text-sm">
         <p><span className="text-[var(--text-muted)] text-xs">Começa quando</span><br />{resumo.inicio}</p>
         <p><span className="text-[var(--text-muted)] text-xs">Termina com</span><br />{resumo.fim}</p>

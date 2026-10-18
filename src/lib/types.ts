@@ -54,6 +54,8 @@ export interface FlowDocNode {
     codigo?: { arquivo?: string; linhas?: string; linguagem?: string; trecho: string };
     /** Termos técnicos desta peça, com definição (opcional; complementa o dicionário embutido) */
     glossario?: { termo: string; definicao: string }[];
+    /** Marca: as posições deste nó foram arrumadas/salvas na vertical (de cima para baixo) */
+    layoutV?: number;
   };
 }
 
