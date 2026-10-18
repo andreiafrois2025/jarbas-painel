@@ -139,7 +139,8 @@ export async function statusRerender(name: string): Promise<StatusRerender> {
 }
 
 export function urlVideo(reelUrl: string, reelMtime: number): string {
-  return `${SQUAD_API_BASE}${reelUrl}?v=${reelMtime}`;
+  // reelUrl já vem assinado (?t=...) da squad-api; o ?v= só quebra o cache do vídeo
+  return `${SQUAD_API_BASE}${reelUrl}${reelUrl.includes("?") ? "&" : "?"}v=${reelMtime}`;
 }
 
 export function formatarMMSS(segundos: number): string {
