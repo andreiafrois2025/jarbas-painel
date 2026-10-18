@@ -96,16 +96,19 @@ export interface TrechoAula { agente: string; de: number; ate: number; tarefa: s
 export interface RoteiroAula { id: string; rotulo: string; descricao: string; pedido: string; trechos: TrechoAula[] }
 export const ROTEIROS: RoteiroAula[] = [
   {
-    id: "carrossel", rotulo: "📱 Carrossel de IA", descricao: "Para cursos abertos",
-    pedido: "Andréia pede um carrossel sobre 5 ferramentas de IA para o dia a dia",
+    id: "carrossel", rotulo: "📱 Carrossel de IA com vídeo", descricao: "Para cursos abertos",
+    pedido: "Andréia pede um carrossel sobre o novo lançamento de uma empresa de IA, com vídeo",
     trechos: [
-      { agente: "jarbas", de: 1, ate: 8, tarefa: "Distribuindo as tarefas do carrossel", entrega: "Tarefas distribuídas" },
-      { agente: "mike", de: 7, ate: 19, tarefa: "Pesquisando as 5 ferramentas de IA", entrega: "Pesquisa pronta, com as 5 ferramentas" },
-      { agente: "izzy", de: 20, ate: 31, tarefa: "Escrevendo os textos dos slides", entrega: "Texto dos slides pronto" },
-      { agente: "felipe", de: 32, ate: 43, tarefa: "Desenhando os slides", entrega: "Slides desenhados" },
-      { agente: "harvey", de: 44, ate: 50, tarefa: "Conferindo os direitos de imagem", entrega: "Direitos de imagem conferidos" },
+      { agente: "jarbas", de: 1, ate: 7, tarefa: "Distribuindo as tarefas do carrossel", entrega: "Tarefas distribuídas" },
+      { agente: "mike", de: 6, ate: 15, tarefa: "Pesquisando e procurando o vídeo do lançamento", entrega: "Pesquisa e vídeo do lançamento prontos" },
+      { agente: "theo", de: 15, ate: 23, tarefa: "Editando o trecho do vídeo que vai no carrossel", entrega: "Trecho do vídeo editado" },
+      { agente: "izzy", de: 23, ate: 30, tarefa: "Escrevendo os textos dos slides", entrega: "Texto dos slides pronto" },
+      { agente: "felipe", de: 30, ate: 38, tarefa: "Desenhando os slides", entrega: "Slides desenhados" },
+      { agente: "izzy", de: 38, ate: 43, tarefa: "Conferindo se o texto ficou no lugar certo", entrega: "Texto cortado no slide 3" },
+      { agente: "felipe", de: 43, ate: 47, tarefa: "Ajustando o slide 3", entrega: "Slide 3 ajustado" },
+      { agente: "izzy", de: 47, ate: 51, tarefa: "Conferindo os slides de novo", entrega: "Slides sem cortes nem erros" },
       { agente: "donna", de: 51, ate: 56, tarefa: "Agendando a publicação", entrega: "Publicação agendada" },
-      { agente: "jarbas", de: 56.5, ate: 59.5, tarefa: "Montando o pacote para aprovação", entrega: "Carrossel pronto para você aprovar!" },
+      { agente: "jarbas", de: 56.5, ate: 59.5, tarefa: "Montando o pacote para aprovação", entrega: "Carrossel com vídeo pronto para você aprovar!" },
     ],
   },
   {
@@ -113,7 +116,8 @@ export const ROTEIROS: RoteiroAula[] = [
     pedido: "Andréia pede o processo para contratar licenças de software de geoprocessamento",
     trechos: [
       { agente: "jarbas", de: 1, ate: 7, tarefa: "Distribuindo as tarefas do processo", entrega: "Tarefas distribuídas" },
-      { agente: "eric", de: 7, ate: 16, tarefa: "Especificando a parte técnica", entrega: "Especificação técnica pronta" },
+      { agente: "eric", de: 7, ate: 16, tarefa: "Especificando a parte de geoprocessamento", entrega: "Parte de geoprocessamento pronta" },
+      { agente: "junior", de: 8, ate: 17, tarefa: "Especificando a parte de TI: requisitos, compatibilidade e segurança", entrega: "Requisitos de TI prontos" },
       { agente: "sofia", de: 12, ate: 19, tarefa: "Organizando as normas aplicáveis", entrega: "Normas organizadas" },
       { agente: "katrina", de: 19, ate: 29, tarefa: "Redigindo o ETP e o TR", entrega: "ETP e TR redigidos" },
       { agente: "louis", de: 24, ate: 32, tarefa: "Pesquisando preços de mercado", entrega: "Pesquisa de preços pronta" },
