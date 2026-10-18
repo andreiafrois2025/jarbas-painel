@@ -32,6 +32,7 @@ interface DashboardProps {
 // construiu; não funcionaria pra mais ninguém, nem pra ela daqui a 3 meses.
 const NAV_ITEMS: { path: string; icon: string; nome: string; title: string; match: string; pessoal?: boolean }[] = [
   { path: "/inicio", icon: "🏠", nome: "Hoje", title: "Hoje — agenda, tarefas e a caixa de aprovação", match: "/inicio" },
+  { path: "/chat", icon: "💬", nome: "Chat", title: "Chat — converse com o Jarbas e com cada funcionário", match: "/chat" },
   { path: "/equipe", icon: "👥", nome: "Equipe", title: "Equipe — colaboradores, setores e assistentes", match: "/equipe" },
   { path: "/producao/automacoes", icon: "🚀", nome: "Produção", title: "Produção — squads, automações, fluxos e estúdio", match: "/producao" },
   { path: "/saude", icon: "🩺", nome: "Saúde", title: "Saúde — do sistema e das integrações", match: "/saude" },
