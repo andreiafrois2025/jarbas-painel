@@ -104,19 +104,19 @@ export const CP_DURACAO = 4.2;
 export const POS_ANDREIA = { x: 688, y: 314 }; // sala de Comando
 export const ROTEIROS: RoteiroAula[] = [
   {
-    id: "carrossel", rotulo: "📱 Carrossel de IA com vídeo", descricao: "Para cursos abertos", duracao: 90,
-    pedido: "Andréia pede um carrossel sobre o novo lançamento de uma empresa de IA, com vídeo",
+    id: "carrossel", rotulo: "📱 Carrossel de IA", descricao: "Para cursos abertos", duracao: 90,
+    pedido: "Andréia pede um carrossel sobre 3 jeitos de usar IA para organizar a semana, com vídeo",
     checkpoints: [
-      { de: 0.3, pedido: true, espera: "📨 Carrossel sobre o novo lançamento de uma empresa de IA, com vídeo", ok: "", mural: "pediu um carrossel sobre o novo lançamento de uma empresa de IA, com vídeo" },
-      { de: 18, espera: "🙋 Esperando você: escolher a notícia e o vídeo", ok: "✔ Andréia escolheu", mural: "aprovou a notícia e o vídeo" },
+      { de: 0.3, pedido: true, espera: "📨 Carrossel sobre 3 jeitos de usar IA para organizar a semana, com vídeo", ok: "", mural: "pediu um carrossel sobre 3 jeitos de usar IA para organizar a semana, com vídeo" },
+      { de: 18, espera: "🙋 Esperando você: escolher os casos e o vídeo", ok: "✔ Andréia escolheu", mural: "aprovou os casos e o vídeo" },
       { de: 28, espera: "🙋 Esperando você: escolher o ângulo", ok: "✔ Andréia escolheu", mural: "aprovou o ângulo do carrossel" },
       { de: 41, espera: "🙋 Esperando você: aprovar o texto e o vídeo", ok: "✔ Andréia aprovou", mural: "aprovou o texto e o vídeo" },
       { de: 50, espera: "🙋 Esperando você: escolher o visual", ok: "✔ Andréia escolheu", mural: "aprovou a proposta visual" },
       { de: 75, espera: "🙋 Esperando você: aprovar o carrossel", ok: "✔ Andréia aprovou", mural: "aprovou o carrossel final" },
     ],
     trechos: [
-      { agente: "rafaela", de: 3.5, ate: 9, tarefa: "Definindo a estratégia: público iniciante, objetivo ensinar, CTA \"salva pra testar\"", entrega: "Estratégia definida" },
-      { agente: "mike", de: 9, ate: 18, tarefa: "Pesquisando a notícia e o vídeo oficial, seguindo a estratégia", entrega: "Notícia e vídeo oficial encontrados" },
+      { agente: "rafaela", de: 3.5, ate: 9, tarefa: "Definindo a estratégia: público iniciante, objetivo ensinar, CTA \"salve e teste o jeito 1 hoje\"", entrega: "Estratégia definida" },
+      { agente: "mike", de: 9, ate: 18, tarefa: "Pesquisando casos reais e um vídeo curto de demonstração, seguindo a estratégia", entrega: "Casos reais e vídeo de demonstração encontrados" },
       { agente: "izzy", de: 22.5, ate: 28, tarefa: "Propondo 3 ângulos para o carrossel", entrega: "3 ângulos propostos" },
       { agente: "izzy", de: 32.5, ate: 41, tarefa: "Escrevendo os textos dos slides", entrega: "Texto dos slides pronto" },
       { agente: "theo", de: 32.5, ate: 41, tarefa: "Cortando o trecho do vídeo", entrega: "Trecho do vídeo cortado" },
