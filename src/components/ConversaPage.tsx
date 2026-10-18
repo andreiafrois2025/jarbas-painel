@@ -176,7 +176,7 @@ export default function ConversaPage() {
       {/* ===== CENTRO: saudação + chat ===== */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:min-h-0 h-[calc(100dvh-8.5rem)] min-h-[460px] lg:h-auto shrink-0 lg:shrink">
         <div className="flex items-center gap-3.5 px-4 md:px-10 pt-4 md:pt-[22px] pb-1 shrink-0">
-          <Mascote nome="jarbas" emoji="⚡" tamanho={64} className="max-md:!w-12 max-md:!h-12" />
+          <Mascote nome="jarbas" emoji="⚡" tamanho={64} className="max-md:!w-10 max-md:!h-10" />
           <div className="min-w-0">
             <h1 className="fonte-maquina m-0 text-[22px] md:text-[28px] leading-tight text-[var(--text-primary)]">{saudacao()}, Andréia</h1>
             <p className="m-0 mt-0.5 text-sm text-[var(--text-secondary)]">{dataPorExtenso()}{espera}</p>

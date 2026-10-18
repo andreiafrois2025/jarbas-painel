@@ -248,9 +248,12 @@ export default function FlowsPageV2() {
   // Esta tela ficou sendo o que ela sempre foi de fato: o lugar de desenhar.
   // Painel v2: a lista de fluxos voltou a morar aqui (é o "Mapa" da Máquina),
   // agrupada pela categoria que cada fluxo traz na descrição: "[Categoria] texto".
+  // Quando o fluxo é de uma automação do relógio da VPS, vale o nome e a categoria
+  // dela (o título do fluxo costuma ser o comando, tipo "/usr/bin/python3 ...").
+  const doRelogio = (f: FlowDoc) => automacoes.find((a) => a.flow && semAcento(a.flow) === semAcento(f.title));
   const grupos = new Map<string, FlowDoc[]>();
   for (const f of flows) {
-    const cat = /^\[([^\]]+)\]/.exec(f.description || "")?.[1] || "Outros";
+    const cat = doRelogio(f)?.categoria || /^\[([^\]]+)\]/.exec(f.description || "")?.[1] || "Outros";
     grupos.set(cat, [...(grupos.get(cat) || []), f]);
   }
   return (
@@ -263,17 +266,17 @@ export default function FlowsPageV2() {
       </div>
       {flows.length === 0 && <p className="text-sm text-[var(--text-secondary)]">Nenhum fluxo desenhado ainda.</p>}
       <div className="space-y-6">
-        {[...grupos.entries()].map(([cat, lista]) => (
+        {[...grupos.entries()].sort((a, b) => (a[0] === "Outros" ? 1 : b[0] === "Outros" ? -1 : b[1].length - a[1].length)).map(([cat, lista]) => (
           <section key={cat}>
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">{cat}</h3>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {lista.map((f) => (
                 <button key={f.id} onClick={() => abrirFluxo(f.id)}
                   className="text-left rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3.5 cursor-pointer hover:border-[var(--ac)] transition-colors">
-                  <span className="block text-sm font-semibold text-[var(--text-primary)]">{f.title}</span>
-                  {f.description && (
+                  <span className="block text-sm font-semibold text-[var(--text-primary)]">{doRelogio(f)?.nome || nomeAmigavel(f.title)}</span>
+                  {(doRelogio(f)?.descricao || f.description) && (
                     <span className="block text-xs text-[var(--text-secondary)] mt-1 line-clamp-2">
-                      {f.description.replace(/^\[[^\]]+\]\s*/, "")}
+                      {(doRelogio(f)?.descricao || f.description || "").replace(/^\[[^\]]+\]\s*/, "")}
                     </span>
                   )}
                 </button>
@@ -284,6 +287,14 @@ export default function FlowsPageV2() {
       </div>
     </div>
   );
+}
+
+// Alguns fluxos têm o próprio comando como título ("/usr/bin/python3 /root/x/y.py -z"):
+// na lista aparece só o nome do script, que dá pra ler.
+function nomeAmigavel(titulo: string): string {
+  if (!titulo.startsWith("/")) return titulo;
+  const script = titulo.split(/\s+/).find((t) => /\.(py|sh|js)$/.test(t));
+  return script ? script.split("/").pop()! : titulo;
 }
 
 function Dado({ rotulo, valor, extra }: { rotulo: string; valor: string; extra?: string }) {

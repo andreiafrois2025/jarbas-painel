@@ -287,7 +287,7 @@ export default function ChatPage({ compacto = false, servidora = false }: { comp
             </select>
           </label>
           {uso && (
-            <span className={`text-xs px-2 py-1 rounded-lg border ${uso.aviso ? "border-[var(--warning)] bg-[var(--warning)]/15" : "border-[var(--border)]"} text-[var(--text-secondary)]`}
+            <span className={`${compacto ? "hidden md:inline" : ""} text-xs px-2 py-1 rounded-lg border ${uso.aviso ? "border-[var(--warning)] bg-[var(--warning)]/15" : "border-[var(--border)]"} text-[var(--text-secondary)]`}
               title="Cada mensagem gasta uma parte da assinatura do Claude">
               Hora {uso.hora.usadas}/{uso.hora.limite} · Hoje {uso.dia.usadas}/{uso.dia.limite}
             </span>
@@ -398,7 +398,7 @@ export default function ChatPage({ compacto = false, servidora = false }: { comp
               : <button onClick={() => enviar(texto)} disabled={!texto.trim() || limiteBatido} className="h-12 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium disabled:opacity-40 cursor-pointer">Enviar</button>}
           </div>
           )}
-          <p className={`text-[11px] text-[var(--text-muted)] mt-1.5 ${compacto ? "px-2" : ""}`}>Uma conversa por vez · 20 mensagens por hora e 100 por dia · o áudio vira texto na caixa para você conferir antes de enviar.</p>
+          <p className={`text-[11px] text-[var(--text-muted)] mt-1.5 ${compacto ? "px-2 hidden md:block" : ""}`}>Uma conversa por vez · 20 mensagens por hora e 100 por dia · o áudio vira texto na caixa para você conferir antes de enviar.</p>
         </footer>
       </section>
     </div>

@@ -67,8 +67,8 @@
     /* As páginas antigas escrevem text-white em cima do --accent; dourado com
        texto branco não lê. Por isso o --accent antigo vira um petróleo médio e
        o dourado fica só no --ac, que é o que a casca nova usa. */
-    --accent: #2F7A75;
-    --accent-hover: #3A8D87;
+    --accent: #3A8F88;
+    --accent-hover: #4AA39B;
     --accent-soft: #2A4A44;
     --text-primary: #EDE6D6;
     --text-secondary: #A9BDB8;
@@ -78,7 +78,7 @@
     --success: #6BC0B2;
     --warning: #C4A460;
     --danger: #E89A72;
-    --af-teal: #2F7A75;
+    --af-teal: #3A8F88;
     --af-teal-dark: #256460;
     --af-terracotta: #E89A72;
     --af-gold: #C4A460;
@@ -99,8 +99,8 @@
   --bg-secondary: #14353A;
   --bg-tertiary: #183E44;
   --bg-card: #14353A;
-  --accent: #2F7A75;
-  --accent-hover: #3A8D87;
+  --accent: #3A8F88;
+  --accent-hover: #4AA39B;
   --accent-soft: #2A4A44;
   --text-primary: #EDE6D6;
   --text-secondary: #A9BDB8;
@@ -110,7 +110,7 @@
   --success: #6BC0B2;
   --warning: #C4A460;
   --danger: #E89A72;
-  --af-teal: #2F7A75;
+  --af-teal: #3A8F88;
   --af-teal-dark: #256460;
   --af-terracotta: #E89A72;
   --af-gold: #C4A460;
