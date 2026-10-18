@@ -401,6 +401,7 @@ export default function EscritorioPage() {
                       ) : trab ? (
                         <span className="esc-fala">
                           {v?.tarefaTxt ?? "Trabalhando"}
+                          {!!v?.mais && v.mais > 0 && <b className="ml-1 opacity-80">+{v.mais}</b>}
                           {typeof v?.progresso === "number" && <span className="esc-barra block"><i style={{ width: `${Math.round(v.progresso * 100)}%` }} /></span>}
                         </span>
                       ) : p.modo === "cafe" ? (

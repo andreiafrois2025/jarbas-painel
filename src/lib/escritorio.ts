@@ -67,6 +67,7 @@ export interface AgenteVivo {
   estado: "trabalhando" | "livre";
   tarefa?: string;
   progresso?: number; // 0..1
+  mais?: number;      // outros ajudantes na mesma mesa (balão mostra "+N")
   desde?: string;
 }
 export interface EventoMural { em: string; agente: string; texto: string }
