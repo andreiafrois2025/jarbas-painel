@@ -16,8 +16,9 @@ const carregando = () => (
 );
 const FlowsPageV2 = dynamic(() => import("./flow/FlowsPageV2"), { loading: carregando, ssr: false });
 const EstudioPage = dynamic(() => import("./EstudioPage"), { loading: carregando, ssr: false });
+const LicitacaoPage = dynamic(() => import("./LicitacaoPage"), { loading: carregando, ssr: false });
 
-type SubPage = "squads" | "automacoes" | "fluxos" | "estudio";
+type SubPage = "squads" | "automacoes" | "fluxos" | "estudio" | "licitacao";
 
 interface Props {
   sub: SubPage;
@@ -65,6 +66,16 @@ export default function ProducaoPage({ sub }: Props) {
         >
           🎬 Estúdio
         </button>
+        <button
+          onClick={() => router.push("/producao/licitacao")}
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
+            sub === "licitacao"
+              ? "border-[var(--accent)] text-[var(--text-primary)]"
+              : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          ⚖️ Licitação
+        </button>
         <div className="flex-1" />
         {sub === "automacoes" && (
           <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
@@ -81,6 +92,11 @@ export default function ProducaoPage({ sub }: Props) {
             revisão da edição automática de reels
           </span>
         )}
+        {sub === "licitacao" && (
+          <span className="text-xs text-[var(--text-muted)] italic hidden md:inline">
+            anexar, acompanhar, aprovar as paradas e ler os documentos
+          </span>
+        )}
       </div>
       {/* precisa ser flex: os filhos (FlowsPageV2 etc) usam flex-1 pra herdar a altura */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
@@ -90,6 +106,8 @@ export default function ProducaoPage({ sub }: Props) {
           <AutomacoesPage />
         ) : sub === "fluxos" ? (
           <FlowsPageV2 />
+        ) : sub === "licitacao" ? (
+          <LicitacaoPage />
         ) : (
           <EstudioPage />
         )}
