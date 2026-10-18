@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useUI } from "./ui";
+import Mascote from "./Mascote";
 import type { Collaborator, Assignment, Category, QuickLink, SubLink } from "@/lib/types";
 import { CONTEXTS as CONTEXTS_TODOS } from "@/lib/types";
 import { usePainel } from "@/lib/painel-context";
+import { mascoteSrc } from "@/lib/mascotes";
 import { ehColaboradorOculto, ehContextoPessoal, ehPessoal, limpaColaborador } from "@/lib/modo";
 import {
   getCollaborators, addCollaborator, updateCollaborator, deleteCollaborator,
@@ -704,10 +706,14 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                           onClick={() => setExpandedCollab(isExpanded ? null : collab.id)}
                         >
                           {/* Avatar */}
-                          <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
-                            style={{ backgroundColor: SKIN_COLORS[collab.skin_tone] + "30" }}>
-                            {collab.icon}
-                          </div>
+                          {mascoteSrc(collab.name) ? (
+                            <Mascote nome={collab.name} emoji={collab.icon} tamanho={96} grande className="drop-shadow-sm" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
+                              style={{ backgroundColor: SKIN_COLORS[collab.skin_tone] + "30" }}>
+                              {collab.icon}
+                            </div>
+                          )}
 
                           {/* Info */}
                           <div className="flex-1 min-w-0">
@@ -924,7 +930,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                       ) : (
                         catAsgs.map(asg => (
                           <div key={asg.id} className="flex items-center gap-2 py-2 px-2.5 rounded-lg hover:bg-[var(--bg-tertiary)] transition-all group">
-                            <span className="text-lg">{asg.collaborator?.icon || "⚡"}</span>
+                            <Mascote nome={asg.collaborator?.name} emoji={asg.collaborator?.icon || "⚡"} tamanho={32} />
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-medium truncate">{asg.collaborator?.name || "?"}</div>
                               <div className="text-[10px] text-[var(--text-muted)] truncate">
@@ -1055,7 +1061,7 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
             <div className="p-5 max-h-[70vh] overflow-y-auto space-y-4">
               {/* Collaborator name */}
               <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--bg-tertiary)]">
-                <span className="text-xl">{collaborators.find(c => c.id === showNewAssignment)?.icon || "⚡"}</span>
+                <Mascote nome={collaborators.find(c => c.id === showNewAssignment)?.name} emoji={collaborators.find(c => c.id === showNewAssignment)?.icon || "⚡"} tamanho={36} />
                 <span className="text-sm font-medium">{collaborators.find(c => c.id === showNewAssignment)?.name || "?"}</span>
               </div>
 

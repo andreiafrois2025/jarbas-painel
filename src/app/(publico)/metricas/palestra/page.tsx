@@ -6,6 +6,7 @@
 // pra link direto —, mas quem controla é o chip. Clicar num agente abre o
 // cartão com papel, bio e habilidades.
 
+import Mascote from "@/components/Mascote";
 import { useEffect, useState } from "react";
 import { GraficoLinha } from "@/components/charts";
 import { useMetricsHistory, semanasOrdenadas } from "@/lib/metrics";
@@ -34,7 +35,7 @@ function CartaoAgente({ agente, onFechar }: { agente: AgentePublico; onFechar: (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6" style={{ background: "rgba(45,59,59,.45)" }} onClick={onFechar}>
       <div className="rounded-2xl p-6 md:p-8 max-w-lg w-full max-h-[85vh] overflow-y-auto" style={{ background: "#F5F0EA", color: "#2D3B3B" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-4">
-          <span className="text-5xl">{agente.icone}</span>
+          <Mascote nome={agente.nome} emoji={agente.icone} tamanho={96} grande />
           <div>
             <h3 className="text-2xl font-bold">{agente.nome}</h3>
             {agente.papel && <p className="text-sm uppercase tracking-widest" style={{ color: "#A0583C" }}>{agente.papel}</p>}
@@ -210,7 +211,7 @@ export default function PalestraPage() {
             <button key={a.nome} onClick={() => setAgenteAberto(a)}
               className="rounded-xl py-3 px-1 cursor-pointer hover:scale-105 transition-transform"
               style={{ background: "#FFFFFF" }}>
-              <div className="text-2xl">{a.icone}</div>
+              <div className="flex justify-center"><Mascote nome={a.nome} emoji={a.icone} tamanho={56} className="text-2xl" /></div>
               <div className="text-xs mt-1 font-medium">{a.nome}</div>
             </button>
           ))}
