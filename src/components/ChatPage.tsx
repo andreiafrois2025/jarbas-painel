@@ -168,7 +168,13 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
 
   // inicial: lista de pessoas, uso e o último funcionário usado neste aparelho
   useEffect(() => {
-    try { const s = window.localStorage.getItem("chatAgente"); if (s) setAgenteId(s); } catch { /* sem storage */ }
+    try {
+      // ?agente=izzy (vindo do Escritório) vale mais que o último agente do aparelho
+      const pedido = new URLSearchParams(window.location.search).get("agente");
+      const s = pedido && /^[a-z]{3,10}$/.test(pedido) ? pedido : window.localStorage.getItem("chatAgente");
+      if (s) setAgenteId(s);
+      if (pedido) setTelaCelular("chat");
+    } catch { /* sem storage */ }
     chatApi.agentes().then((as) => setAgentes(servidora ? as.filter((a) => !ehColaboradorOculto(a.nome) && a.id !== "louis") : as)).catch((e) => setErro(e.message));
     chatApi.uso().then(setUso).catch(() => {});
     chatApi.modelos().then(setModelos).catch(() => {});

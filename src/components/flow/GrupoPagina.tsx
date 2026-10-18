@@ -287,7 +287,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
             onClick={() => (editando ? sair() : setEditando(true))}
             aria-pressed={editando}
             className="text-sm px-3.5 py-1.5 rounded-lg border cursor-pointer"
-            style={editando ? { background: "#2D6B6B", color: "#fff", borderColor: "#2D6B6B" } : { borderColor: "#2D6B6B", color: "#2D6B6B", background: "transparent" }}
+            style={editando ? { background: "#2D6B6B", color: "#fff", borderColor: "#2D6B6B" } : { borderColor: "var(--accent)", color: "var(--text-primary)", background: "transparent" }}
           >{editando ? "✓ Terminar de editar as setas" : "✏️ Editar as setas entre rotinas"}</button>
           {!editando && <span className="text-xs text-[var(--text-muted)]">apagar ou criar as setas «alimenta / recebe de»</span>}
         </div>

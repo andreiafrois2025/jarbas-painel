@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import HRPage from "./HRPage";
 import BibliotecaPage from "./BibliotecaPage";
+import EscritorioPage from "./EscritorioPage";
 import { Abas } from "./ui";
 import { usePainel, pageToPath } from "@/lib/painel-context";
 import { useAbaUrl } from "@/lib/navegacao";
@@ -10,7 +11,7 @@ import { useAbaUrl } from "@/lib/navegacao";
 type Aba = "agentes" | "habilidades" | "escritorio";
 
 // Equipe: quem trabalha por ela (agentes), o que sabem fazer (habilidades,
-// prompts e plugins) e, na próxima etapa, o escritório.
+// prompts e plugins) e o escritório (a equipe trabalhando ao vivo).
 export default function EquipePage() {
   const router = useRouter();
   const { reload } = usePainel();
@@ -25,13 +26,7 @@ export default function EquipePage() {
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {aba === "agentes" && <HRPage onNavigate={(p) => router.push(pageToPath(p))} onDataChanged={reload} />}
         {aba === "habilidades" && <BibliotecaPage />}
-        {aba === "escritorio" && (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 p-8 text-center">
-            <span className="text-4xl" aria-hidden>🏗️</span>
-            <p className="text-base font-semibold">O escritório está em construção</p>
-            <p className="text-sm text-[var(--text-secondary)] max-w-md">Aqui você vai ver a equipe trabalhando, cada agente na sua mesa. Chega na próxima etapa.</p>
-          </div>
-        )}
+        {aba === "escritorio" && <EscritorioPage />}
       </div>
     </div>
   );
