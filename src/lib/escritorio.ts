@@ -41,7 +41,7 @@ export const AGENTES: PerfilAgente[] = [
   { id: "felipe", nome: "Felipe", cargo: "designer", sala: "estudio", trab: { x: 395, y: 270 }, livre: { x: 188, y: 262 }, ocio: "🎨 rabiscando no cavalete", tam: 78 },
   { id: "theo", nome: "Theo", cargo: "vídeo e roteiro", sala: "estudio", trab: { x: 262, y: 288 }, livre: { x: 96, y: 288 }, ocio: "🎥 ajustando a câmera", tam: 70 },
   { id: "jarbas", nome: "Jarbas", cargo: "orquestrador", sala: "comando", trab: { x: 622, y: 292 }, livre: { x: 545, y: 292 }, ocio: "🛰️ vigiando o painel", tam: 96 },
-  { id: "rafaela", nome: "Rafaela", cargo: "estrategista", sala: "comando", trab: { x: 772, y: 284 }, livre: { x: 706, y: 306 }, ocio: "📌 revendo metas", tam: 70 },
+  { id: "rafaela", nome: "Rafaela", cargo: "estrategista", sala: "comando", trab: { x: 772, y: 284 }, livre: { x: 835, y: 298 }, ocio: "📌 revendo metas", tam: 70 },
   { id: "harvey", nome: "Dr. Harvey", cargo: "advogado revisor", sala: "docs", trab: { x: 990, y: 322 }, livre: { x: 935, y: 300 }, ocio: "⚖️ pesando um caso", tam: 78 },
   { id: "katrina", nome: "Katrina", cargo: "advogada estruturadora", sala: "docs", trab: { x: 1075, y: 326 }, livre: { x: 1130, y: 328 }, ocio: "📑 relendo uma minuta", tam: 72 },
   { id: "sofia", nome: "Sofia", cargo: "arquiteta da informação", sala: "docs", trab: { x: 1195, y: 312 }, livre: { x: 1196, y: 334 }, ocio: "🗂️ etiquetando pastas", tam: 66 },
@@ -89,43 +89,66 @@ export async function buscaEscritorio(servidora: boolean): Promise<DadosEscritor
 }
 
 // ── Roteiros do modo aula (SÓ exemplo, nada de dado real) ──────────────────
-// Dois roteiros de ~60 s que repetem. Cada trecho põe um agente para
-// trabalhar; cada entrega vira ✅ com plim. Tudo fictício e genérico.
-export const AULA_DURACAO = 60;
+// Dois roteiros de ~90 s que repetem, seguindo o fluxo real da squad, com
+// CHECKPOINTS HUMANOS: a Andréia aparece no Comando ("Esperando você: ..."),
+// "aprova" sozinha depois de ~2 s e o mural registra. Tudo fictício e genérico.
 export interface TrechoAula { agente: string; de: number; ate: number; tarefa: string; entrega: string }
-export interface RoteiroAula { id: string; rotulo: string; descricao: string; pedido: string; trechos: TrechoAula[] }
+export interface CheckpointAula { de: number; espera: string; ok: string; mural: string; pedido?: boolean }
+export interface RoteiroAula {
+  id: string; rotulo: string; descricao: string; pedido: string; duracao: number;
+  trechos: TrechoAula[]; checkpoints: CheckpointAula[];
+}
+/** Tempo (s) que a Andréia leva para "escolher", e quanto o "✔ escolheu" fica na tela. */
+export const CP_ESPERA = 2.2;
+export const CP_DURACAO = 4.2;
+export const POS_ANDREIA = { x: 688, y: 314 }; // sala de Comando
 export const ROTEIROS: RoteiroAula[] = [
   {
-    id: "carrossel", rotulo: "📱 Carrossel de IA com vídeo", descricao: "Para cursos abertos",
+    id: "carrossel", rotulo: "📱 Carrossel de IA com vídeo", descricao: "Para cursos abertos", duracao: 90,
     pedido: "Andréia pede um carrossel sobre o novo lançamento de uma empresa de IA, com vídeo",
+    checkpoints: [
+      { de: 0.3, pedido: true, espera: "📨 Carrossel sobre o novo lançamento de uma empresa de IA, com vídeo", ok: "", mural: "pediu um carrossel sobre o novo lançamento de uma empresa de IA, com vídeo" },
+      { de: 18, espera: "🙋 Esperando você: escolher a notícia e o vídeo", ok: "✔ Andréia escolheu", mural: "aprovou a notícia e o vídeo" },
+      { de: 28, espera: "🙋 Esperando você: escolher o ângulo", ok: "✔ Andréia escolheu", mural: "aprovou o ângulo do carrossel" },
+      { de: 41, espera: "🙋 Esperando você: aprovar o texto e o vídeo", ok: "✔ Andréia aprovou", mural: "aprovou o texto e o vídeo" },
+      { de: 50, espera: "🙋 Esperando você: escolher o visual", ok: "✔ Andréia escolheu", mural: "aprovou a proposta visual" },
+      { de: 75, espera: "🙋 Esperando você: aprovar o carrossel", ok: "✔ Andréia aprovou", mural: "aprovou o carrossel final" },
+    ],
     trechos: [
-      { agente: "jarbas", de: 1, ate: 7, tarefa: "Distribuindo as tarefas do carrossel", entrega: "Tarefas distribuídas" },
-      { agente: "mike", de: 6, ate: 15, tarefa: "Pesquisando e procurando o vídeo do lançamento", entrega: "Pesquisa e vídeo do lançamento prontos" },
-      { agente: "theo", de: 15, ate: 23, tarefa: "Editando o trecho do vídeo que vai no carrossel", entrega: "Trecho do vídeo editado" },
-      { agente: "izzy", de: 23, ate: 30, tarefa: "Escrevendo os textos dos slides", entrega: "Texto dos slides pronto" },
-      { agente: "felipe", de: 30, ate: 38, tarefa: "Desenhando os slides", entrega: "Slides desenhados" },
-      { agente: "izzy", de: 38, ate: 43, tarefa: "Conferindo se o texto ficou no lugar certo", entrega: "Texto cortado no slide 3" },
-      { agente: "felipe", de: 43, ate: 47, tarefa: "Ajustando o slide 3", entrega: "Slide 3 ajustado" },
-      { agente: "izzy", de: 47, ate: 51, tarefa: "Conferindo os slides de novo", entrega: "Slides sem cortes nem erros" },
-      { agente: "donna", de: 51, ate: 56, tarefa: "Agendando a publicação", entrega: "Publicação agendada" },
-      { agente: "jarbas", de: 56.5, ate: 59.5, tarefa: "Montando o pacote para aprovação", entrega: "Carrossel com vídeo pronto para você aprovar!" },
+      { agente: "rafaela", de: 3.5, ate: 9, tarefa: "Definindo a estratégia: público iniciante, objetivo ensinar, CTA \"salva pra testar\"", entrega: "Estratégia definida" },
+      { agente: "mike", de: 9, ate: 18, tarefa: "Pesquisando a notícia e o vídeo oficial, seguindo a estratégia", entrega: "Notícia e vídeo oficial encontrados" },
+      { agente: "izzy", de: 22.5, ate: 28, tarefa: "Propondo 3 ângulos para o carrossel", entrega: "3 ângulos propostos" },
+      { agente: "izzy", de: 32.5, ate: 41, tarefa: "Escrevendo os textos dos slides", entrega: "Texto dos slides pronto" },
+      { agente: "theo", de: 32.5, ate: 41, tarefa: "Cortando o trecho do vídeo", entrega: "Trecho do vídeo cortado" },
+      { agente: "felipe", de: 45.5, ate: 50, tarefa: "Montando a proposta visual", entrega: "Proposta visual pronta" },
+      { agente: "felipe", de: 54.5, ate: 62, tarefa: "Desenhando os slides", entrega: "Slides desenhados" },
+      { agente: "izzy", de: 62, ate: 67, tarefa: "Conferindo se o texto ficou no lugar", entrega: "Texto cortado no slide 3" },
+      { agente: "felipe", de: 67, ate: 71, tarefa: "Ajustando o slide 3", entrega: "Slide 3 ajustado" },
+      { agente: "izzy", de: 71, ate: 75, tarefa: "Conferindo os slides de novo", entrega: "Slides sem cortes nem erros" },
+      { agente: "donna", de: 79.5, ate: 84, tarefa: "Agendando a publicação", entrega: "Publicação agendada" },
+      { agente: "jarbas", de: 84, ate: 89, tarefa: "Avisando que o carrossel está pronto", entrega: "Carrossel publicado na agenda de terça!" },
     ],
   },
   {
-    id: "licitacao", rotulo: "📑 Processo de licitação", descricao: "Para o serviço público",
-    pedido: "Andréia pede o processo para contratar licenças de software de geoprocessamento",
+    id: "licitacao", rotulo: "📑 Processo de licitação", descricao: "Para o serviço público", duracao: 90,
+    pedido: "Andréia envia a demanda: contratar licenças de software de geoprocessamento",
+    checkpoints: [
+      { de: 0.3, pedido: true, espera: "📨 Demanda: contratar licenças de software de geoprocessamento", ok: "", mural: "enviou a demanda: contratar licenças de software de geoprocessamento" },
+      { de: 40, espera: "🙋 Esperando você: revisar o ETP e o TR", ok: "✔ Andréia aprovou", mural: "aprovou o ETP e o TR" },
+      { de: 64, espera: "🙋 Esperando você: aprovar o processo", ok: "✔ Andréia aprovou", mural: "aprovou o processo" },
+    ],
     trechos: [
-      { agente: "jarbas", de: 1, ate: 7, tarefa: "Distribuindo as tarefas do processo", entrega: "Tarefas distribuídas" },
-      { agente: "eric", de: 7, ate: 16, tarefa: "Especificando a parte de geoprocessamento", entrega: "Parte de geoprocessamento pronta" },
-      { agente: "junior", de: 8, ate: 17, tarefa: "Especificando a parte de TI: requisitos, compatibilidade e segurança", entrega: "Requisitos de TI prontos" },
-      { agente: "sofia", de: 12, ate: 19, tarefa: "Organizando as normas aplicáveis", entrega: "Normas organizadas" },
-      { agente: "katrina", de: 19, ate: 29, tarefa: "Redigindo o ETP e o TR", entrega: "ETP e TR redigidos" },
-      { agente: "louis", de: 24, ate: 32, tarefa: "Pesquisando preços de mercado", entrega: "Pesquisa de preços pronta" },
-      { agente: "harvey", de: 32, ate: 38, tarefa: "Revisando o parecer", entrega: "Parecer com 2 ressalvas" },
-      { agente: "katrina", de: 38, ate: 44, tarefa: "Ajustando o ETP conforme as ressalvas", entrega: "Ajustes feitos" },
-      { agente: "harvey", de: 44, ate: 49, tarefa: "Conferindo os ajustes", entrega: "Parecer sem ressalvas" },
-      { agente: "donna", de: 49, ate: 55, tarefa: "Organizando o envio do processo", entrega: "Envio organizado" },
-      { agente: "jarbas", de: 55.5, ate: 59.5, tarefa: "Montando o processo para revisão", entrega: "Processo pronto para sua revisão!" },
+      { agente: "jarbas", de: 3.5, ate: 8, tarefa: "Avaliando a demanda: é de tecnologia?", entrega: "Sim, é de tecnologia" },
+      { agente: "eric", de: 8, ate: 17, tarefa: "Especificando a parte de geoprocessamento", entrega: "Parte de geoprocessamento pronta" },
+      { agente: "junior", de: 9, ate: 18, tarefa: "Especificando a parte de TI: requisitos, compatibilidade e segurança", entrega: "Requisitos de TI prontos" },
+      { agente: "sofia", de: 18, ate: 25, tarefa: "Organizando as normas aplicáveis", entrega: "Normas organizadas" },
+      { agente: "katrina", de: 25, ate: 36, tarefa: "Redigindo o ETP e o TR", entrega: "ETP e TR redigidos" },
+      { agente: "louis", de: 30, ate: 40, tarefa: "Pesquisando preços de mercado", entrega: "Pesquisa de preços pronta" },
+      { agente: "harvey", de: 44.5, ate: 52, tarefa: "Fazendo o parecer", entrega: "Parecer com 1 ressalva" },
+      { agente: "katrina", de: 52, ate: 59, tarefa: "Corrigindo a ressalva", entrega: "Ressalva corrigida" },
+      { agente: "harvey", de: 59, ate: 64, tarefa: "Conferindo a correção", entrega: "Parecer sem ressalvas" },
+      { agente: "donna", de: 68.5, ate: 78, tarefa: "Organizando o envio do processo", entrega: "Envio organizado" },
+      { agente: "jarbas", de: 78, ate: 86, tarefa: "Avisando que o processo está pronto", entrega: "Processo pronto para seguir!" },
     ],
   },
 ];
@@ -161,6 +184,9 @@ function nota(freq: number, ini: number, dur: number, vol: number, tipo: Oscilla
 
 /** "Plim" de entrega: duas notas curtas, subindo. */
 export function somPlim() { nota(988, 0, 0.18, 0.09); nota(1480, 0.09, 0.32, 0.08); }
+
+/** Aprovação da Andréia: dois tons, mais graves e "redondos" que o plim. */
+export function somDoisTons() { nota(523, 0, 0.2, 0.08, "triangle"); nota(698, 0.16, 0.34, 0.08, "triangle"); }
 
 /** Uma tecla baixinha. */
 export function somTecla() { nota(900 + Math.random() * 700, 0, 0.03, 0.012, "square"); }

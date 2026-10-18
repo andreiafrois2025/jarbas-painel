@@ -16,8 +16,8 @@ import Mascote from "./Mascote";
 import { usePainel } from "@/lib/painel-context";
 import { ehColaboradorOculto, ehPessoal } from "@/lib/modo";
 import {
-  AGENTES, ALTURA, AULA_DURACAO, CAFE, LARGURA, ROTEIROS, SALAS, SOFA,
-  buscaEscritorio, liberaSom, perfil, somPlim, somTecla,
+  AGENTES, ALTURA, CAFE, CP_DURACAO, CP_ESPERA, POS_ANDREIA, LARGURA, ROTEIROS, SALAS, SOFA,
+  buscaEscritorio, liberaSom, perfil, somDoisTons, somPlim, somTecla,
   type AgenteVivo, type DadosEscritorio, type EventoMural, type PerfilAgente,
 } from "@/lib/escritorio";
 
@@ -60,6 +60,7 @@ export default function EscritorioPage() {
   const [roteiroId, setRoteiroId] = useState<string | null>(null); // null = escolhendo
   const roteiro = ROTEIROS.find((r) => r.id === roteiroId) ?? null;
   const trechos = useMemo(() => roteiro?.trechos ?? [], [roteiro]);
+  const checkpoints = useMemo(() => roteiro?.checkpoints ?? [], [roteiro]);
   const [sel, setSel] = useState<string | null>(null);
   const [lugar, setLugar] = useState<Record<string, Lugar>>({});
   const [ocioVis, setOcioVis] = useState<Record<string, number>>({});
@@ -138,10 +139,11 @@ export default function EscritorioPage() {
     if (!aula || !roteiro) return;
     const ini = Date.now(); aulaPrev.current = 0; setAulaT(0);
     const t = setInterval(() => {
-      const s = ((Date.now() - ini) / 1000) % AULA_DURACAO;
+      const s = ((Date.now() - ini) / 1000) % roteiro.duracao;
       const prev = aulaPrev.current;
       const cruza = (x: number) => (s >= prev ? prev < x && x <= s : x > prev || x <= s);
       for (const tr of roteiro.trechos) if (cruza(tr.ate)) darEntrega(tr.agente, "✅ " + tr.entrega);
+      for (const cp of roteiro.checkpoints) if (!cp.pedido && cruza(cp.de + CP_ESPERA) && somRef.current) somDoisTons();
       aulaPrev.current = s;
       setAulaT(s);
     }, 250);
@@ -261,7 +263,11 @@ export default function EscritorioPage() {
   const mural = useMemo<Evento[]>(() => {
     if (aula) {
       if (!roteiro) return [];
-      const ev: { t: number; agente: string; texto: string }[] = [{ t: 0, agente: "jarbas", texto: "recebeu o pedido: " + (roteiro?.pedido.replace(/^Andréia pede /, "") ?? "") }];
+      const ev: { t: number; agente: string; texto: string }[] = [];
+      for (const cp of checkpoints) {
+        const t = cp.pedido ? cp.de : cp.de + CP_ESPERA;
+        if (aulaT >= t) ev.push({ t, agente: "andreia", texto: cp.mural });
+      }
       for (const tr of trechos) {
         if (aulaT >= tr.de) ev.push({ t: tr.de, agente: tr.agente, texto: "começou: " + minuscula(tr.tarefa) });
         if (aulaT >= tr.ate) ev.push({ t: tr.ate, agente: tr.agente, texto: "entregou: " + minuscula(tr.entrega) });
@@ -270,7 +276,7 @@ export default function EscritorioPage() {
     }
     const ok = new Set(visiveis.map((a) => a.id));
     return (dados?.mural ?? []).filter((e) => ok.has(e.agente)).slice(0, 12).map((e) => ({ ...e, id: e.em + e.agente, texto: mascara(e.texto) ?? e.texto }));
-  }, [aula, aulaT, roteiro, trechos, dados, visiveis, mascara]);
+  }, [aula, aulaT, roteiro, trechos, checkpoints, dados, visiveis, mascara]);
 
   const placar = useMemo(() => {
     const t = nTrabalhando;
@@ -358,6 +364,20 @@ export default function EscritorioPage() {
                 {SALAS.map((s) => (
                   <span key={s.id} className="esc-sala" style={{ left: `${(s.x / LARGURA) * 100}%`, top: `${(s.y / ALTURA) * 100}%` }}>{s.rotulo}</span>
                 ))}
+                {aula && checkpoints.map((cp) => {
+                  const dt = aulaT - cp.de;
+                  const duracao = cp.pedido ? 3.2 : CP_DURACAO;
+                  if (dt < 0 || dt >= duracao) return null;
+                  const aprovado = !cp.pedido && dt >= CP_ESPERA;
+                  return (
+                    <div key={cp.de} className="esc-ag trab" style={{ left: `${(POS_ANDREIA.x / LARGURA) * 100}%`, top: `${(POS_ANDREIA.y / ALTURA) * 100}%`, zIndex: 1500, ["--w" as string]: `${(56 / LARGURA) * 100}cqw`, cursor: "default" }}>
+                      <span className="esc-luz" />
+                      <span className="esc-af">AF</span>
+                      <span className="esc-nome">Andréia</span>
+                      <span className={`esc-fala ${aprovado ? "ok" : ""}`}>{aprovado ? cp.ok : cp.espera}</span>
+                    </div>
+                  );
+                })}
                 {ordenados.map((a) => {
                   const p = ondeEsta(a);
                   const v = vivos[a.id];
@@ -428,8 +448,8 @@ export default function EscritorioPage() {
               const p = perfil(e.agente);
               return (
                 <li key={e.id} className="grid grid-cols-[34px_1fr_auto] gap-2.5 items-center text-[13px] py-2 border-b border-dashed border-[var(--border)]">
-                  <Mascote nome={p?.nome} tamanho={34} />
-                  <span className="min-w-0"><b className="font-bold">{p?.nome}</b> {e.texto}</span>
+                  {e.agente === "andreia" ? <AvatarAF tamanho={34} /> : <Mascote nome={p?.nome} tamanho={34} />}
+                  <span className="min-w-0"><b className="font-bold">{e.agente === "andreia" ? "Andréia" : p?.nome}</b> {e.texto}</span>
                   <small className="text-[var(--text-muted)] tabular-nums whitespace-nowrap">{aula ? e.em : hhmm(e.em)}</small>
                 </li>
               );
@@ -440,6 +460,11 @@ export default function EscritorioPage() {
       </div>
     </div>
   );
+}
+
+function AvatarAF({ tamanho }: { tamanho: number }) {
+  return <span aria-hidden style={{ width: tamanho, height: tamanho, fontSize: tamanho * 0.4 }}
+    className="shrink-0 rounded-full bg-[#C4A460] text-[#0F2A2E] font-extrabold flex items-center justify-center">AF</span>;
 }
 
 function Cartao({ a, v, aula, servidora, entregas, desdeRegistro, onFechar, onConversar }: {
