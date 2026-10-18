@@ -12,7 +12,7 @@ import { interpretaCron } from "@/lib/cron";
 import { avaliaSaude, SELO_SAUDE, ehAposentada, descricaoLimpa, primeiraFrase, montaDesenho, caminhoDeArquivo, type Nivel } from "@/lib/radiografia";
 import { layoutHorizontal, pontasHorizontal } from "@/lib/flow/layout";
 import { medePeca, larguraRotuloSeta } from "@/lib/flow/medida";
-import { aplicaLeigo, leigoDoFluxo, quemNoBalao } from "@/lib/flow/leigo";
+import { aplicaLeigo, leigoDoFluxo, quemNoBalao, fraseCurta, repete } from "@/lib/flow/leigo";
 import { nomeDoFluxo, type MacroMontado } from "@/lib/flow/macro-fluxos";
 import { ligacoesDoGrupo, desenhoPodeEstarVelho, type LigacoesFluxos } from "@/lib/flow/ligacoes";
 import RoughNode from "./RoughNode";
@@ -218,17 +218,8 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
   const altura = montagem ? Math.max(420, Math.round(montagem.H * zoomAlvo + 70)) : 420;
 
   // ── textos da estrutura ──
-  const sub = (f: FlowDoc) => leigoDoFluxo(f)?.frase || primeiraFrase(descricaoLimpa(f)) || `${f.nodes.length} etapas`;
-  const bolinhas: Bolinha[] = ordenados.map((f) => {
-    const a = automacaoDe(f);
-    const cron = a ? interpretaCron(a.agenda) : null;
-    return {
-      id: f.id,
-      titulo: nomeDoFluxo(f),
-      frase: nivel === 1 ? sub(f) : `${sub(f)}${cron ? ` ⏰ ${cron.descricao}` : ""}`,
-      codigo: nivel === 3 ? [a?.agenda ? `cron ${a.agenda} UTC` : "", a?.script || ""].filter(Boolean).join(" · ") || undefined : undefined,
-    };
-  });
+  // (v3.3) a lista mostra só o título de cada rotina
+  const bolinhas: Bolinha[] = ordenados.map((f) => ({ id: f.id, titulo: nomeDoFluxo(f) }));
 
   const etapa = escolha ? porId.get(escolha.flowId)?.nodes.find((n) => n.id === escolha.nodeId) : null;
   const fEtapa = escolha ? porId.get(escolha.flowId) : null;
@@ -238,7 +229,7 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
       <div className="px-3 md:px-6 pt-4 pb-24 space-y-3 max-w-[2000px]">
         <div>
           <h2 className="text-xl md:text-2xl font-semibold leading-tight">{macro.def.icone} {macro.def.titulo}</h2>
-          <p className="text-sm text-[var(--text-secondary)] mt-1 max-w-[90ch]">{macro.def.resumo}</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-1 max-w-[90ch]">{fraseCurta(macro.def.resumo)}</p>
         </div>
 
         <BotoesNivel nivel={nivel} onMuda={onNivel} />
@@ -290,7 +281,11 @@ function Interno({ macro, automacaoDe, nivel, onNivel, onAbrirFluxo, ligacoesAut
                   <div className="space-y-2 text-sm">
                     <p className="text-xs text-[var(--text-muted)]">{nomeDoFluxo(fEtapa)}</p>
                     <h3 className="text-base font-semibold">{etapa.data.icon} {nivel < 3 ? etapa.data.leigo?.rotulo || etapa.data.label : etapa.data.label}</h3>
-                    <p className="text-[var(--text-secondary)] whitespace-pre-line">{(nivel < 3 ? etapa.data.leigo?.frase : null) || etapa.data.details || "Sem descrição ainda."}</p>
+                    {(() => {
+                      const titEtapa = nivel < 3 ? etapa.data.leigo?.rotulo || etapa.data.label : etapa.data.label;
+                      const desc = (nivel < 3 ? etapa.data.leigo?.frase : null) || etapa.data.details || "Sem descrição ainda.";
+                      return repete(titEtapa, desc) ? null : <p className="text-[var(--text-secondary)] whitespace-pre-line">{desc}</p>;
+                    })()}
                     {(etapa.data.leigo?.quem || (nivel === 3 ? etapa.data.executor : undefined)) && <p className="text-xs"><span className="text-[var(--text-muted)]">Quem faz: </span>{etapa.data.leigo?.quem || etapa.data.executor}</p>}
                     {etapa.data.tags?.length ? <p className="text-xs"><span className="text-[var(--text-muted)]">Ferramentas: </span>{etapa.data.tags.join(", ")}</p> : null}
                     <button className="text-xs px-3 py-1.5 rounded-lg text-white cursor-pointer" style={{ background: "var(--accent, #2D6B6B)" }} onClick={() => onAbrirFluxo(fEtapa)}>Abrir este fluxo ↗</button>

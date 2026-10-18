@@ -11,7 +11,7 @@ import {
 } from "@/lib/radiografia";
 import { layoutVertical, layoutHorizontal, pontasHorizontal, verticaliza, horizontaliza, temSobreposicao } from "@/lib/flow/layout";
 import { medePeca, type Medida } from "@/lib/flow/medida";
-import { aplicaLeigo, leigoDoFluxo, quemNoBalao } from "@/lib/flow/leigo";
+import { aplicaLeigo, leigoDoFluxo, quemNoBalao, fraseCurta, repete } from "@/lib/flow/leigo";
 import { nomeDoFluxo } from "@/lib/flow/macro-fluxos";
 import FlowViewer, { type Selecao, type NoVis, type SetaVis } from "./FlowViewer";
 import FlowCanvas from "./FlowCanvas";
@@ -76,8 +76,8 @@ export default function FlowRadiografia({
   const desenho: Desenho = nivel === 1 ? d1 : d2; // o nível 3 usa o desenho do 2 (mesmas peças)
   const resumo = useMemo(() => {
     const r = montaResumo(desenho, nivel, 99);
-    // nos níveis 1 e 2, "começa" e "termina" são os textos simples do curador
-    return nivel < 3 && lf ? { ...r, inicio: lf.comeca, fim: lf.termina } : r;
+    // nos 3 níveis, "começa" e "termina" são os textos simples do curador (iguais aos do Leigo)
+    return lf?.comeca && lf?.termina ? { ...r, inicio: lf.comeca, fim: lf.termina } : r;
   }, [desenho, nivel, lf]);
   const modoEditar = editando && nivel !== 1;
 
@@ -91,17 +91,8 @@ export default function FlowRadiografia({
   };
 
   // bolinhas numeradas
-  const bolinhas: Bolinha[] = resumo.passos.map((p) => {
-    const peca = desenho.pecas.find((x) => x.id === p.id)!;
-    const frase = nivel === 1
-      ? peca.membros.map((m) => primeiraFrase(m.data.details)).filter(Boolean).join(" ")
-      : primeiraFrase(peca.membros[0].data.details);
-    const cod = peca.membros[0].data.codigo;
-    if (nivel === 3 && cod) {
-      return { id: p.id, titulo: p.t, frase: cod.explicacao_tecnica || frase, codigo: `${nomeCurto(cod.arquivo)}:${cod.linhas}` };
-    }
-    return { id: p.id, titulo: p.t, frase, codigo: nivel === 3 ? arquivoDe(peca) || undefined : undefined };
-  });
+  // (v3.3) a lista mostra só o título; a descrição completa abre na caixinha lateral ao clicar
+  const bolinhas: Bolinha[] = resumo.passos.map((p) => ({ id: p.id, titulo: p.t }));
 
   // ── Vista vertical (celular) e horizontal (computador) ──
   const larguraMax = Math.max(480, area.w / 0.8 - 80);
@@ -271,7 +262,7 @@ export default function FlowRadiografia({
   const setaSel = sel?.tipo === "seta" ? desenho.setas.find((s) => s.id === sel.id) || null : null;
   const painelAberto = !!(pecaSel || setaSel);
   const titulo = nomeDoFluxo(flow);
-  const sub = nivel < 3 && lf ? lf.frase : descricaoLimpa(flow);
+  const sub = fraseCurta(lf?.frase || descricaoLimpa(flow), flow.id);
 
   const itemMenu = "w-full text-left text-sm px-3 py-2 hover:bg-[var(--bg-tertiary)] cursor-pointer whitespace-nowrap";
 
@@ -299,8 +290,6 @@ export default function FlowRadiografia({
             {/* detalhes de bastidor: só no nível Código */}
             {nivel === 3 && (
               <p className="text-[11px] mt-1 flex flex-wrap gap-x-3 gap-y-0.5 items-center text-[var(--text-muted)]">
-                {flow.title !== titulo && <span className="font-mono break-all">{flow.title}</span>}
-                {automacao && <span>última execução: {tempoDesde(automacao.ultima_execucao)}</span>}
                 {desatualizado && !aposentada && <span style={{ color: "var(--warning)" }} title="O relógio da VPS mudou depois da última vez que este desenho foi mexido">✏️ desenho pode estar atrasado</span>}
                 {scriptMudou && !aposentada && <span style={{ color: "var(--warning)" }} title={`O código mudou em ${new Date(scriptMudou.script_mudou_em).toLocaleDateString("pt-BR")}, depois do desenho`}>✏️ desenho pode estar velho: o código mudou depois dele</span>}
               </p>
@@ -419,13 +408,7 @@ export default function FlowRadiografia({
 
 // ── Painéis ─────────────────────────────────────────────────────────────
 export function BlocoScript({ automacao, avisar }: { automacao: AutomacaoApiItem | null; avisar: (m: string) => void }) {
-  if (!automacao) {
-    return (
-      <div className="mt-4 rounded-lg border border-dashed border-[var(--border-light)] p-3 text-xs text-[var(--text-secondary)]">
-        Este fluxo não está ligado a uma linha do relógio da VPS (squad, rotina manual ou reação a um evento), então não há comando de cron para mostrar.
-      </div>
-    );
-  }
+  if (!automacao) return null; // (v3.3) sem relógio na VPS: nada a mostrar, sem texto explicativo
   return (
     <div className="mt-4">
       <h3 className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1">📄 Script principal</h3>
@@ -472,7 +455,7 @@ export function PainelPeca({ peca, nivel, flow, desenho, d1, automacao, cronDesc
         <button onClick={() => onSelect(null)} aria-label="Fechar detalhe" className="text-lg leading-none text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">×</button>
       </div>
 
-      {nivel > 1 && liderPeca && (
+      {nivel > 1 && liderPeca && !repete(liderPeca.label, peca.label) && (
         <button onClick={() => onIrParaLeigo(liderPeca.id)} className="text-[11px] text-[var(--accent)] hover:underline cursor-pointer mb-2 text-left">
           📍 No nível Leigo isto é parte de: {liderPeca.label}
         </button>
@@ -481,12 +464,17 @@ export function PainelPeca({ peca, nivel, flow, desenho, d1, automacao, cronDesc
       {/* Nível 1: só o que acontece, em português de gente */}
       {nivel === 1 && (
         <div className="space-y-2 text-sm mt-2">
-          {peca.membros.map((m) => (
-            <div key={m.id}>
-              {peca.membros.length > 1 && <p className="font-medium">{m.data.icon} {m.data.label}</p>}
-              <p className="text-[var(--text-secondary)]">{primeiraFrase(m.data.details) || "Sem descrição ainda."}</p>
-            </div>
-          ))}
+          {peca.membros.map((m) => {
+            const frase = primeiraFrase(m.data.details);
+            // (v3.3) descrição que só repete o título não aparece
+            const mostra = frase ? !repete(peca.membros.length > 1 ? m.data.label : peca.label, frase) : peca.membros.length === 1;
+            return (
+              <div key={m.id}>
+                {peca.membros.length > 1 && <p className="font-medium">{m.data.icon} {m.data.label}</p>}
+                {mostra && <p className="text-[var(--text-secondary)]">{frase || "Sem descrição ainda."}</p>}
+              </div>
+            );
+          })}
           {tags.length > 0 && <p className="text-xs text-[var(--text-muted)]">usa: {tags.join(", ")}</p>}
           {m0.type === "start" && cronDescricao && <p className="text-xs text-[var(--text-muted)]">⏰ {cronDescricao}</p>}
         </div>
@@ -495,10 +483,10 @@ export function PainelPeca({ peca, nivel, flow, desenho, d1, automacao, cronDesc
       {/* Nível 2: peças e horários */}
       {nivel >= 2 && (
         <div className="space-y-2 text-sm mt-2">
-          {m0.data.details ? (
-            <p className="whitespace-pre-line text-[var(--text-secondary)]">{m0.data.details}</p>
-          ) : (
+          {!m0.data.details ? (
             <p className="text-[var(--text-muted)]">Sem descrição ainda.</p>
+          ) : repete(peca.label, m0.data.details) || (nivel === 3 && m0.data.codigo && repete(m0.data.details, m0.data.codigo.explicacao_tecnica)) ? null : (
+            <p className="whitespace-pre-line text-[var(--text-secondary)]">{m0.data.details}</p>
           )}
           <Linha rotulo="Quem faz" valor={executores.join(", ") || "não informado"} />
           {tags.length > 0 && <Linha rotulo="Ferramentas" valor={tags.join(", ")} />}
@@ -517,14 +505,14 @@ export function PainelPeca({ peca, nivel, flow, desenho, d1, automacao, cronDesc
                 const caminho = caminhoDeArquivo(ex);
                 return caminho ? <CaminhoCopiavel key={ex} valor={caminho} avisar={avisar} /> : null;
               })}
-              <div className="rounded-lg border border-dashed border-[var(--border-light)] p-3 text-xs text-[var(--text-secondary)]">
-                <p className="font-medium text-[var(--text-primary)] mb-0.5">Sem trecho de código próprio</p>
-                {m0.type === "start" || m0.type === "end"
-                  ? "Esta etapa marca o começo ou o fim do fluxo e não tem uma linha de código só dela."
-                  : executores.length
+              {m0.type !== "start" && m0.type !== "end" && (
+                <div className="rounded-lg border border-dashed border-[var(--border-light)] p-3 text-xs text-[var(--text-secondary)]">
+                  <p className="font-medium text-[var(--text-primary)] mb-0.5">Sem trecho de código próprio</p>
+                  {executores.length
                     ? `Esta etapa é feita por ${executores.join(", ")}, sem um trecho de script dedicado.`
                     : "O curador não achou um trecho de código dedicado a esta etapa."}
-              </div>
+                </div>
+              )}
             </>
           )}
           {m0.type === "start" ? <BlocoScript automacao={automacao} avisar={avisar} /> : null}
@@ -571,7 +559,6 @@ export function PainelPeca({ peca, nivel, flow, desenho, d1, automacao, cronDesc
           )}
         </div>
       )}
-      {nivel === 3 && <p className="mt-4 text-[10px] text-[var(--text-muted)] break-all">Fluxo: {flow.title}</p>}
     </div>
   );
 }

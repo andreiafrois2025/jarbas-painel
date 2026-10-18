@@ -57,7 +57,7 @@ export function BotoesNivel({ nivel, onMuda }: { nivel: Nivel; onMuda: (n: Nivel
             role="tab"
             aria-selected={ativo}
             onClick={() => onMuda(n.n)}
-            title={`${n.dica} (tecla ${n.n})`}
+            title={`tecla ${n.n}`}
             className="rounded-xl px-2 sm:px-4 py-2.5 sm:py-3 text-left cursor-pointer transition-colors min-w-0"
             style={{
               border: `${ativo ? 2 : 1}px solid ${ativo ? cor : "var(--border)"}`,
@@ -66,12 +66,10 @@ export function BotoesNivel({ nivel, onMuda }: { nivel: Nivel; onMuda: (n: Nivel
           >
             <span className="flex items-center gap-2 min-w-0">
               <span className="w-3 h-3 rounded-full shrink-0" style={{ background: cor }} aria-hidden />
-              <span className="min-w-0">
-                <span className="block text-[11px] text-[var(--text-muted)] leading-none">Nível {n.n}</span>
-                <span className={`block text-[12px] sm:text-[15px] leading-tight mt-0.5 ${ativo ? "font-semibold" : "font-medium"} text-[var(--text-primary)]`}>{NOME_NIVEL[n.n]}</span>
+              <span className={`min-w-0 text-[12px] sm:text-[15px] leading-tight ${ativo ? "font-semibold" : "font-medium"} text-[var(--text-primary)]`}>
+                <span className="text-[var(--text-muted)] font-normal">Nível {n.n} · </span>{NOME_NIVEL[n.n]}
               </span>
             </span>
-            <span className="hidden lg:block text-[11px] text-[var(--text-secondary)] mt-1 leading-snug">{n.dica}</span>
           </button>
         );
       })}
@@ -84,8 +82,8 @@ export { BOLA_NIVEL };
 export interface Bolinha {
   id: string;
   titulo: string;
+  /** (v3.3) a lista mostra só o título; a descrição abre na caixinha lateral */
   frase?: string;
-  /** linha em fonte de código (nível 3) */
   codigo?: string;
 }
 
@@ -137,8 +135,6 @@ export function BlocoProcesso({ comeca, termina, bolinhas, selecionada, onEscolh
                     <span className="shrink-0 w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center text-white mt-0.5" style={{ background: "var(--accent, #2D6B6B)" }}>{i + 1}</span>
                     <span className="min-w-0 text-sm leading-snug">
                       <strong className="font-semibold">{b.titulo}</strong>
-                      {b.frase && <span className="text-[var(--text-secondary)]"> — {b.frase}</span>}
-                      {b.codigo && <span className="block font-mono text-[11px] text-[var(--text-muted)] break-all mt-0.5">{b.codigo}</span>}
                     </span>
                   </button>
                 </li>
