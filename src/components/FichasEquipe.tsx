@@ -35,7 +35,7 @@ const primeiraFrase = (t?: string) => {
 const fmtH = (v: number) => `${(Math.round(v * 10) / 10).toString().replace(".", ",")}h`;
 
 // Ordem das salas e dos agentes, como no mock: Comando primeiro, Jarbas à frente.
-const ORDEM_SALAS: SalaId[] = ["comando", "estudio", "docs", "secretaria", "bemestar", "lab"];
+const ORDEM_SALAS: SalaId[] = ["comando", "estudio", "docs", "secretaria", "hall", "lab"];
 const SALAS_ORDENADAS = ORDEM_SALAS.map((id) => SALAS.find((s) => s.id === id)!);
 const posicao = (nome: string) => {
   const id = mascoteId(nome);

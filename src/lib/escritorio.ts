@@ -8,14 +8,14 @@ import { supabase } from "./supabase";
 import { SQUAD_API_BASE } from "./config";
 import { MEDIDAS_MASCOTE } from "./mascotes-medidas";
 
-export const LARGURA = 1448;
-export const ALTURA = 1086;
+export const LARGURA = 1774;
+export const ALTURA = 887;
 
 // ── Tamanho dos mascotes (escritório v3) ─────────────────────────────────
 // As imagens têm margens transparentes diferentes; medimos o desenho real
 // (scripts/medir-mascotes.py) para que TODOS tenham a mesma altura visível.
 // O Jarbas fica 15% maior (ela gostou dele maior).
-export const ALTURA_VISIVEL = 92;
+export const ALTURA_VISIVEL = 104;
 export const ESCALA_JARBAS = 1.15;
 /** Parte do corpo escondida atrás da mesa quando o agente trabalha (0 a 1 da altura visível). */
 export const SENTADO_PADRAO = 0.36;
@@ -33,17 +33,17 @@ export function geomMascote(id: string): GeomMascote {
   return { w, esq: -((m.l + m.r) / 2 - 0.5) * w, rodape: (1 - m.b) * w, alt };
 }
 
-export type SalaId = "hall" | "estudio" | "comando" | "docs" | "secretaria" | "bemestar" | "lab";
+export type SalaId = "hall" | "estudio" | "comando" | "docs" | "secretaria" | "lab";
 
 export interface Sala { id: SalaId; rotulo: string; x: number; y: number }
 // canto superior esquerdo da etiqueta da sala (mock)
 export const SALAS: Sala[] = [
-  { id: "estudio", rotulo: "🎬 Estúdio", x: 120, y: 96 },
-  { id: "comando", rotulo: "🧭 Comando", x: 560, y: 30 },
-  { id: "docs", rotulo: "📜 Documentos e leis", x: 1000, y: 96 },
-  { id: "secretaria", rotulo: "🗂️ Secretaria", x: 70, y: 372 },
-  { id: "bemestar", rotulo: "🌿 Bem-estar", x: 470, y: 372 },
-  { id: "lab", rotulo: "🔬 Laboratório", x: 1170, y: 392 },
+  { id: "estudio", rotulo: "🎬 Estúdio", x: 120, y: 128 },
+  { id: "comando", rotulo: "🧭 Comando", x: 880, y: 74 },
+  { id: "docs", rotulo: "📜 Documentos e leis", x: 1230, y: 126 },
+  { id: "secretaria", rotulo: "🗂️ Secretaria", x: 150, y: 444 },
+  { id: "hall", rotulo: "☕ Hall & bem-estar", x: 640, y: 466 },
+  { id: "lab", rotulo: "🔬 Laboratório", x: 1040, y: 490 },
 ];
 
 type Ponto = { x: number; y: number; sit?: number };
@@ -55,33 +55,40 @@ export interface PerfilAgente {
   sala: SalaId;
   trab: Ponto;           // posição de trabalho (na mesa)
   livre: Ponto;          // posição livre, na própria sala
+  livreSit?: number;     // se fica sentado quando livre (ex.: poltrona)
   ocio: string;          // atividade típica quando livre
 }
 
 export const AGENTES: PerfilAgente[] = [
-  { id: "izzy", nome: "Izzy", cargo: "redatora", sala: "estudio", trab: { x: 312, y: 262 }, livre: { x: 235, y: 280 }, ocio: "✍️ relendo um rascunho" },
-  { id: "felipe", nome: "Felipe", cargo: "designer", sala: "estudio", trab: { x: 395, y: 270 }, livre: { x: 188, y: 262 }, ocio: "🎨 rabiscando no cavalete" },
-  { id: "theo", nome: "Theo", cargo: "vídeo e roteiro", sala: "estudio", trab: { x: 262, y: 288 }, livre: { x: 96, y: 288 }, ocio: "🎥 ajustando a câmera" },
-  { id: "jarbas", nome: "Jarbas", cargo: "orquestrador", sala: "comando", trab: { x: 622, y: 292 }, livre: { x: 545, y: 292 }, ocio: "🛰️ vigiando o painel" },
-  { id: "rafaela", nome: "Rafaela", cargo: "estrategista", sala: "comando", trab: { x: 772, y: 284 }, livre: { x: 835, y: 298 }, ocio: "📌 revendo metas" },
-  { id: "harvey", nome: "Dr. Harvey", cargo: "advogado revisor", sala: "docs", trab: { x: 990, y: 322 }, livre: { x: 935, y: 300 }, ocio: "⚖️ pesando um caso" },
-  { id: "katrina", nome: "Katrina", cargo: "advogada estruturadora", sala: "docs", trab: { x: 1075, y: 326 }, livre: { x: 1130, y: 328 }, ocio: "📑 relendo uma minuta" },
-  { id: "sofia", nome: "Sofia", cargo: "arquiteta da informação", sala: "docs", trab: { x: 1195, y: 312 }, livre: { x: 1196, y: 334 }, ocio: "🗂️ etiquetando pastas" },
-  { id: "donna", nome: "Donna", cargo: "assistente administrativa", sala: "secretaria", trab: { x: 225, y: 548 }, livre: { x: 322, y: 566 }, ocio: "📅 conferindo a agenda" },
-  { id: "louis", nome: "Louis", cargo: "finanças", sala: "secretaria", trab: { x: 355, y: 514 }, livre: { x: 425, y: 528 }, ocio: "🪙 contando moedinhas" },
-  { id: "nara", nome: "Dra. Nara", cargo: "psicóloga", sala: "bemestar", trab: { x: 470, y: 548 }, livre: { x: 505, y: 600 }, ocio: "🧘 respirando fundo" },
-  { id: "lara", nome: "Lara", cargo: "nutricionista", sala: "bemestar", trab: { x: 556, y: 490 }, livre: { x: 672, y: 556 }, ocio: "🍎 provando uma receita" },
-  { id: "tonny", nome: "Tonny", cargo: "dados e BI", sala: "lab", trab: { x: 900, y: 522 }, livre: { x: 905, y: 592 }, ocio: "📊 ajustando os gráficos" },
-  { id: "junior", nome: "Junior", cargo: "desenvolvedor", sala: "lab", trab: { x: 975, y: 566 }, livre: { x: 1040, y: 600 }, ocio: "🐞 caçando um bug" },
-  { id: "mike", nome: "Mike", cargo: "pesquisa e OSINT", sala: "lab", trab: { x: 842, y: 548 }, livre: { x: 1196, y: 598 }, ocio: "🔎 conferindo fontes" },
-  { id: "eric", nome: "Eric", cargo: "geoprocessamento", sala: "lab", trab: { x: 1112, y: 522 }, livre: { x: 1148, y: 546 }, ocio: "🗺️ olhando o mapa das bacias" },
+  // Estúdio: Theo junto da câmera, Felipe ao lado do cavalete, Izzy na cadeira da máquina de escrever
+  { id: "theo", nome: "Theo", cargo: "vídeo e roteiro", sala: "estudio", trab: { x: 150, y: 372, sit: 0 }, livre: { x: 205, y: 380 }, ocio: "🎥 ajustando a câmera" },
+  { id: "felipe", nome: "Felipe", cargo: "designer", sala: "estudio", trab: { x: 318, y: 362, sit: 0 }, livre: { x: 345, y: 386 }, ocio: "🎨 rabiscando no cavalete" },
+  { id: "izzy", nome: "Izzy", cargo: "redatora", sala: "estudio", trab: { x: 428, y: 322, sit: 0.3 }, livre: { x: 485, y: 386 }, ocio: "✍️ relendo um rascunho" },
+  // Comando
+  { id: "jarbas", nome: "Jarbas", cargo: "orquestrador", sala: "comando", trab: { x: 835, y: 330, sit: 0.3 }, livre: { x: 640, y: 392 }, ocio: "🛰️ vigiando o painel" },
+  { id: "rafaela", nome: "Rafaela", cargo: "estrategista", sala: "comando", trab: { x: 1140, y: 372, sit: 0.3 }, livre: { x: 960, y: 415 }, ocio: "📌 revendo metas" },
+  // Documentos e leis
+  { id: "harvey", nome: "Dr. Harvey", cargo: "advogado revisor", sala: "docs", trab: { x: 1340, y: 344, sit: 0.3 }, livre: { x: 1235, y: 468 }, ocio: "⚖️ pesando um caso" },
+  { id: "katrina", nome: "Katrina", cargo: "advogada estruturadora", sala: "docs", trab: { x: 1430, y: 360, sit: 0.3 }, livre: { x: 1385, y: 482 }, ocio: "📑 relendo uma minuta" },
+  { id: "sofia", nome: "Sofia", cargo: "arquiteta da informação", sala: "docs", trab: { x: 1610, y: 388, sit: 0.3 }, livre: { x: 1520, y: 478 }, ocio: "🗂️ etiquetando pastas" },
+  // Secretaria
+  { id: "donna", nome: "Donna", cargo: "assistente administrativa", sala: "secretaria", trab: { x: 255, y: 614, sit: 0.3 }, livre: { x: 285, y: 712 }, ocio: "📅 conferindo a agenda" },
+  { id: "louis", nome: "Louis", cargo: "finanças", sala: "secretaria", trab: { x: 470, y: 608, sit: 0.35 }, livre: { x: 395, y: 700 }, ocio: "🪙 contando moedinhas" },
+  // Hall e bem-estar (Nara e Lara)
+  { id: "nara", nome: "Dra. Nara", cargo: "psicóloga", sala: "hall", trab: { x: 838, y: 738, sit: 0.3 }, livre: { x: 520, y: 724 }, livreSit: 0.3, ocio: "🧘 respirando fundo" },
+  { id: "lara", nome: "Lara", cargo: "nutricionista", sala: "hall", trab: { x: 915, y: 636, sit: 0.35 }, livre: { x: 915, y: 642 }, ocio: "🍎 provando uma receita" },
+  // Laboratório
+  { id: "tonny", nome: "Tonny", cargo: "dados e BI", sala: "lab", trab: { x: 1183, y: 656, sit: 0.3 }, livre: { x: 1120, y: 740 }, ocio: "📊 ajustando os gráficos" },
+  { id: "junior", nome: "Junior", cargo: "desenvolvedor", sala: "lab", trab: { x: 1337, y: 704, sit: 0.3 }, livre: { x: 1395, y: 785 }, ocio: "🐞 caçando um bug" },
+  { id: "mike", nome: "Mike", cargo: "pesquisa e OSINT", sala: "lab", trab: { x: 1225, y: 792, sit: 0.3 }, livre: { x: 1290, y: 838 }, ocio: "🔎 conferindo fontes" },
+  { id: "eric", nome: "Eric", cargo: "geoprocessamento", sala: "lab", trab: { x: 1500, y: 692, sit: 0.35 }, livre: { x: 1660, y: 765 }, ocio: "🗺️ olhando o mapa das bacias" },
 ];
 
 export const perfil = (id: string) => AGENTES.find((a) => a.id === id);
 
-// Cantinho do café: no máximo 3 lugares. Sofá do Bem-estar: 2 lugares.
-export const CAFE: Ponto[] = [{ x: 598, y: 490 }, { x: 638, y: 494 }, { x: 676, y: 499 }];
-export const SOFA: Ponto[] = [{ x: 512, y: 524 }, { x: 572, y: 524 }];
+// Café (3 lugares, espaçados): balcão e dois pufes do Hall. Sofá do "zzz" (2 lugares): sofá e poltrona laranja.
+export const CAFE: Ponto[] = [{ x: 820, y: 632, sit: 0.35 }, { x: 580, y: 780, sit: 0.3 }, { x: 782, y: 792, sit: 0.3 }];
+export const SOFA: Ponto[] = [{ x: 660, y: 704, sit: 0.4 }, { x: 738, y: 704, sit: 0.4 }];
 
 // ── Dados ao vivo (GET /api/escritorio) ───────────────────────────────────
 export interface AgenteVivo {
@@ -152,7 +159,7 @@ export interface RoteiroAula {
 /** Tempo (s) que a Andréia leva para "escolher", e quanto o "✔ escolheu" fica na tela. */
 export const CP_ESPERA = 2.2;
 export const CP_DURACAO = 4.2;
-export const POS_ANDREIA = { x: 688, y: 314 }; // sala de Comando
+export const POS_ANDREIA = { x: 770, y: 418 }; // sala de Comando
 export const ROTEIROS: RoteiroAula[] = [
   {
     id: "carrossel", rotulo: "📱 Carrossel de IA", descricao: "Para cursos abertos", duracao: 90,
@@ -345,7 +352,7 @@ function resolver(palco: HTMLElement, aplicar: boolean): number {
   };
   const grade = (it: Item) => {
     const g: Cand[] = [];
-    const subida = Math.max(it.bh * 2.8, 150);
+    const subida = it.discreto ? 46 : Math.max(it.bh * 2.8, 150);
     for (let dx = -it.maxDx; dx <= it.maxDx + 0.1; dx += 16) for (let dy = 0; dy >= -subida; dy -= 10) g.push({ dx, dy, c: Math.abs(dx) + Math.abs(dy) * 1.25 });
     return g.sort((p, q) => p.c - q.c);
   };

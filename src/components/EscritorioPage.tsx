@@ -360,7 +360,7 @@ export default function EscritorioPage() {
     const l = lugar[a.id];
     if (l?.tipo === "cafe") return { x: CAFE[l.idx].x, y: CAFE[l.idx].y, modo: "cafe" as const, sit: CAFE[l.idx].sit ?? 0 };
     if (l?.tipo === "sofa") return { x: SOFA[l.idx].x, y: SOFA[l.idx].y, modo: "sofa" as const, sit: SOFA[l.idx].sit ?? 0 };
-    return { ...abs(efetivaRel(a, "livre", pos)), modo: "livre" as const, sit: 0 };
+    return { ...abs(efetivaRel(a, "livre", pos)), modo: "livre" as const, sit: a.livreSit ?? 0 };
   };
   // fumacinha da xícara de quem está no café (perto do mascote)
   const cafeNoAr = visiveis.flatMap((a) => { const p = ondeEsta(a); return p.modo === "cafe" ? [{ x: p.x / LARGURA, y: p.y / ALTURA }] : []; });
