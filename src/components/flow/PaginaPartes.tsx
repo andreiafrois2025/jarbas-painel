@@ -179,7 +179,8 @@ export function BlocoProcesso({ comeca, termina, bolinhas, selecionada, onEscolh
                     className="w-full text-left flex gap-2.5 items-start rounded-lg px-2 py-1.5 cursor-pointer hover:bg-[var(--bg-tertiary)]"
                     style={sel ? { background: "var(--accent-soft, rgba(45,107,107,0.12))", outline: "1.5px solid var(--accent, #2D6B6B)" } : undefined}
                   >
-                    <span className="shrink-0 w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center text-white mt-0.5" style={{ background: "var(--accent, #2D6B6B)" }}>{b.semNumero ? "•" : i + 1}</span>
+                    {/* 18/10: sem sequência real (rotinas do grupo), não mostra marcador nenhum: ela achou repetitivo. */}
+                    {!b.semNumero && <span className="shrink-0 w-6 h-6 rounded-full text-xs font-semibold flex items-center justify-center text-white mt-0.5" style={{ background: "var(--accent, #2D6B6B)" }}>{i + 1}</span>}
                     <span className="min-w-0 text-sm leading-snug">
                       {(() => {
                         const i = b.titulo.lastIndexOf(" ");
