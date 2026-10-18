@@ -46,6 +46,8 @@ export interface SnapshotDia {
   /** Livro-caixa de entregas (18/10/2026): horas somadas de todos os agentes. */
   horas_por_agente?: Record<string, number>;
   horas_por_tipo?: Record<string, number>;
+  /** Quantas entregas cada agente tem no livro-caixa (somando a quantidade de cada uma). */
+  entregas_por_agente?: Record<string, number>;
   horas_semana?: number;
   horas_mes?: number;
   atividades_por_agente?: Record<string, number>;

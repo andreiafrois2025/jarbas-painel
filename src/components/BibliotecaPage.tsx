@@ -52,7 +52,9 @@ interface CriacaoUnificada {
   grupo?: string;
 }
 
-export default function BibliotecaPage() {
+// modo "atalhos" e "grafo": usados dentro de Ajustes (sem o cabeçalho próprio).
+// As habilidades e os prompts agora vivem em Equipe › Habilidades.
+export default function BibliotecaPage({ modo = "completo" }: { modo?: "completo" | "atalhos" | "grafo" }) {
   const { confirmar, comDesfazer } = useUI();
   const { servidora } = usePainel();
 
@@ -68,7 +70,7 @@ export default function BibliotecaPage() {
     };
   };
 
-  const [aba, setAba] = useState<Aba>("criacoes");
+  const [aba, setAba] = useState<Aba>(modo === "grafo" ? "grafo" : "criacoes");
   const [catalogo, setCatalogo] = useState<Catalogo | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [skillAberta, setSkillAberta] = useState<{
@@ -215,14 +217,14 @@ export default function BibliotecaPage() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0 overflow-x-auto">
+      {modo === "completo" && <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0 overflow-x-auto">
         <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">📚 Biblioteca</h1>
         {botao("criacoes", "🔗 Criações")}
         {botao("skills", "🧰 Skills")}
         {botao("prompts", "💬 Prompts")}
         {botao("plugins", "🔌 Plugins")}
         {botao("grafo", "🕸️ Grafo")}
-      </div>
+      </div>}
 
       <div className="flex-1 overflow-y-auto">
         {aba === "grafo" ? (

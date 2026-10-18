@@ -173,7 +173,10 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       const pedido = new URLSearchParams(window.location.search).get("agente");
       const s = pedido && /^[a-z]{3,10}$/.test(pedido) ? pedido : window.localStorage.getItem("chatAgente");
       if (s) setAgenteId(s);
-      if (pedido) setTelaCelular("chat");
+      // ?texto=... (ex.: "+ Nova squad") deixa a mensagem escrita, pronta para ela completar
+      const rascunho = new URLSearchParams(window.location.search).get("texto");
+      if (rascunho) setTexto(rascunho.slice(0, 8000));
+      if (pedido || rascunho) setTelaCelular("chat");
     } catch { /* sem storage */ }
     chatApi.agentes().then((as) => setAgentes(servidora ? as.filter((a) => !ehColaboradorOculto(a.nome) && a.id !== "louis") : as)).catch((e) => setErro(e.message));
     chatApi.uso().then(setUso).catch(() => {});

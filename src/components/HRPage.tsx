@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useUI } from "./ui";
+import { useUI, Janela } from "./ui";
+import FichasEquipe from "./FichasEquipe";
 import Mascote from "./Mascote";
 import type { Collaborator, Assignment, Category, QuickLink, SubLink } from "@/lib/types";
 import { CONTEXTS as CONTEXTS_TODOS } from "@/lib/types";
@@ -38,11 +39,15 @@ const QL_ICONS = [
 ];
 
 interface HRPageProps {
-  onNavigate: (page: string) => void;
+  onNavigate?: (page: string) => void;
   onDataChanged: () => void;
+  /** "fichas" = Equipe › Agentes; "organizacao" = Setores e Atalhos rápidos (dentro de Ajustes). */
+  modo?: "fichas" | "organizacao";
+  /** Muda de valor quando o botão "+ Novo agente" do topo é clicado. */
+  novoSinal?: number;
 }
 
-export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
+export default function HRPage({ onDataChanged, modo = "fichas", novoSinal = 0 }: HRPageProps) {
   const { confirmar, avisar, comDesfazer } = useUI();
   // Data
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -52,7 +57,8 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
   const [loading, setLoading] = useState(true);
 
   // UI
-  const [activeTab, setActiveTab] = useState<"collaborators" | "sectors" | "quicklinks">("collaborators");
+  const [activeTab, setActiveTab] = useState<"collaborators" | "sectors" | "quicklinks">(modo === "organizacao" ? "sectors" : "collaborators");
+  const [fichaAberta, setFichaAberta] = useState<string | null>(null);
   const [filterContext, setFilterContext] = useState<string>("all");
   const [filterSector, setFilterSector] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -497,279 +503,12 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
     } finally { setSaving(false); }
   };
 
-  // ---- Render ----
-  if (loading) {
+
+  // Ficha completa (abre do menu "⋯" da ficha): perfil e funções do agente
+  const renderFichaCompleta = (collab: Collaborator) => {
+    const collabAsgs = getCollabAssignments(collab.id);
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <span className="text-4xl animate-pulse">👥</span>
-          <span className="text-[var(--text-secondary)]">Carregando RH...</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-full flex flex-col bg-[var(--bg-primary)]">
-      {/* ===== HEADER ===== */}
-      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] flex items-center px-6 py-3 gap-4 shrink-0">
-        <button
-          onClick={() => onNavigate("office")}
-          className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] transition-all"
-        >
-          ← Escritório
-        </button>
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Gestão de RH</h1>
-        <div className="flex-1" />
-        <span className="text-xs text-[var(--text-muted)]">
-          {collaborators.length} colaboradores · {assignments.length} atribuições · {categories.length} setores
-        </span>
-      </div>
-
-      {/* ===== TABS ===== */}
-      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border)] flex px-6 gap-1 shrink-0">
-        {([
-          { key: "collaborators", label: "👤 Colaboradores", count: collaborators.length },
-          { key: "sectors", label: "🏢 Setores", count: categories.length },
-          { key: "quicklinks", label: "🔗 Atalhos Rápidos", count: quickLinks.length },
-        ] as const).map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-3 text-sm font-medium cursor-pointer transition-all border-b-2 ${
-              activeTab === tab.key
-                ? "border-[var(--accent)] text-[var(--accent)]"
-                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"
-            }`}
-          >
-            {tab.label} <span className="text-xs opacity-60">({tab.count})</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ===== CONTENT ===== */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* ===== TAB: COLABORADORES ===== */}
-        {activeTab === "collaborators" && (
-          <>
-            {/* Left filter panel */}
-            <aside className="w-60 bg-[var(--bg-secondary)] border-r border-[var(--border)] p-4 flex flex-col gap-4 overflow-y-auto shrink-0 hidden lg:flex">
-              {/* Search */}
-              <div>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">🔍</span>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Buscar..."
-                    className="input-modern !pl-9 !py-2 text-sm w-full"
-                  />
-                </div>
-              </div>
-
-              {/* Context filter */}
-              <div>
-                <label className="block text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium mb-2">Contexto</label>
-                <div className="space-y-1">
-                  <button
-                    onClick={() => { setFilterContext("all"); setFilterSector("all"); }}
-                    className={`w-full text-left text-xs px-3 py-2 rounded-lg cursor-pointer transition-all flex items-center justify-between ${
-                      filterContext === "all" ? "bg-[var(--accent)] text-white" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                    }`}
-                  >
-                    <span>Todos</span>
-                    <span className="opacity-60">{collaborators.length}</span>
-                  </button>
-                  {CONTEXTS.map(ctx => {
-                    const catIds = new Set(categories.filter(c => (c.context || "IGAM") === ctx).map(c => c.id));
-                    const count = new Set(assignments.filter(a => catIds.has(a.category_id)).map(a => a.collaborator_id)).size;
-                    return (
-                      <button
-                        key={ctx}
-                        onClick={() => { setFilterContext(ctx); setFilterSector("all"); }}
-                        className={`w-full text-left text-xs px-3 py-2 rounded-lg cursor-pointer transition-all flex items-center justify-between ${
-                          filterContext === ctx ? "bg-[var(--accent)] text-white" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                        }`}
-                      >
-                        <span>{ctx}</span>
-                        <span className="opacity-60">{count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Sector filter */}
-              {filterContext !== "all" && (
-                <div>
-                  <label className="block text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium mb-2">Setor</label>
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => setFilterSector("all")}
-                      className={`w-full text-left text-xs px-3 py-2 rounded-lg cursor-pointer transition-all ${
-                        filterSector === "all" ? "bg-[var(--accent-soft)] text-[var(--accent)] font-medium" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                      }`}
-                    >
-                      Todos os setores
-                    </button>
-                    {sectorsInFilter.map(cat => {
-                      const count = assignments.filter(a => a.category_id === cat.id).length;
-                      return (
-                        <button
-                          key={cat.id}
-                          onClick={() => setFilterSector(cat.id)}
-                          className={`w-full text-left text-xs px-3 py-2 rounded-lg cursor-pointer transition-all flex items-center justify-between ${
-                            filterSector === cat.id ? "bg-[var(--accent-soft)] text-[var(--accent)] font-medium" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                          }`}
-                        >
-                          <span className="truncate">{cat.name}</span>
-                          <span className="opacity-60 text-[10px]">{count}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Status filter */}
-              <div>
-                <label className="block text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-medium mb-2">Status</label>
-                <button
-                  onClick={() => setShowDismissed(!showDismissed)}
-                  className={`w-full text-left text-xs px-3 py-2 rounded-lg cursor-pointer transition-all flex items-center justify-between ${
-                    showDismissed ? "bg-[var(--warning)]/10 text-[var(--warning)] font-medium" : "hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                  }`}
-                >
-                  <span>Incluir desligados</span>
-                  <span className="text-[10px]">{showDismissed ? "✓" : ""}</span>
-                </button>
-              </div>
-
-              {/* Actions */}
-              <div className="mt-auto space-y-2">
-                <button
-                  onClick={() => { setShowNewCollab(true); resetCollabForm(); }}
-                  className="btn-primary w-full !text-xs !py-2"
-                >
-                  + Novo Colaborador
-                </button>
-              </div>
-            </aside>
-
-            {/* Main content */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6">
-              {/* Mobile search + filter */}
-              <div className="lg:hidden mb-4 space-y-2">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] text-sm pointer-events-none">🔍</span>
-                  <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Buscar colaborador..." className="input-modern !pl-9 !py-2 text-sm w-full" />
-                </div>
-                <div className="flex gap-1 flex-wrap">
-                  <button onClick={() => { setFilterContext("all"); setFilterSector("all"); }}
-                    className={`text-xs px-3 py-1.5 rounded-lg cursor-pointer ${filterContext === "all" ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-secondary)] border border-[var(--border)]"}`}>
-                    Todos
-                  </button>
-                  {CONTEXTS.map(ctx => (
-                    <button key={ctx} onClick={() => { setFilterContext(ctx); setFilterSector("all"); }}
-                      className={`text-xs px-3 py-1.5 rounded-lg cursor-pointer ${filterContext === ctx ? "bg-[var(--accent)] text-white" : "bg-[var(--bg-secondary)] border border-[var(--border)]"}`}>
-                      {ctx}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={() => { setShowNewCollab(true); resetCollabForm(); }}
-                  className="btn-primary !text-xs !py-2 w-full">+ Novo Colaborador</button>
-              </div>
-
-              {/* Collaborator grid */}
-              {filteredCollaborators.length === 0 ? (
-                <div className="text-center py-16">
-                  <p className="text-3xl mb-2">👤</p>
-                  <p className="text-sm text-[var(--text-muted)]">
-                    {searchQuery ? "Nenhum colaborador encontrado" : "Nenhum colaborador cadastrado"}
-                  </p>
-                </div>
-              ) : (
-                <div className="grid gap-3 xl:grid-cols-2 items-start">
-                  {filteredCollaborators.map(collab => {
-                    const collabAsgs = getCollabAssignments(collab.id);
-                    const ctxs = getCollabContexts(collab.id);
-                    const isExpanded = expandedCollab === collab.id;
-                    const isEditing = editingCollab === collab.id;
-
-                    return (
-                      <div key={collab.id} className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl overflow-hidden transition-all hover:shadow-md">
-                        {/* Card header */}
-                        <div
-                          className="flex items-center gap-3 p-4 cursor-pointer"
-                          onClick={() => setExpandedCollab(isExpanded ? null : collab.id)}
-                        >
-                          {/* Avatar */}
-                          {mascoteSrc(collab.name) ? (
-                            <Mascote nome={collab.name} emoji={collab.icon} tamanho={96} grande className="drop-shadow-sm" />
-                          ) : (
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
-                              style={{ backgroundColor: SKIN_COLORS[collab.skin_tone] + "30" }}>
-                              {collab.icon}
-                            </div>
-                          )}
-
-                          {/* Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className={`font-semibold text-sm ${collab.status === "dismissed" ? "opacity-60" : ""}`}>{collab.name}</span>
-                              <span className="text-[10px] text-[var(--text-muted)]">{collab.gender === "female" ? "👩" : "👨"}</span>
-                              {collab.status === "dismissed" && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--danger)]/10 text-[var(--danger)] font-medium">Desligado</span>
-                              )}
-                            </div>
-                            {collab.specialization && (
-                              <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 line-clamp-1 font-medium">{collab.specialization}</p>
-                            )}
-                            {collab.bio && !collab.specialization && (
-                              <p className="text-[10px] text-[var(--text-muted)] mt-0.5 line-clamp-1">{collab.bio}</p>
-                            )}
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-bold">
-                                {collabAsgs.length} {collabAsgs.length !== 1 ? "funções" : "função"}
-                              </span>
-                              {ctxs.map(ctx => (
-                                <span key={ctx} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--accent-soft)] text-[var(--accent)] font-medium">
-                                  {ctx}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                            <button
-                              onClick={() => isEditing ? setEditingCollab(null) : openEditCollab(collab)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)] hover:text-[var(--accent)] transition-all"
-                              title="Editar"
-                            >✏️</button>
-                            <button
-                              onClick={() => handleDeleteCollab(collab.id, collab.name)}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer hover:bg-[var(--danger)]/10 text-[var(--text-muted)] hover:text-[var(--danger)] transition-all"
-                              title="Excluir"
-                            >🗑️</button>
-                          </div>
-
-                          {/* Expand icon */}
-                          <span className={`text-[var(--text-muted)] text-xs transition-transform ${isExpanded ? "rotate-180" : ""}`}>▼</span>
-                        </div>
-
-                        {/* Edit collaborator inline */}
-                        {isEditing && (
-                          <div className="border-t border-[var(--border)] p-4 bg-[var(--bg-tertiary)]" onClick={e => e.stopPropagation()}>
-                            {renderCollabForm(() => handleUpdateCollab(collab.id), "Salvar", () => setEditingCollab(null))}
-                          </div>
-                        )}
-
-                        {/* Expanded: profile + assignments */}
-                        {isExpanded && !isEditing && (
-                          <div className="border-t border-[var(--border)]" onClick={e => e.stopPropagation()}>
+                          <div>
                             {/* Profile details */}
                             {(collab.specialization || collab.skills || collab.personality || collab.bio) && (
                               <div className="px-4 py-3 bg-[var(--bg-tertiary)]/50 space-y-2">
@@ -857,14 +596,65 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
                               </button>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </>
+    );
+  };
+
+  // "+ Novo agente" no topo da página (fora deste componente)
+  useEffect(() => {
+    if (novoSinal > 0) { setShowNewCollab(true); resetCollabForm(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [novoSinal]);
+
+  // ---- Render ----
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <span className="text-4xl animate-pulse">👥</span>
+          <span className="text-[var(--text-secondary)]">Carregando RH...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col bg-[var(--bg-primary)]">
+      {/* ===== ABAS (só na versão "organização", dentro de Ajustes) ===== */}
+      {modo === "organizacao" && (
+        <div className="border-b border-[var(--border)] flex gap-1 shrink-0 overflow-x-auto">
+          {([
+            { key: "sectors", label: "🏢 Setores", count: categories.length },
+            { key: "quicklinks", label: "🔗 Atalhos rápidos", count: quickLinks.length },
+          ] as const).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-3 text-sm font-medium cursor-pointer transition-all border-b-2 whitespace-nowrap ${
+                activeTab === tab.key
+                  ? "border-[var(--accent)] text-[var(--accent)]"
+                  : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]"
+              }`}
+            >
+              {tab.label} <span className="text-xs opacity-60">({tab.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ===== CONTENT ===== */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* ===== FICHAS DOS AGENTES ===== */}
+        {modo === "fichas" && (
+          <FichasEquipe
+            colaboradores={filteredCollaborators}
+            servidora={servidora}
+            desligados={collaborators.filter(c => c.status === "dismissed").length}
+            mostrarDesligados={showDismissed}
+            onMostrarDesligados={setShowDismissed}
+            onEditar={openEditCollab}
+            onExcluir={(c) => handleDeleteCollab(c.id, c.name)}
+            onVerFicha={(c) => setFichaAberta(c.id)}
+          />
         )}
 
         {/* ===== TAB: SETORES ===== */}
@@ -1049,6 +839,32 @@ export default function HRPage({ onNavigate, onDataChanged }: HRPageProps) {
           </div>
         </div>
       )}
+
+      {/* ===== MODAL: Editar agente (abre do menu da ficha) ===== */}
+      {modo === "fichas" && editingCollab && (
+        <Janela titulo="Editar agente" subtitulo={collabName} onFechar={() => setEditingCollab(null)} largura="estreita">
+          {renderCollabForm(() => handleUpdateCollab(editingCollab), "Salvar", () => setEditingCollab(null))}
+        </Janela>
+      )}
+
+      {/* ===== MODAL: Ficha completa ===== */}
+      {fichaAberta && (() => {
+        const c = collaborators.find(x => x.id === fichaAberta);
+        if (!c) return null;
+        return (
+          <Janela
+            titulo={<span className="flex items-center gap-2"><Mascote nome={c.name} emoji={c.icon} tamanho={40} />{c.name}</span>}
+            subtitulo={c.specialization}
+            onFechar={() => setFichaAberta(null)}
+            largura="media"
+            rodape={<div className="flex gap-2 justify-end">
+              <button className="btn-secondary !py-1.5 !px-3 text-xs" onClick={() => { setFichaAberta(null); openEditCollab(c); }}>✏️ Editar</button>
+            </div>}
+          >
+            <div className="-m-4">{renderFichaCompleta(c)}</div>
+          </Janela>
+        );
+      })()}
 
       {/* ===== MODAL: New/Edit Assignment ===== */}
       {showNewAssignment && (

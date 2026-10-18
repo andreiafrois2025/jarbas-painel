@@ -1,20 +1,20 @@
 "use client";
 
 import Mascote from "./Mascote";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Squad, SquadDocument, Collaborator, CONTEXTS as CONTEXTS_TODOS } from "@/lib/types";
 import { usePainel } from "@/lib/painel-context";
 import { ehPessoal, ehColaboradorOculto, ehContextoPessoal } from "@/lib/modo";
 import { getSquads, addSquad, updateSquad, deleteSquad, getCollaborators } from "@/lib/storage";
-import { useUI } from "./ui";
+import { useUI, Janela } from "./ui";
 import { supabase } from "@/lib/supabase";
 import { refDocumento, abrirDocumento } from "@/lib/documentos";
-import { SQUAD_API_BASE } from "@/lib/config";
+import { squadFetch } from "@/lib/squadFetch";
+import {
+  buscaResumoSquads, buscaJobs, codigoDaSquad, separaSquads, quandoCurto,
+  type ResumoSquad, type JobResumo, type NoCaminho, type MotivoRascunho,
+} from "@/lib/squadsResumo";
 import StartSquadModal from "./StartSquadModal";
-
-interface SquadsPageProps {
-  onNavigate: (page: string) => void;
-}
 
 const CONTEXT_ICONS: Record<string, string> = {
   "IGAM": "🏛️",
@@ -23,49 +23,95 @@ const CONTEXT_ICONS: Record<string, string> = {
   "Família": "🏠",
 };
 
-function PipelineView({ collaboratorIds, collaborators }: { collaboratorIds: string[]; collaborators: Collaborator[] }) {
-  if (!collaboratorIds?.length) return null;
-  const members = collaboratorIds.map(id => collaborators.find(c => c.id === id)).filter(Boolean) as Collaborator[];
-  if (!members.length) return null;
+type Filtro = "todas" | "conteudo" | "igam" | "equipe";
+const FILTROS: { id: Filtro; rotulo: string }[] = [
+  { id: "todas", rotulo: "Todas" },
+  { id: "conteudo", rotulo: "🎬 Conteúdo" },
+  { id: "igam", rotulo: "🏛️ Igam" },
+  { id: "equipe", rotulo: "🤖 Equipe" },
+];
+
+const NOMES_CURTOS: Record<string, string> = { "Dr. Harvey": "Harvey", "Dra. Nara": "Nara" };
+
+// ── O caminho da squad: mascote + verbo de cada um, e as paradas dela (AF) ──
+function Mini({ id, nome, tam }: { id: string; nome: string; tam: number }) {
+  return <Mascote nome={nome} emoji="🤖" tamanho={tam} />;
+}
+
+function No({ n }: { n: NoCaminho }) {
+  if (n.tipo === "cp") {
+    return (
+      <span className="shrink-0 mt-1" title="Aqui a squad para e espera você aprovar" role="img" aria-label="parada: espera a aprovação da Andréia">
+        <span className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-extrabold"
+          style={{ background: "var(--ouro)", color: "#fff" }}>AF</span>
+      </span>
+    );
+  }
+  if (n.tipo === "grupo") {
+    return (
+      <span className="flex flex-col items-center gap-1 shrink-0 max-w-[112px]">
+        <span className="flex -space-x-3">
+          {n.membros.slice(0, 3).map((m) => <Mini key={m} id={m} nome={m} tam={32} />)}
+        </span>
+        <span className="text-[11px] text-[var(--text-secondary)] leading-tight text-center">
+          <b className="text-[var(--text-primary)] font-semibold">{n.nome}</b> {n.verbo}
+        </span>
+      </span>
+    );
+  }
+  const curto = NOMES_CURTOS[n.nome] || n.nome;
   return (
-    <div className="flex items-center gap-1 flex-wrap mt-2">
-      {members.map((c, i) => (
-        <div key={c.id} className="flex items-center gap-1">
-          <div className="flex flex-col items-center">
-            <Mascote nome={c.name} emoji={c.icon} tamanho={28} />
-            <span className="text-[9px] text-[var(--text-secondary)] max-w-[48px] truncate text-center">{c.name}</span>
-          </div>
-          {i < members.length - 1 && (
-            <span className="text-[var(--text-muted)] text-xs mx-0.5">→</span>
-          )}
-        </div>
+    <span className="flex flex-col items-center gap-1 shrink-0 max-w-[96px]">
+      {n.id === "especialista"
+        ? <span className="flex -space-x-3"><Mini id="eric" nome="Eric" tam={32} /><Mini id="junior" nome="Junior" tam={32} /></span>
+        : <Mini id={n.id} nome={n.nome} tam={40} />}
+      <span className="text-[11px] text-[var(--text-secondary)] leading-tight text-center">
+        <b className="text-[var(--text-primary)] font-semibold">{curto}</b> {n.verbo}
+      </span>
+    </span>
+  );
+}
+
+function Caminho({ caminho }: { caminho: NoCaminho[] }) {
+  if (!caminho.length) return null;
+  return (
+    <div className="rounded-xl bg-[var(--bg-tertiary)] px-3 py-2.5">
+    <div className="flex items-start gap-x-1.5 gap-y-3 flex-wrap">
+      {caminho.map((n, i) => (
+        <span key={i} className="flex items-start gap-1.5">
+          <No n={n} />
+          {i < caminho.length - 1 && <span className="text-[var(--text-muted)] text-sm mt-3" aria-hidden>→</span>}
+        </span>
       ))}
+    </div>
+    {caminho.some((n) => n.tipo === "cp") && (
+      <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+        <span className="inline-block w-3.5 h-3.5 rounded-full align-[-2px] mr-1" style={{ background: "var(--ouro)" }} aria-hidden />
+        = a squad para e espera a sua aprovação (AF)
+      </p>
+    )}
     </div>
   );
 }
 
-export default function SquadsPage({ onNavigate }: SquadsPageProps) {
-  const { confirmar, avisar } = useUI();
+interface SquadsPageProps {
+  onNavigate?: (page: string) => void;
+}
+
+export default function SquadsPage(_props: SquadsPageProps = {}) {
+  const { confirmar } = useUI();
   const { servidora } = usePainel();
   // Modo Servidora: sem os contextos Pessoal/Família nem squads/colaboradores pessoais
   const CONTEXTS = CONTEXTS_TODOS.filter((c) => !(servidora && ehContextoPessoal(c)));
   const [squads, setSquads] = useState<Squad[]>([]);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedContext, setSelectedContext] = useState<string>(CONTEXTS[1]);
-  // Painel Setores recolhível: no celular começa recolhido; a escolha fica salva
-  const [setoresRecolhido, setSetoresRecolhido] = useState(false);
-  useEffect(() => {
-    const salvo = localStorage.getItem("squads_setores_recolhido");
-    if (salvo !== null) setSetoresRecolhido(salvo === "1");
-    else if (window.matchMedia("(max-width: 767px)").matches) setSetoresRecolhido(true);
-  }, []);
-  const toggleSetores = () => {
-    setSetoresRecolhido((v) => {
-      localStorage.setItem("squads_setores_recolhido", v ? "0" : "1");
-      return !v;
-    });
-  };
+  const [filtro, setFiltro] = useState<Filtro>("todas");
+  const [resumo, setResumo] = useState<ResumoSquad[] | null>(null);
+  const [jobs, setJobs] = useState<JobResumo[]>([]);
+  const [rascunhosAbertos, setRascunhosAbertos] = useState(false);
+  const [menuAberto, setMenuAberto] = useState<string | null>(null);
+  const [entregasDe, setEntregasDe] = useState<Squad | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingSquad, setEditingSquad] = useState<Squad | null>(null);
   const [saving, setSaving] = useState(false);
@@ -89,49 +135,6 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
   // --- Modal "Iniciar Squad" (estado mínimo: só qual squad e se está aberto) ---
   const [showRunModal, setShowRunModal] = useState(false);
   const [runningSquad, setRunningSquad] = useState<Squad | null>(null);
-
-  const loadData = async () => {
-    try {
-      const [squadsData, collabData] = await Promise.all([getSquads(), getCollaborators()]);
-      setSquads(servidora
-        ? squadsData.filter(sq => !ehPessoal(sq.name, sq.description)).map(sq => ({ ...sq, contexts: (sq.contexts || []).filter(c => !ehContextoPessoal(c)) }))
-        : squadsData);
-      setCollaborators(collabData.filter(c => (c.status || "active") === "active" && !(servidora && ehColaboradorOculto(c.name))));
-    } catch (err) {
-      console.error("Erro ao carregar dados:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { loadData(); }, []);
-
-  const squadsInContext = useMemo(() =>
-    squads.filter(s => (s.status || "active") === "active" && (s.contexts || []).includes(selectedContext)),
-  [squads, selectedContext]);
-
-  const openAdd = () => {
-    setEditingSquad(null);
-    setForm({ name: "", description: "", icon: "📸", link: "", contexts: [selectedContext], collaborator_ids: [], documents: [], status: "active" });
-    setUploadError(null);
-    setShowForm(true);
-  };
-
-  const openEdit = (squad: Squad) => {
-    setEditingSquad(squad);
-    setForm({
-      name: squad.name,
-      description: squad.description || "",
-      icon: squad.icon || "📸",
-      link: squad.link || "",
-      contexts: squad.contexts || [],
-      collaborator_ids: squad.collaborator_ids || [],
-      documents: squad.documents || [],
-      status: squad.status || "active",
-    });
-    setUploadError(null);
-    setShowForm(true);
-  };
 
   // --- Upload de documentos ---
 
@@ -251,6 +254,96 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
       return { ...f, collaborator_ids: arr };
     });
   };
+  const loadData = async () => {
+    try {
+      const [squadsData, collabData] = await Promise.all([getSquads(), getCollaborators()]);
+      setSquads(servidora
+        ? squadsData.filter(sq => !ehPessoal(sq.name, sq.description)).map(sq => ({ ...sq, contexts: (sq.contexts || []).filter(c => !ehContextoPessoal(c)) }))
+        : squadsData);
+      setCollaborators(collabData.filter(c => (c.status || "active") === "active" && !(servidora && ehColaboradorOculto(c.name))));
+    } catch (err) {
+      console.error("Erro ao carregar dados:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadData(); }, []);
+
+  // Resumo (caminho, última, estado) e jobs rodando: mesma fonte do JobsMonitor (/api/jobs)
+  const atualizaVivo = useCallback(async () => {
+    const [r, j] = await Promise.all([buscaResumoSquads(), buscaJobs()]);
+    if (r) setResumo(r);
+    if (j) setJobs(j);
+  }, []);
+  useEffect(() => {
+    atualizaVivo();
+    const id = setInterval(atualizaVivo, 15000);
+    return () => clearInterval(id);
+  }, [atualizaVivo]);
+
+  const resumoDe = useCallback((s: Squad) => {
+    const code = codigoDaSquad(s.link);
+    return code ? resumo?.find((x) => x.code === code) : undefined;
+  }, [resumo]);
+
+  const { reais, rascunhos } = useMemo(
+    () => separaSquads(squads, resumo ? new Set(resumo.map((x) => x.code)) : null),
+    [squads, resumo],
+  );
+
+  const categoriaDe = useCallback((s: Squad): Filtro => {
+    const c = resumoDe(s)?.categoria;
+    if (c) return c;
+    return (s.contexts || []).includes("IGAM") ? "igam" : "conteudo";
+  }, [resumoDe]);
+
+  const visiveis = useMemo(
+    () => reais.filter((s) => filtro === "todas" || categoriaDe(s) === filtro),
+    [reais, filtro, categoriaDe],
+  );
+  const contagem = (f: Filtro) => (f === "todas" ? reais.length : reais.filter((s) => categoriaDe(s) === f).length);
+
+  // Squads rodando agora (jobs reais) ligadas a um card
+  const rodando = useMemo(() => {
+    const ativos = jobs.filter((j) => j.status === "running" && !j.userStatus);
+    return ativos.map((j) => {
+      const sq = reais.find((s) => codigoDaSquad(s.link) === j.squad);
+      const rs = resumo?.find((x) => x.code === j.squad);
+      return { job: j, squad: sq, resumo: rs };
+    });
+  }, [jobs, reais, resumo]);
+
+  const descricaoCurta = (s: Squad): string => {
+    const r = resumoDe(s);
+    if (r?.descricao) return r.descricao;
+    const t = (s.description || "").replace(/\s+/g, " ").trim();
+    const i = t.search(/[.](\s|$)/);
+    return i > 0 ? t.slice(0, i + 1) : t;
+  };
+
+  const openEdit = (squad: Squad) => {
+    setEditingSquad(squad);
+    setForm({
+      name: squad.name,
+      description: squad.description || "",
+      icon: squad.icon || "📸",
+      link: squad.link || "",
+      contexts: squad.contexts || [],
+      collaborator_ids: squad.collaborator_ids || [],
+      documents: squad.documents || [],
+      status: squad.status || "active",
+    });
+    setUploadError(null);
+    setShowForm(true);
+  };
+
+  const ultimaTexto = (s: Squad) => {
+    const u = resumoDe(s)?.ultima;
+    if (!u) return null;
+    const t = (u.topico || "").replace(/\s+/g, " ").trim();
+    return `${quandoCurto(u.quando)}${t ? " · " + (t.length > 56 ? t.slice(0, 55).trimEnd() + "…" : t) : ""}`;
+  };
 
   if (loading) {
     return (
@@ -260,146 +353,109 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
     );
   }
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Header */}
-      <header className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] flex items-center px-3 md:px-5 gap-2 md:gap-4 shrink-0 h-14">
-        <button onClick={() => onNavigate("office")} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors text-sm">
-          ← Escritório
-        </button>
-        <h1 className="text-lg font-semibold">Squads</h1>
-        <span className="text-[var(--text-secondary)] text-sm">
-          <span className="text-[var(--text-primary)] font-medium">{squads.filter(s => s.status !== "inactive").length}</span> ativos
-        </span>
-        <div className="flex-1" />
-        <button onClick={openAdd} className="btn-primary !py-2 !px-4 text-sm">
-          + Novo Squad
-        </button>
-      </header>
+  const chip = (ativo: boolean) =>
+    `shrink-0 text-[13px] font-bold rounded-full px-3.5 py-1.5 border cursor-pointer transition-colors ${
+      ativo ? "bg-[var(--ac)] text-[var(--on-ac)] border-[var(--ac)]"
+            : "bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-light)] hover:text-[var(--text-primary)]"}`;
+  const btnRodar = "inline-flex items-center gap-1 rounded-full px-4 py-2 text-[13px] font-bold cursor-pointer bg-[var(--ac)] text-[var(--on-ac)] hover:opacity-90";
+  const btnSec = "inline-flex items-center gap-1 rounded-full px-4 py-2 text-[13px] font-bold cursor-pointer border border-[var(--border-light)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]";
 
-      {/* Body: split layout */}
-      <div className="flex-1 p-4 overflow-hidden">
-        <div className="win-border-outset flex h-full" style={{ background: "var(--win-surface)" }}>
-
-          {/* Left — Context list (recolhível: vira trilho de ícones) */}
-          <div className="shrink-0 border-r border-[var(--border)] flex flex-col transition-all" style={{ width: setoresRecolhido ? 52 : 180, background: "var(--bg-secondary)" }}>
-            <div className="win-titlebar flex items-center justify-between gap-1" style={{ fontSize: 10 }}>
-              {!setoresRecolhido && <span>Setores</span>}
-              <button
-                onClick={() => toggleSetores()}
-                className="px-1 cursor-pointer opacity-80 hover:opacity-100"
-                title={setoresRecolhido ? "Expandir setores" : "Recolher setores"}
-              >
-                {setoresRecolhido ? "»" : "«"}
-              </button>
+  const cartao = (squad: Squad, motivo?: MotivoRascunho) => {
+    const r = resumoDe(squad);
+    const ult = ultimaTexto(squad);
+    const roda = rodando.some((x) => x.squad?.id === squad.id);
+    return (
+      <article key={squad.id} className="relative rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 md:p-5 flex flex-col gap-3 min-w-0">
+        <div className="flex items-start gap-2">
+          <h2 className="flex-1 min-w-0 text-lg font-bold leading-snug text-[var(--text-primary)] break-words">
+            <span className="mr-1.5" aria-hidden>{squad.icon || "📸"}</span>{squad.name}
+          </h2>
+          <button onClick={() => setMenuAberto(menuAberto === squad.id ? null : squad.id)} aria-label={`Mais opções de ${squad.name}`}
+            className="shrink-0 w-8 h-8 -mt-1 -mr-1 rounded-lg text-lg leading-none text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] cursor-pointer">⋯</button>
+          {menuAberto === squad.id && (
+            <div className="absolute right-3 top-12 z-20 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg py-1 min-w-[140px]">
+              <button onClick={() => { setMenuAberto(null); openEdit(squad); }} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--bg-tertiary)] cursor-pointer">✏️ Editar</button>
+              <button onClick={() => { setMenuAberto(null); handleDelete(squad.id); }} className="w-full text-left px-3 py-2 text-sm text-[var(--danger)] hover:bg-[var(--bg-tertiary)] cursor-pointer">🗑️ Excluir</button>
             </div>
-            <div className="flex-1 overflow-auto py-1">
-              {CONTEXTS.map(ctx => {
-                const count = squads.filter(s => s.status !== "inactive" && (s.contexts || []).includes(ctx)).length;
-                return (
-                  <button key={ctx} onClick={() => setSelectedContext(ctx)}
-                    title={ctx}
-                    className={`w-full flex items-center gap-2 py-2.5 text-left transition-all text-sm cursor-pointer ${
-                      setoresRecolhido ? "justify-center px-0" : "px-3"
-                    } ${
-                      selectedContext === ctx
-                        ? "bg-[var(--accent-soft)] text-[var(--text-primary)] font-semibold"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
-                    }`}>
-                    <span className="relative">
-                      {CONTEXT_ICONS[ctx] || "📁"}
-                      {setoresRecolhido && count > 0 && (
-                        <span className="absolute -top-1.5 -right-2 text-[9px] font-bold px-1 rounded-full"
-                          style={{ background: "var(--accent)", color: "#fff" }}>
-                          {count}
-                        </span>
-                      )}
-                    </span>
-                    {!setoresRecolhido && <span className="flex-1 truncate">{ctx}</span>}
-                    {!setoresRecolhido && count > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                        style={{ background: selectedContext === ctx ? "var(--accent)" : "var(--bg-tertiary)", color: selectedContext === ctx ? "#fff" : "var(--text-muted)" }}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right — Squads list */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="win-titlebar" style={{ fontSize: 10 }}>
-              {CONTEXT_ICONS[selectedContext]} {selectedContext} — Squads
-            </div>
-            <div className="flex-1 overflow-auto p-4">
-              {squadsInContext.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-                  <span className="text-4xl opacity-30">🤖</span>
-                  <p className="text-sm text-[var(--text-secondary)]">Nenhum squad em {selectedContext}</p>
-                  <button onClick={openAdd} className="btn-secondary !py-1.5 !px-3 text-xs">
-                    + Criar primeiro squad
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {squadsInContext.map(squad => (
-                    <div key={squad.id} className="room-card group relative" style={{ cursor: "default" }}>
-                      <div className="room-card-header flex items-center justify-between">
-                        <span className="flex items-center gap-2 min-w-0 flex-1">
-                          <span>{squad.icon || "📸"}</span>
-                          <span className="truncate">{squad.name}</span>
-                        </span>
-                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                          <button
-                            onClick={e => { e.stopPropagation(); openRunModal(squad); }}
-                            title="Iniciar squad com um tópico"
-                            className="flex items-center gap-1 text-white/95 hover:text-white bg-emerald-500/30 hover:bg-emerald-500/50 px-2 py-0.5 rounded text-[10px] font-semibold transition-all whitespace-nowrap cursor-pointer"
-                          >
-                            ▶️ Iniciar
-                          </button>
-                          <a
-                            href={squad.link || `${SQUAD_API_BASE}/office`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            title="Abrir Escritório Virtual"
-                            className="flex items-center gap-1 text-white/90 hover:text-white bg-white/15 hover:bg-white/25 px-2 py-0.5 rounded text-[10px] font-semibold transition-all no-underline whitespace-nowrap"
-                          >
-                            🏢 Escritório
-                          </a>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openEdit(squad)} className="text-white/70 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer" title="Editar">✏️</button>
-                            <button onClick={() => handleDelete(squad.id)} className="text-white/70 hover:text-white px-1.5 py-0.5 rounded text-xs cursor-pointer" title="Excluir">🗑️</button>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="room-card-body flex-col !items-start gap-2">
-                        {squad.description && (
-                          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">{squad.description}</p>
-                        )}
-                        {/* Pipeline de colaboradores */}
-                        <PipelineView collaboratorIds={squad.collaborator_ids || []} collaborators={collaborators} />
-                        {/* Badge dos contextos */}
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {(squad.contexts || []).map(ctx => (
-                            <span key={ctx} className="text-[9px] px-1.5 py-0.5 rounded font-medium"
-                              style={{ background: ctx === selectedContext ? "var(--af-teal)" : "var(--bg-tertiary)", color: ctx === selectedContext ? "#fff" : "var(--text-muted)" }}>
-                              {CONTEXT_ICONS[ctx]} {ctx}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          )}
         </div>
+        {motivo && <p className="text-xs text-[var(--text-muted)] -mt-2">Guardada aqui porque: {motivo}</p>}
+        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{descricaoCurta(squad)}</p>
+        {r && <Caminho caminho={r.caminho} />}
+        <div className="mt-auto flex items-center gap-3 flex-wrap">
+          <p className="flex-1 min-w-[10rem] text-[13px] text-[var(--text-secondary)] flex items-center gap-1.5">
+            {roda
+              ? <><span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse shrink-0" /> Rodando agora</>
+              : ult
+                ? <><span className="w-2 h-2 rounded-full bg-[var(--success)] shrink-0" /> <span>Última: {ult}</span></>
+                : <><span className="w-2 h-2 rounded-full border border-[var(--text-muted)] shrink-0" /> Ainda não rodou de verdade</>}
+          </p>
+          <button onClick={() => openRunModal(squad)} className={btnRodar}>▶ Rodar</button>
+          <button onClick={() => setEntregasDe(squad)} className={btnSec}>Entregas</button>
+        </div>
+      </article>
+    );
+  };
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden" onClick={() => menuAberto && setMenuAberto(null)}>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 py-4 space-y-4">
+        {/* Rodando agora: só aparece quando há execução de verdade */}
+        {rodando.map(({ job, squad, resumo: rs }) => {
+          const etapa = rs?.estado?.etapa ?? 0, total = rs?.estado?.total ?? 0;
+          const pct = total > 0 ? Math.min(100, Math.round((etapa / total) * 100)) : 0;
+          return (
+            <div key={job.jobId} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] px-4 py-3 flex items-center gap-3 flex-wrap">
+              <span className="w-3 h-3 rounded-full bg-[var(--success)] animate-pulse shrink-0" aria-hidden />
+              <b className="text-[var(--text-primary)]">{squad?.name || rs?.nome || job.squad}</b>
+              <span className="text-sm text-[var(--text-secondary)] flex-1 min-w-[12rem]">
+                rodando agora{total > 0 ? ` · etapa ${Math.min(etapa + 1, total)} de ${total}` : ""}{rs?.estado?.rotulo ? ` · ${rs.estado.rotulo}` : ""}
+              </span>
+              {total > 0 && (
+                <span className="h-2 w-full sm:w-48 rounded-full bg-[var(--bg-tertiary)] overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                  <span className="block h-full rounded-full bg-[var(--ac)]" style={{ width: `${Math.max(pct, 4)}%` }} />
+                </span>
+              )}
+              {squad && <button onClick={() => setEntregasDe(squad)} className={btnSec}>Acompanhar</button>}
+            </div>
+          );
+        })}
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filtrar squads">
+          {FILTROS.map((f) => (
+            <button key={f.id} onClick={() => setFiltro(f.id)} aria-pressed={filtro === f.id} className={chip(filtro === f.id)}>
+              {f.rotulo}{f.id === "todas" ? ` (${contagem(f.id)})` : ""}
+            </button>
+          ))}
+        </div>
+
+        {visiveis.length === 0 ? (
+          <div className="text-center py-16 text-sm text-[var(--text-secondary)]">
+            <p className="text-4xl opacity-30 mb-2">🤖</p>
+            Nenhuma squad {filtro === "todas" ? "ainda" : "neste filtro"}.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-stretch">{visiveis.map((s) => cartao(s))}</div>
+        )}
+
+        {rascunhos.length > 0 && (
+          <section className="rounded-2xl border border-dashed border-[var(--border-light)]">
+            <button onClick={() => setRascunhosAbertos((v) => !v)} aria-expanded={rascunhosAbertos}
+              className="w-full text-left px-4 py-3 text-sm text-[var(--text-secondary)] cursor-pointer flex items-center gap-2">
+              <span>🧪 Rascunhos e testes ({rascunhos.length})</span>
+              <span className="hidden sm:inline text-[var(--text-muted)]">· squads de teste e cópias repetidas ficam guardadas aqui, fora da vista</span>
+              <span className="ml-auto">{rascunhosAbertos ? "⌄" : "›"}</span>
+            </button>
+            {rascunhosAbertos && (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 p-4 pt-0">
+                {rascunhos.map(({ squad, motivo }) => cartao(squad, motivo))}
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
+      {entregasDe && <EntregasModal squad={entregasDe} jobs={jobs} onFechar={() => setEntregasDe(null)} />}
       {/* Modal — Criar/Editar Squad */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -578,13 +634,64 @@ export default function SquadsPage({ onNavigate }: SquadsPageProps) {
           </div>
         </div>
       )}
-
       {/* Modal — Iniciar Squad (componente reutilizável) */}
       <StartSquadModal
         squad={runningSquad}
         open={showRunModal}
-        onClose={() => setShowRunModal(false)}
+        onClose={() => { setShowRunModal(false); atualizaVivo(); }}
       />
     </div>
+  );
+}
+
+// ── Entregas: rodadas recentes da squad e os arquivos que ela deixou ──
+function EntregasModal({ squad, jobs, onFechar }: { squad: Squad; jobs: JobResumo[]; onFechar: () => void }) {
+  const code = codigoDaSquad(squad.link);
+  const meus = jobs.filter((j) => j.squad === code);
+  const [arquivos, setArquivos] = useState<{ name: string; size: number }[] | null>(null);
+  const ref = meus.find((j) => j.status === "completed") || meus[0];
+  useEffect(() => {
+    if (!ref) { setArquivos([]); return; }
+    squadFetch(`/api/jobs/${ref.jobId}/files`).then((r) => r.json()).then((d) => setArquivos(d.files || [])).catch(() => setArquivos([]));
+  }, [ref]);
+  const abrir = async (nome: string) => {
+    if (!ref) return;
+    const r = await squadFetch(`/api/jobs/${ref.jobId}/files/${encodeURIComponent(nome)}`);
+    const url = URL.createObjectURL(await r.blob());
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  };
+  const estado: Record<string, string> = { completed: "concluída", running: "rodando", failed: "falhou", paused: "pausada", interrupted: "interrompida" };
+  return (
+    <Janela titulo={`Entregas · ${squad.name}`} subtitulo="O que essa squad já rodou e o que deixou pronto" onFechar={onFechar} largura="media">
+      <div className="space-y-5">
+        <section>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">Rodadas recentes</h3>
+          {meus.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">Ainda não rodou de verdade.</p> : (
+            <ul className="divide-y divide-[var(--border)]">
+              {meus.slice(0, 8).map((j) => (
+                <li key={j.jobId} className="py-2 flex items-baseline gap-3 text-sm">
+                  <span className="text-[var(--text-muted)] shrink-0 w-20">{quandoCurto(j.completedAt || j.startedAt)}</span>
+                  <span className="flex-1 min-w-0 truncate text-[var(--text-primary)]">{j.topic}</span>
+                  <span className="text-xs text-[var(--text-secondary)] shrink-0">{estado[j.status] || j.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-2">Arquivos na pasta de saída</h3>
+          {arquivos === null ? <p className="text-sm text-[var(--text-muted)]">carregando…</p>
+            : arquivos.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">Nenhum arquivo por aqui.</p> : (
+            <ul className="flex flex-wrap gap-2">
+              {arquivos.map((a) => (
+                <li key={a.name}><button onClick={() => abrir(a.name)}
+                  className="text-xs px-3 py-1.5 rounded-full border border-[var(--border-light)] bg-[var(--bg-secondary)] hover:border-[var(--accent)] cursor-pointer">{a.name}</button></li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </Janela>
   );
 }

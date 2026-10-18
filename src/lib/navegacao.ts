@@ -52,10 +52,12 @@ export const PAGINAS_BUSCA: EntradaBusca[] = [
   { tipo: "página", titulo: "Máquina › Mapa", detalhe: "o que roda sozinho", ir: "/maquina?aba=mapa", chave: "fluxos automacoes cron" },
   { tipo: "página", titulo: "Máquina › Squads", detalhe: "equipes de agentes", ir: "/maquina?aba=squads", chave: "squad opensquad" },
   { tipo: "página", titulo: "Máquina › Saúde", detalhe: "tudo funcionando?", ir: "/maquina?aba=saude", chave: "status semaforo vps integracoes" },
-  { tipo: "página", titulo: "Equipe › Agentes", detalhe: "quem trabalha por você", ir: "/equipe?aba=agentes", chave: "colaboradores personas setores" },
-  { tipo: "página", titulo: "Equipe › Habilidades", detalhe: "skills, prompts e plugins", ir: "/equipe?aba=habilidades", chave: "biblioteca skills prompts plugins grafo" },
+  { tipo: "página", titulo: "Equipe › Agentes", detalhe: "quem trabalha por você", ir: "/equipe?aba=agentes", chave: "colaboradores personas fichas" },
+  { tipo: "página", titulo: "Equipe › Habilidades", detalhe: "skills, prompts e plugins", ir: "/equipe?aba=habilidades", chave: "biblioteca skills prompts plugins habilidades" },
   { tipo: "página", titulo: "Números", detalhe: "métricas e diário", ir: "/numeros", chave: "metricas diario de bordo produtividade" },
-  { tipo: "página", titulo: "Ajustes", detalhe: "conta e integrações", ir: "/config", chave: "config conta senha integracoes" },
+  { tipo: "página", titulo: "Ajustes", detalhe: "conta e atalhos", ir: "/config", chave: "config conta senha integracoes criacoes links notion drive" },
+  { tipo: "página", titulo: "Ajustes › Organização da equipe", detalhe: "setores e atalhos rápidos (avançado)", ir: "/config", chave: "setores atalhos rapidos rh" },
+  { tipo: "página", titulo: "Ajustes › Grafo", detalhe: "grafo de conhecimento (avançado)", ir: "/config", chave: "grafo conhecimento" },
 ];
 
 /**

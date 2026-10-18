@@ -6,7 +6,6 @@ import { useAbaUrl } from "@/lib/navegacao";
 import SquadsPage from "./SquadsPage";
 import SaudePage from "./SaudePage";
 import { useRouter } from "next/navigation";
-import { pageToPath } from "@/lib/painel-context";
 
 // O editor de desenho (@xyflow + roughjs) é pesado: só chega quando o Mapa abre.
 const FlowsPageV2 = dynamic(() => import("./flow/FlowsPageV2"), {
@@ -28,10 +27,16 @@ export default function MaquinaPage() {
         { id: "mapa", rotulo: "🗺️ Mapa" },
         { id: "squads", rotulo: "🤖 Squads" },
         { id: "saude", rotulo: "🩺 Saúde" },
-      ]} />
+      ]} direita={aba === "squads" ? (
+        <button
+          onClick={() => router.push("/conversa?agente=jarbas&texto=" + encodeURIComponent("Quero criar uma squad para "))}
+          title="A criação de squads acontece numa conversa com o Jarbas"
+          className="my-2 shrink-0 whitespace-nowrap rounded-full border border-[var(--ac)] px-4 py-1.5 text-[13px] font-bold text-[var(--ac)] hover:bg-[var(--accent-soft)] cursor-pointer"
+        >+ Nova squad <span className="hidden sm:inline">(pelo chat)</span></button>
+      ) : undefined} />
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         {aba === "mapa" && <FlowsPageV2 />}
-        {aba === "squads" && <SquadsPage onNavigate={(p: string) => router.push(pageToPath(p))} />}
+        {aba === "squads" && <SquadsPage />}
         {aba === "saude" && <SaudePage />}
       </div>
     </div>

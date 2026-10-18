@@ -5,12 +5,14 @@ import { supabase } from "@/lib/supabase";
 import { useMetricsHistory, tempoRelativo } from "@/lib/metrics";
 import type { User } from "@supabase/supabase-js";
 import { usePainel } from "@/lib/painel-context";
+import HRPage from "./HRPage";
+import BibliotecaPage from "./BibliotecaPage";
 
 // Config: Conta (perfil + segurança) e Integrações (status real de cada serviço).
 const STATUS_URL =
   "https://pmmyqljiuslstwbmiron.supabase.co/storage/v1/object/public/status/status.json";
 
-type SubPage = "conta" | "integracoes";
+type SubPage = "conta" | "atalhos" | "organizacao" | "grafo";
 
 // ─────────────────────────── Aba Conta ───────────────────────────
 
@@ -168,11 +170,13 @@ interface StatusSaude {
 // ─────────────────────────── Página ───────────────────────────
 
 export default function ConfigPage() {
+  const { reload } = usePainel();
   const [subPage, setSubPage] = useState<SubPage>("conta");
   const aba = (id: SubPage, rotulo: string) => (
     <button
       onClick={() => setSubPage(id)}
-      className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
+      aria-current={subPage === id ? "page" : undefined}
+      className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-all cursor-pointer ${
         subPage === id
           ? "border-[var(--accent)] text-[var(--text-primary)]"
           : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -183,13 +187,26 @@ export default function ConfigPage() {
   );
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0 overflow-x-auto">
         <h1 className="text-base md:text-lg font-semibold mr-4 py-3">Config</h1>
         {aba("conta", "👤 Conta")}
+        {aba("atalhos", "🔗 Atalhos")}
+        {aba("organizacao", "🏢 Organização da equipe (avançado)")}
+        {aba("grafo", "🕸️ Grafo (avançado)")}
       </div>
-      <div className="flex-1 overflow-auto">
-        <ContaTab />
+      <div className="flex-1 min-h-0 overflow-auto flex flex-col">
+        {subPage === "conta" && <ContaTab />}
+        {subPage === "atalhos" && <BibliotecaPage modo="atalhos" />}
+        {subPage === "organizacao" && (
+          <div className="flex-1 min-h-0 flex flex-col px-3 md:px-5">
+            <p className="text-xs text-[var(--text-muted)] pt-3">
+              Setores (as áreas onde cada agente atua) e os atalhos rápidos da tela Hoje. Antes ficavam dentro de “Gestão de RH”.
+            </p>
+            <div className="flex-1 min-h-0"><HRPage modo="organizacao" onDataChanged={reload} /></div>
+          </div>
+        )}
+        {subPage === "grafo" && <BibliotecaPage modo="grafo" />}
       </div>
     </div>
   );
