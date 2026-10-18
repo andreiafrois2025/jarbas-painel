@@ -330,8 +330,9 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
 
       {/* ===== CONVERSA ===== */}
       <section className={`flex-1 min-w-0 min-h-0 flex flex-col ${compacto && telaCelular === "lista" ? "max-md:hidden" : ""}`}>
-        {compacto && cabecalho && <div className="max-md:hidden shrink-0">{cabecalho}</div>}
-        <header className={`flex items-center gap-3 flex-wrap ${compacto ? "px-4 md:px-6 2xl:px-10 py-1.5" : "px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]"}`}>
+        {/* 18/10: cabeçalho (saudação + agente) em faixa de outra cor, para não se misturar com a área das mensagens */}
+        {compacto && cabecalho && <div className="max-md:hidden shrink-0 bg-[var(--bg-secondary)]">{cabecalho}</div>}
+        <header className={`flex items-center gap-3 flex-wrap ${compacto ? "px-4 md:px-6 2xl:px-10 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)] shadow-[0_2px_8px_var(--sombra)] relative z-[1]" : "px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]"}`}>
           {compacto ? (
             <div className="flex items-center gap-2 flex-1 basis-40 min-w-0">
               <button onClick={() => setTelaCelular("lista")} aria-label="Voltar para a lista de agentes"
