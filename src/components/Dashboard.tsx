@@ -183,7 +183,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
       <ProvedorUI>
       <div className="flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]" style={{ height: "var(--app-h, 100dvh)" }}>
         {/* ===== BARRA DO TOPO ===== */}
-        <header className="shrink-0 flex flex-wrap items-center gap-x-1.5 md:gap-x-3 gap-y-2 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-5 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)] pb-2 md:pt-0 md:pb-0 md:h-[60px] border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+        <header className="shrink-0 flex flex-wrap items-center gap-x-1.5 md:gap-x-3 gap-y-2 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-5 pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] pb-2.5 md:pt-0 md:pb-0 md:h-[60px] border-b border-[var(--border)] bg-[var(--bg-secondary)]">
           <button onClick={() => router.push("/conversa")} className="order-1 flex items-center gap-2 md:gap-2.5 cursor-pointer min-w-0" title="Ir para a Conversa">
             <Mascote nome="jarbas" emoji="⚡" tamanho={36} grande className="max-md:!w-8 max-md:!h-8" />
             <span className="fonte-maquina max-md:!font-[family-name:var(--font-manrope)] max-md:!font-extrabold text-[22px] max-md:text-[18px] leading-none text-[var(--ac)] max-md:text-[var(--text-primary)]">Jarbas</span>
