@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 // Tela Conversa (painel v2): saudação + o chat do Jarbas no centro; à direita
 // (~360px) o dia dela: Hoje, Esperando você e Notícias.
 //
@@ -223,6 +225,11 @@ export default function ConversaPage() {
             <h1 className="fonte-maquina m-0 text-[22px] md:text-[28px] leading-tight text-[var(--text-primary)]">{saudacao()}, Andréia</h1>
             <p className="m-0 mt-0.5 text-sm text-[var(--text-secondary)]">{dataPorExtenso()}{espera}</p>
           </div>
+          {/* 19/10/2026: atalho para o Escritório (ver a equipe trabalhando; bom para aula) */}
+          <Link href="/equipe?aba=escritorio" title="Abrir o escritório: ver a equipe trabalhando"
+            className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm font-bold text-[var(--text-primary)] no-underline hover:bg-[var(--bg-tertiary)]">
+            🏢<span className="max-md:hidden">Escritório</span>
+          </Link>
         </div>
         )} />
       </div>

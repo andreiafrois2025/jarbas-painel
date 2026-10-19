@@ -107,7 +107,9 @@ function DescricaoRH({ c, fallback }: { c?: Collaborator; fallback: string }) {
 // (a escolha vira um seletor no topo), caixa de texto grande embaixo.
 // `servidora` (modo Só Igam): sem agentes pessoais e sem abrir conversa antiga,
 // porque o histórico pode citar assunto de casa.
-export default function ChatPage({ compacto = false, servidora = false, cabecalho }: { compacto?: boolean; servidora?: boolean; cabecalho?: React.ReactNode }) {
+// `agenteFixo` (19/10/2026, Escritório): chat embutido ao lado dos bonequinhos, já com o agente escolhido,
+// sem a lista de pessoas; a seta de voltar chama `aoFechar`.
+export default function ChatPage({ compacto = false, servidora = false, cabecalho, agenteFixo, aoFechar }: { compacto?: boolean; servidora?: boolean; cabecalho?: React.ReactNode; agenteFixo?: string; aoFechar?: () => void }) {
   const { collaborators } = usePainel();
   const perfilDe = useCallback((a?: Agente) => (a ? collaborators.find((c) => c.name.trim().toLowerCase() === a.nome.toLowerCase()) : undefined), [collaborators]);
   const [abertos, setAbertos] = useState<Set<string>>(new Set()); // itens da lista com a descrição aberta
@@ -142,7 +144,8 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   // Lista lateral de agentes (modo compacto): recolhida mostra só as fotos; no celular
   // a lista é a primeira tela e o chat abre ao tocar num agente.
   const [recolhida, setRecolhida] = useState(false);
-  const [telaCelular, setTelaCelular] = useState<"lista" | "chat">("lista");
+  const [telaCelular, setTelaCelular] = useState<"lista" | "chat">(agenteFixo ? "chat" : "lista");
+  useEffect(() => { if (agenteFixo) { setAgenteId(agenteFixo); setTelaCelular("chat"); } }, [agenteFixo]);
   // Celular: placeholder curto, cabe em uma linha
   const [celular, setCelular] = useState(false);
   useEffect(() => {
@@ -218,7 +221,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     try {
       // ?agente=izzy (vindo do Escritório) vale mais que o último agente do aparelho
       const pedido = new URLSearchParams(window.location.search).get("agente");
-      const s = pedido && /^[a-z]{3,10}$/.test(pedido) ? pedido : window.localStorage.getItem("chatAgente");
+      const s = agenteFixo || (pedido && /^[a-z]{3,10}$/.test(pedido) ? pedido : window.localStorage.getItem("chatAgente"));
       if (s) setAgenteId(s);
       // ?texto=... (ex.: "+ Nova squad") deixa a mensagem escrita, pronta para ela completar
       const rascunho = new URLSearchParams(window.location.search).get("texto");
@@ -424,7 +427,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       </aside>}
 
       {/* ===== LISTA DE AGENTES (estilo WhatsApp) ===== */}
-      {compacto && (
+      {compacto && !agenteFixo && (
         <ListaAgentes agentes={ordem} ativo={agenteId} previas={previas} recolhida={recolhida} onAlternar={alternarLista}
           aoEscolher={(id) => { setAgenteId(id); setTelaCelular("chat"); }} cabecalho={cabecalho}
           className={telaCelular === "chat" ? "max-md:hidden" : ""} />
@@ -437,11 +440,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
         <header className={`flex items-center gap-3 flex-wrap ${compacto ? "px-4 md:px-6 2xl:px-10 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)] shadow-[0_2px_8px_var(--sombra)] relative z-[1]" : "px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]"}`}>
           {compacto ? (
             <div className="flex items-center gap-2 flex-1 basis-40 min-w-0">
-              <button onClick={() => setTelaCelular("lista")} aria-label="Voltar para a lista de agentes"
-                className="md:hidden h-10 w-10 -ml-2 shrink-0 inline-flex items-center justify-center rounded-full text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer">
+              <button onClick={() => (aoFechar ? aoFechar() : setTelaCelular("lista"))} aria-label={aoFechar ? "Fechar a conversa" : "Voltar para a lista de agentes"}
+                className={`${aoFechar ? "" : "md:hidden "}h-10 w-10 -ml-2 shrink-0 inline-flex items-center justify-center rounded-full text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer`}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
               </button>
-              <span className="md:hidden"><Avatar a={agente} tamanho={32} /></span>
+              <span className={aoFechar ? "" : "md:hidden"}><Avatar a={agente} tamanho={32} /></span>
               <div className="min-w-0">
                 <p className="m-0 text-sm font-bold text-[var(--text-primary)] leading-tight truncate">{agente?.nome ?? "Chat"}</p>
                 <p className="m-0 text-xs text-[var(--text-secondary)] truncate">{perfilDe(agente)?.specialization || agente?.cargo}</p>

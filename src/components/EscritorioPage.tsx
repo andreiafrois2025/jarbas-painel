@@ -11,8 +11,8 @@
 // Modo aula: usa SÓ um roteiro de exemplo, nunca dado real.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Mascote from "./Mascote";
+import ChatPage from "./ChatPage";
 import Ambiente from "./EscritorioAmbiente";
 import { usePainel } from "@/lib/painel-context";
 import { ehColaboradorOculto, ehPessoal } from "@/lib/modo";
@@ -54,7 +54,6 @@ interface Vivo extends AgenteVivo { tarefaTxt?: string }
 interface Evento extends EventoMural { id: string }
 
 export default function EscritorioPage() {
-  const router = useRouter();
   const { servidora } = usePainel();
 
   const [dados, setDados] = useState<DadosEscritorio | null>(null);
@@ -68,6 +67,10 @@ export default function EscritorioPage() {
   const trechos = useMemo(() => roteiro?.trechos ?? [], [roteiro]);
   const checkpoints = useMemo(() => roteiro?.checkpoints ?? [], [roteiro]);
   const [sel, setSel] = useState<string | null>(null);
+  // Conversa embutida (19/10/2026): "Conversar" abre o chat ao lado dos bonequinhos, sem sair da tela
+  const [conversa, setConversa] = useState<string | null>(null);
+  const rapido = useRef(false);
+  rapido.current = !!conversa;
   const [lugar, setLugar] = useState<Record<string, Lugar>>({});
   const [ocioVis, setOcioVis] = useState<Record<string, number>>({});
   const [entregaBal, setEntregaBal] = useState<Record<string, { texto: string; ate: number; visita?: boolean }>>({});
@@ -167,9 +170,11 @@ export default function EscritorioPage() {
       } catch { if (vivo) setErro(true); }
     };
     anterior.current = null; muralVisto.current = null;
-    buscar();
-    const t = setInterval(buscar, ATUALIZA_MS);
-    return () => { vivo = false; clearInterval(t); };
+    // com a conversa aberta, confere a cada 5 s (para ver o agente começar a trabalhar logo); senão, 25 s
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const ciclo = async () => { await buscar(); if (vivo) t = setTimeout(ciclo, rapido.current ? 5000 : ATUALIZA_MS); };
+    ciclo();
+    return () => { vivo = false; if (t) clearTimeout(t); };
   }, [aula, servidora, darEntrega, mascara]);
 
   // ── modo aula: relógio do roteiro ─────────────────────────────────────
@@ -596,13 +601,20 @@ export default function EscritorioPage() {
               entregas={dados?.entregas[selPerfil.id]}
               desdeRegistro={vivos[selPerfil.id]?.desde}
               onFechar={() => setSel(null)}
-              onConversar={() => router.push(`/conversa?agente=${selPerfil.id}`)}
+              onConversar={() => { setConversa(selPerfil.id); setSel(null); }}
             />
           )}
         </div>
 
+        {/* Conversa embutida: no lugar do mural (lateral no computador, embaixo no celular) */}
+        {conversa && !aula && (
+          <aside className="md:w-[400px] lg:w-[440px] shrink-0 border-t md:border-t-0 md:border-l border-[var(--border)] bg-[var(--bg-primary)] flex flex-col min-h-0 h-[72dvh] md:h-auto">
+            <ChatPage compacto servidora={servidora} agenteFixo={conversa} aoFechar={() => setConversa(null)} />
+          </aside>
+        )}
+
         {/* Mural */}
-        <aside className="md:w-[330px] lg:w-[360px] shrink-0 border-t md:border-t-0 md:border-l border-[var(--border)] bg-[var(--bg-secondary)] p-4 md:overflow-y-auto flex flex-col gap-3">
+        <aside className={`md:w-[330px] lg:w-[360px] shrink-0 border-t md:border-t-0 md:border-l border-[var(--border)] bg-[var(--bg-secondary)] p-4 md:overflow-y-auto flex flex-col gap-3 ${conversa && !aula ? "hidden" : ""}`}>
           <h3 className="m-0 text-xs font-bold uppercase tracking-[0.09em] text-[var(--text-secondary)]">Agora no escritório</h3>
           <div className="grid grid-cols-3 gap-2">
             {[[placar.t, "trabalhando"], [placar.l, "livres"], [placar.e, "entregas hoje"]].map(([n, r]) => (
