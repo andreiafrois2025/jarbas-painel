@@ -141,6 +141,13 @@ export default function JobsMonitor() {
     return () => clearInterval(id);
   }, [fetchData]);
 
+  // A Conversa (Esperando você) manda abrir a faixa quando o botão é de uma parada de squad
+  useEffect(() => {
+    const abrir = () => setExpanded(true);
+    window.addEventListener("abrir-aprovacoes", abrir);
+    return () => window.removeEventListener("abrir-aprovacoes", abrir);
+  }, []);
+
   const pendingCount = Object.values(pendings).reduce((acc, arr) => acc + arr.length, 0);
   const hasAnything = runningJobs.length > 0 || pendingCount > 0 || troubledJobs.length > 0 || archivedJobs.length > 0;
 
@@ -439,7 +446,9 @@ export default function JobsMonitor() {
   const hasTroubled = troubledJobs.length > 0;
   // Cores (pedido 18/07): vermelho = esperando ELA (problema ou aprovação);
   // azul = squad rodando; verde = tudo em dia. Amarelo saiu (parecia pendência).
-  const aguardandoEla = hasTroubled || pendingCount > 0;
+  // 19/10/2026: aprovação pendente NÃO pinta mais a faixa de vermelho; o alerta
+  // vive na Conversa (Esperando você) e no pontinho dourado do menu.
+  const aguardandoEla = hasTroubled;
   const rodando = runningJobs.length > 0;
   const bannerBg = aguardandoEla ? "bg-red-50 border-red-500"
     : rodando ? "bg-blue-50 border-blue-400" : "bg-green-50 border-green-400";
@@ -457,11 +466,9 @@ export default function JobsMonitor() {
             onClick={() => setExpanded(!expanded)}
             className={`flex items-center gap-2 text-sm font-bold ${bannerText} cursor-pointer`}
           >
-            {hasTroubled ? "🚨" : pendingCount > 0 ? "🔔" : rodando ? "⚡" : "✅"}
+            {hasTroubled ? "🚨" : rodando ? "⚡" : "✅"}
             {hasTroubled
               ? `${troubledJobs.length} squad(s) precisam da sua atenção`
-              : pendingCount > 0
-              ? `${pendingCount} aprovação(ões) pendente(s)`
               : rodando
               ? `${runningJobs.length} squad(s) em execução`
               : "Squads em dia, nenhuma em execução"}

@@ -18,6 +18,7 @@ import BotaoTema from "./BotaoTema";
 import Mascote from "./Mascote";
 import { PORTAS, PORTA_CONFIG, portaAtiva } from "@/lib/navegacao";
 import { PainelContext } from "@/lib/painel-context";
+import { useEsperando } from "@/lib/esperando";
 import { ProvedorUI } from "./ui";
 import {
   type Modo, lerModoGuardado, guardarModo,
@@ -53,6 +54,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
   }, []);
 
   const [menuAvatar, setMenuAvatar] = useState(false);
+  const { dados: esperando, erro: erroEsperando, recarregar: recarregarEsperando } = useEsperando(servidora);
 
   const loadData = useCallback(async () => {
     try {
@@ -138,14 +140,23 @@ export default function Dashboard({ session, children }: DashboardProps) {
           ativo ? "bg-[var(--accent-soft)] text-[var(--ac)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
         }`}
       >
-        <span className="text-xl leading-none" aria-hidden>{p.icone}</span>
+        <span className="relative text-xl leading-none" aria-hidden>
+          {p.icone}
+          {/* Alerta de aprovação: pontinho dourado com o nº de itens de prioridade alta, visível de qualquer tela */}
+          {p.id === "conversa" && (esperando?.altas ?? 0) > 0 && (
+            <span title={`${esperando!.altas} esperando você com prioridade alta`}
+              className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[var(--af-gold)] text-[#2a1f05] text-[10px] font-extrabold leading-4 text-center ring-2 ring-[var(--bg-secondary)]">
+              {esperando!.altas}
+            </span>
+          )}
+        </span>
         <span className="text-[10.5px] font-bold leading-none">{p.rotulo}</span>
       </button>
     );
   };
 
   return (
-    <PainelContext.Provider value={{ ...visivel, modo, servidora, setModo, reload: loadData }}>
+    <PainelContext.Provider value={{ ...visivel, modo, servidora, setModo, reload: loadData, esperando, erroEsperando, recarregarEsperando }}>
       <ProvedorUI>
       <div className="h-dvh flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]">
         {/* ===== BARRA DO TOPO ===== */}

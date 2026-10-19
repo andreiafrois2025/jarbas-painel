@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Mascote from "./Mascote";
 import { fetchCatalogo } from "@/lib/biblioteca";
@@ -672,6 +673,16 @@ export default function LicitacaoPage({ pedidoNovo = 0 }: { pedidoNovo?: number 
       backend.etapas(sq).then((e) => setEtapasPorSquad((p) => ({ ...p, [sq]: e }))).catch(() => {});
     });
   }, [backend, squadsNaLista, etapasPorSquad]);
+
+  // ?processo=<jobId> (botão "Abrir processo" do Esperando você): abre esse processo uma vez
+  const processoUrl = useSearchParams().get("processo");
+  const abertoPorUrl = useRef<string | null>(null);
+  useEffect(() => {
+    if (!processoUrl || abertoPorUrl.current === processoUrl) return;
+    if (!jobs.some((j) => j.jobId === processoUrl)) return;
+    abertoPorUrl.current = processoUrl;
+    setSelecionado(processoUrl);
+  }, [processoUrl, jobs]);
 
   const job = jobs.find((j) => j.jobId === selecionado) || null;
   const statusSel = job?.status;

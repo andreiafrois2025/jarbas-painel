@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 import type { Collaborator, Assignment, QuickLink, Category as CategoryType } from "@/lib/types";
 import type { Modo } from "@/lib/modo";
+import type { DadosEsperando } from "@/lib/esperando";
 
 // Dados compartilhados entre o shell do painel (layout) e as páginas.
 // O shell carrega uma vez; as páginas consomem via usePainel().
@@ -16,6 +17,10 @@ export interface PainelData {
   servidora: boolean;
   setModo: (m: Modo) => void;
   reload: () => Promise<void>;
+  /** Tudo que espera decisão dela (null = ainda carregando ou squad-api fora). */
+  esperando: DadosEsperando | null;
+  erroEsperando: boolean;
+  recarregarEsperando: () => Promise<void>;
 }
 
 export const PainelContext = createContext<PainelData | null>(null);

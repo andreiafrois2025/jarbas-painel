@@ -4,22 +4,25 @@
 // (~360px) o dia dela: Hoje, Esperando você e Notícias.
 //
 // De onde vem cada bloco (nada é inventado):
-//  - saudação / "N coisas esperam você": relógio de Brasília + nº de cards da
-//    caixa de aprovação (mesmo dado do bloco "Esperando você");
+//  - saudação / "N coisas esperam você": relógio de Brasília + total do bloco
+//    "Esperando você" (tudo junto: squads, finanças e Radar);
 //  - Hoje: /api/hoje (squad-api), campo `agenda` (e `agenda_semana` quando o dia
 //    está livre) — o mesmo que o HojePanel já lia;
-//  - Esperando você: /api/hoje › `caixa` (cards do Radar em "Pra avaliar");
+//  - Esperando você: /api/esperando (paradas de squad, finanças, dicas e notícias,
+//    já ordenadas por prioridade; vem pelo contexto do painel);
 //  - Notícias: UAU = card da caixa com [Prioridade]; radar = /api/hoje ›
 //    `para_mim` (feed de notícias de IA), mais recentes primeiro.
 // No modo Só Igam o pedido vai com ?modo=servidora e o servidor devolve a
 // agenda do Igam e nenhuma notícia; os blocos mostram o estado vazio.
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ChatPage from "./ChatPage";
 import Mascote from "./Mascote";
 import { usePainel } from "@/lib/painel-context";
 import { useHoje, type DadosHoje, type CardCaixa } from "@/lib/hoje";
 import { tempoRelativo } from "@/lib/metrics";
+import { type DadosEsperando, type ItemEsperando } from "@/lib/esperando";
 import { COLUNAS_CAIXA, ehUau } from "./HojePanel";
 
 const TZ = "America/Sao_Paulo";
@@ -100,28 +103,66 @@ function BlocoHoje({ dados, erro }: { dados: DadosHoje | null; erro: boolean }) 
   );
 }
 
-function BlocoEsperando({ caixa, carregado }: { caixa: CardCaixa[]; carregado: boolean }) {
+// Esperando você (19/10/2026): uma lista só, já em ordem de prioridade pela squad-api
+// (/api/esperando): 1 licitação/Igam · 2 outras paradas de squad · 3 finanças que
+// vencem hoje/amanhã · 4 dicas e textos · 5 notícias. Prioridade alta = borda dourada.
+const MOSTRAR_ESPERANDO = 4;
+
+function ItemEsperandoLinha({ it, onIr }: { it: ItemEsperando; onIr: (it: ItemEsperando) => void }) {
+  const alta = it.prioridade === "alta";
+  const noticia = it.grupo === 5;
+  const sub = [it.selo === "UAU" ? "UAU" : "", it.origem, it.detalhe].filter(Boolean).join(" · ");
+  return (
+    <div
+      className={`rounded-[10px] px-2.5 mb-[7px] text-[13px] text-[var(--text-primary)] ${
+        alta ? "py-2.5 border-2 border-[var(--af-gold)] bg-[var(--accent-soft)]"
+          : noticia ? "py-[7px] bg-transparent border border-dashed border-[var(--border)] opacity-80"
+          : "py-[9px] bg-[var(--bg-tertiary)]"}`}>
+      <div className="flex gap-2.5 items-center">
+        <Mascote nome={it.agente || "jarbas"} emoji="⚡" tamanho={noticia ? 24 : 30} />
+        <span className="min-w-0 flex-1">
+          {alta && it.selo && <span className="inline-block mb-0.5 rounded-full bg-[var(--af-gold)] text-[#2a1f05] text-[10.5px] font-extrabold px-2 py-px">{it.selo}</span>}
+          <span className={`block break-words line-clamp-2 ${alta ? "font-bold" : ""} ${noticia ? "text-[12.5px]" : ""}`}>{it.titulo}</span>
+          <small className="block text-[11.5px] text-[var(--text-secondary)]">{sub}</small>
+        </span>
+      </div>
+      {(alta || it.acao.tipo !== "externo") ? (
+        <button onClick={() => onIr(it)}
+          className={`mt-2 w-full rounded-lg py-1.5 text-xs font-bold cursor-pointer ${alta ? "bg-[var(--af-gold)] text-[#2a1f05] hover:brightness-95" : "border border-[var(--border)] text-[var(--ac)] hover:bg-[var(--bg-secondary)]"}`}>
+          {it.acao.rotulo} ›
+        </button>
+      ) : (
+        <button onClick={() => onIr(it)} className="mt-1 text-[11.5px] font-bold text-[var(--ac)] cursor-pointer">{it.acao.rotulo} ↗</button>
+      )}
+    </div>
+  );
+}
+
+function BlocoEsperando({ esperando, erro }: { esperando: DadosEsperando | null; erro: boolean }) {
   const router = useRouter();
-  const mostrar = caixa.slice(0, 3);
+  const [todos, setTodos] = useState(false);
+  const itens = esperando?.itens || [];
+  const mostrar = todos ? itens : itens.slice(0, MOSTRAR_ESPERANDO);
+
+  const ir = (it: ItemEsperando) => {
+    const a = it.acao;
+    if (a.tipo === "licitacao") router.push(`/areas?aba=igam&processo=${encodeURIComponent(a.jobId || "")}`);
+    else if (a.tipo === "aprovacao") window.dispatchEvent(new CustomEvent("abrir-aprovacoes", { detail: { jobId: a.jobId } }));
+    else if (a.tipo === "financas") router.push("/areas?aba=casa&sub=financas");
+    else if (a.url) window.open(a.url, "_blank", "noreferrer");
+  };
+
   return (
     <section>
-      <Titulo extra={carregado ? <span className="normal-case tracking-normal font-bold text-[var(--ac)]">{caixa.length}</span> : null}>Esperando você</Titulo>
-      {!carregado ? <Vazio>carregando…</Vazio>
-        : caixa.length === 0 ? <Vazio>Nada esperando você agora.</Vazio>
+      <Titulo extra={esperando ? <span className="normal-case tracking-normal font-bold text-[var(--ac)]">{esperando.total}</span> : null}>Esperando você</Titulo>
+      {!esperando ? <Vazio>{erro ? "Não consegui ler o que espera você agora." : "carregando…"}</Vazio>
+        : itens.length === 0 ? <Vazio>Nada esperando você agora.</Vazio>
         : <>
-          {mostrar.map((c) => (
-            <a key={c.id} href={c.url} target="_blank" rel="noreferrer"
-              className="flex gap-2.5 items-center rounded-[10px] px-2.5 py-[9px] mb-[7px] text-[13px] no-underline text-[var(--text-primary)] bg-[var(--bg-tertiary)] hover:brightness-95 transition">
-              {/* Quem pediu: vem do /api/hoje (campo agente); sem pista, o Jarbas */}
-              <Mascote nome={c.agente || "jarbas"} emoji="⚡" tamanho={30} />
-              <span className="min-w-0">
-                <span className="block break-words line-clamp-2">{semPrefixo(c.titulo)}</span>
-                <small className="block text-[11.5px] text-[var(--text-secondary)]">{ehUau(c) ? "UAU · " : ""}{c.origem || "Caixa de aprovação"} · ler e decidir no Notion</small>
-              </span>
-            </a>
-          ))}
-          {caixa.length > mostrar.length && (
-            <button onClick={() => router.push("/areas?aba=conteudo&sub=noticias")} className="text-xs font-bold text-[var(--ac)] cursor-pointer">+ {caixa.length - mostrar.length} na lista completa ›</button>
+          {mostrar.map((it) => <ItemEsperandoLinha key={it.id} it={it} onIr={ir} />)}
+          {itens.length > MOSTRAR_ESPERANDO && (
+            <button onClick={() => setTodos((v) => !v)} className="text-xs font-bold text-[var(--ac)] cursor-pointer">
+              {todos ? "mostrar menos ▴" : `+ ${itens.length - MOSTRAR_ESPERANDO} ▾`}
+            </button>
           )}
         </>}
     </section>
@@ -163,13 +204,13 @@ function BlocoNoticias({ dados, caixa, erro }: { dados: DadosHoje | null; caixa:
 }
 
 export default function ConversaPage() {
-  const { servidora } = usePainel();
+  const { servidora, esperando, erroEsperando } = usePainel();
   const { dados, erro } = useHoje(true, servidora ? "servidora" : undefined);
   const caixa = (dados?.caixa || [])
     .filter((c) => COLUNAS_CAIXA.has(c.coluna))
     .sort((a, b) => Number(ehUau(b)) - Number(ehUau(a)));
-  const n = caixa.length;
-  const espera = !dados ? "" : n === 0 ? " · nada esperando você" : n === 1 ? " · 1 coisa espera você" : ` · ${n} coisas esperam você`;
+  const n = esperando?.total ?? 0;
+  const espera = !esperando ? "" : n === 0 ? " · nada esperando você" : n === 1 ? " · 1 coisa espera você" : ` · ${n} coisas esperam você`;
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row">
@@ -189,7 +230,7 @@ export default function ConversaPage() {
       {/* ===== COLUNA DIREITA: o dia dela ===== */}
       <aside aria-label="O dia" className="lg:w-[300px] 2xl:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] bg-[var(--bg-secondary)] px-[18px] py-5 flex flex-col gap-5 lg:overflow-y-auto">
         <BlocoHoje dados={dados} erro={erro} />
-        <BlocoEsperando caixa={caixa} carregado={!!dados} />
+        <BlocoEsperando esperando={esperando} erro={erroEsperando} />
         <BlocoNoticias dados={dados} caixa={caixa} erro={erro} />
       </aside>
     </div>
