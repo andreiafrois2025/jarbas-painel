@@ -20,6 +20,7 @@ import { PORTAS, PORTA_CONFIG, portaAtiva } from "@/lib/navegacao";
 import { PainelContext } from "@/lib/painel-context";
 import { useEsperando } from "@/lib/esperando";
 import { ProvedorUI } from "./ui";
+import PuxarAtualizar from "./PuxarAtualizar";
 import {
   type Modo, lerModoGuardado, guardarModo,
   ehColaboradorOculto, ehContextoPessoal, ehPessoal, limpaColaborador,
@@ -181,6 +182,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
   return (
     <PainelContext.Provider value={{ ...visivel, modo, servidora, setModo, reload: loadData, esperando, erroEsperando, recarregarEsperando }}>
       <ProvedorUI>
+      <PuxarAtualizar />
       <div className="flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]" style={{ height: "var(--app-h, 100dvh)" }}>
         {/* ===== BARRA DO TOPO ===== */}
         <header className="shrink-0 flex flex-wrap items-center gap-x-1.5 md:gap-x-3 gap-y-2 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-5 pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] pb-2.5 md:pt-0 md:pb-0 md:h-[60px] border-b border-[var(--border)] bg-[var(--bg-secondary)]">
