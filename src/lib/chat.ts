@@ -16,7 +16,7 @@ export interface Acao {
 }
 export interface Mensagem {
   id: string; papel: "user" | "assistant" | "sistema"; texto: string; ts: string;
-  anexos?: { id: string; nome: string }[]; acoes?: Acao[];
+  anexos?: { id: string; nome: string }[]; acoes?: Acao[]; habilidade?: string;
   assuntoId?: string; modeloRotulo?: string; respostaDe?: string;
 }
 export interface ConversaResumo { id: string; agente: string; titulo: string; criada: string; atualizada: string; mensagens: number }
@@ -37,6 +37,7 @@ export const chatApi = {
   conversas: async (agente: string) =>
     (await json<{ conversas: ConversaResumo[] }>(await squadFetch(`/api/chat/conversas?agente=${encodeURIComponent(agente)}`))).conversas,
   conversa: async (id: string) => json<{ conversa: { id: string; agente: string; titulo: string }; mensagens: Mensagem[]; assuntos: Assunto[]; modelo: string; assuntosAuto: boolean }>(await squadFetch(`/api/chat/conversas/${id}`)),
+  habilidades: async () => (await json<{ habilidades: Record<string, { obra: boolean; dono: string | null }> }>(await squadFetch("/api/chat/habilidades"))).habilidades,
   modelos: async () => (await json<{ modelos: ModeloOpcao[] }>(await squadFetch("/api/chat/modelos"))).modelos,
   trocarModelo: async (conversaId: string, modelo: string) =>
     json<{ ok: boolean; modelo: string; texto: string }>(await squadFetch("/api/chat/modelo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ conversaId, modelo }) })),
@@ -73,7 +74,7 @@ export interface EventosEnvio {
 }
 
 export async function enviarMensagem(
-  corpo: { agente: string; conversaId?: string; mensagem: string; anexos?: string[]; modelo?: string; assuntoId?: string },
+  corpo: { agente: string; conversaId?: string; mensagem: string; anexos?: string[]; modelo?: string; assuntoId?: string; habilidade?: string },
   ev: EventosEnvio, sinal: AbortSignal,
 ) {
   let r: Response;

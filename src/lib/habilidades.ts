@@ -44,6 +44,8 @@ export function comoPedir(descricao: string): string | null {
 
 // Nome para mostrar (o nome da pasta vira palavra de gente). Fora da tabela: o nome do catálogo, com hífens trocados por espaço.
 export const NOME_BONITO: Record<string, string> = {
+  "acontece-no-igam": "Acontece no Igam",
+  opensquad: "OpenSquad",
   "slide-animado": "Apresentação animada",
   "site-animado": "Site animado",
   "site-animado-cinema": "Site animado com imagens",
