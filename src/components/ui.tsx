@@ -287,3 +287,49 @@ export function Cartao({ children, className = "", onClick }: {
     </button>
   );
 }
+
+// ── Peças das páginas Saúde, Números e Ajustes (19/10/2026) ──────────────
+export type Tom = "ok" | "atencao" | "fora" | "neutro";
+
+const COR_TOM: Record<Tom, string> = {
+  ok: "var(--success)", atencao: "var(--warning)", fora: "var(--danger)", neutro: "var(--text-secondary)",
+};
+
+/** Etiqueta pequena e arredondada ("no ar", "pausado", "sem dado"). Segue o tema claro e o noturno. */
+export function Pilula({ tom = "neutro", children, title }: { tom?: Tom; children: ReactNode; title?: string }) {
+  const cor = COR_TOM[tom];
+  return (
+    <span title={title} className="inline-block rounded-full px-3 py-1 text-[12.5px] font-extrabold whitespace-nowrap leading-none"
+      style={{ color: `color-mix(in srgb, ${cor} 72%, var(--text-primary))`, background: `color-mix(in srgb, ${cor} 15%, transparent)` }}>
+      {children}
+    </span>
+  );
+}
+
+/** Cartão com título em caixa-alta pequena, como nos mocks aprovados. */
+export function CartaoSecao({ titulo, direita, children, className = "", id }: {
+  titulo: string; direita?: ReactNode; children: ReactNode; className?: string; id?: string;
+}) {
+  return (
+    <section id={id} className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-5 md:p-6 min-w-0 ${className}`}>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h2 className="text-[13px] font-extrabold uppercase tracking-[0.16em] text-[var(--text-secondary)]">{titulo}</h2>
+        {direita}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Linha de lista com rótulo + detalhe à esquerda e algo à direita (pílula, botão, interruptor). */
+export function LinhaItem({ titulo, detalhe, direita }: { titulo: ReactNode; detalhe?: ReactNode; direita?: ReactNode }) {
+  return (
+    <li className="flex items-center justify-between gap-3 py-3 border-b border-dashed border-[var(--border)] last:border-b-0 min-h-[56px]">
+      <div className="min-w-0">
+        <div className="text-[15px] text-[var(--text-primary)] leading-snug">{titulo}</div>
+        {detalhe && <div className="text-[13px] text-[var(--text-secondary)] leading-snug mt-0.5">{detalhe}</div>}
+      </div>
+      {direita && <div className="shrink-0">{direita}</div>}
+    </li>
+  );
+}

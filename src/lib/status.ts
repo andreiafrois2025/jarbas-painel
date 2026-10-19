@@ -44,9 +44,17 @@ export interface StatusSaude {
   sinais_vitais?: SinaisVitais;
   crons?: Record<string, CronSaude>;
   automacoes?: Record<string, string | null>;
-  fila_kanban?: Record<string, number>;
+  fila_kanban?: Record<string, number | boolean | string>;
   atividades?: { quando: string; quem: string; icone: string; texto: string }[];
   ronda_diaria?: unknown;
+  /** Avisos que não são problema (ex.: envio do grupo pausado de propósito). */
+  informacoes?: string[];
+  /** Vigias da VPS: pm2, memória livre, backup... (status-saude.py). */
+  vigias?: {
+    pm2?: Record<string, string>;
+    memoria_livre_pct?: number;
+    backup?: { ok: boolean; erros: number };
+  };
   /** Dias com mais posts marcados do que cabem (25/07/2026). */
   capacidade_agenda?: { data: string; marcados: number; cabem: number; sobra: number }[];
 }

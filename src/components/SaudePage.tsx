@@ -1,224 +1,230 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
 import { useStatus, NIVEL_UI } from "@/lib/status";
 import { useMetricsHistory, tempoRelativo } from "@/lib/metrics";
-import { useIntegracoes, COMO_MEDIMOS, type Integracao } from "@/lib/integracoes";
-import { Tile, NOME_AUTOMACAO } from "./MetricasPage";
-import type { StatusSaude } from "@/lib/status";
+import { useIntegracoes } from "@/lib/integracoes";
+import { useSaudeResumo, useAutomacoesCron, type AutomacaoCron } from "@/lib/saude";
+import { interpretaCron, formataProxima } from "@/lib/cron";
 import { usePainel } from "@/lib/painel-context";
-import { ehPessoal, ROTULO_OCULTO } from "@/lib/modo";
+import { ehPessoal } from "@/lib/modo";
+import Mascote from "./Mascote";
+import { CartaoSecao, LinhaItem, Pilula, type Tom } from "./ui";
 
 // =============================================================
-// 🩺 Saúde — o lugar único pra "está tudo funcionando?".
+// 🩺 Máquina › Saúde — uma tela só para "está tudo funcionando?".
 //
-// 25/07/2026 (F3.5): antes essa resposta estava espalhada em quatro telas —
-// o semáforo do topo, Métricas › Saúde, Config › Integrações e, desde 24/07,
-// a lista de Automações. Cada uma com um pedaço, nenhuma conversando com as
-// outras. Foi o buraco entre elas que escondeu por 5 dias uma automação morta.
+// 19/10/2026: redesenhada conforme o mock aprovado (saude-novo). Antes eram duas
+// sub-abas (Do sistema e Integrações); agora tudo cabe numa tela: faixa do estado
+// geral, três colunas (serviços, conexões, rotinas de hoje) e, embaixo, gasto do
+// mês e últimos avisos.
 //
-// Agora: o semáforo continua no topo do painel (é o que ela olha primeiro) e
-// LEVA pra cá, que é o detalhe. Métricas volta a ser só métrica e Config volta
-// a ser só conta.
-//
-// Os avisos de WhatsApp e Telegram NÃO passam por aqui: saem direto da VPS
-// (watchdog.py e status-saude.py) e seguem funcionando com ou sem painel.
+// De onde vem cada dado:
+//  - status.json (VPS, a cada 5 min): semáforo, sinais vitais, disco, memória,
+//    pm2, trava do grupo, backup.
+//  - /api/saude/resumo (squad-api): controle remoto, Outlook, Pluggy, Codex,
+//    custos e últimos avisos (só leitura, sem segredo).
+//  - /api/integracoes: ping do Notion.   - /api/catalogo: rotinas e última execução.
+// O que não tem fonte aparece como "sem dado" — nunca inventamos.
 // =============================================================
 
-type Aba = "saude" | "integracoes";
+const HORA = 3600_000;
+const idadeH = (iso: string | null | undefined) => (iso ? (Date.now() - new Date(iso).getTime()) / HORA : null);
+
+const TOM_BANNER = {
+  verde: "var(--success)", amarelo: "var(--warning)", vermelho: "var(--danger)",
+} as const;
+
+interface Linha { chave: string; titulo: string; detalhe: string; tom: Tom; rotulo: string }
+
+const SEM_DADO = (chave: string, titulo: string, detalhe = "não consegui ler agora"): Linha =>
+  ({ chave, titulo, detalhe, tom: "neutro", rotulo: "sem dado" });
 
 export default function SaudePage() {
-  const [aba, setAba] = useState<Aba>("saude");
-
-  const botao = (id: Aba, rotulo: string) => (
-    <button
-      onClick={() => setAba(id)}
-      className={`px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-        aba === id
-          ? "border-[var(--accent)] text-[var(--text-primary)]"
-          : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-      }`}
-    >
-      {rotulo}
-    </button>
-  );
-
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0 overflow-x-auto">
-        <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">🩺 Saúde</h1>
-        {botao("saude", "❤️ Do sistema")}
-        {botao("integracoes", "🔌 Integrações")}
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-4 md:p-6 space-y-4">
-          {aba === "saude" ? <AbaSaude /> : <AbaIntegracoes />}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AbaSaude() {
   const { status: vivo, mudo, carregando } = useStatus();
   const { hoje } = useMetricsHistory();
   const { servidora } = usePainel();
+  const { dados: extra, erro: erroExtra } = useSaudeResumo();
+  const { integracoes } = useIntegracoes();
+  const { automacoes } = useAutomacoesCron();
 
-  if (carregando && !vivo) {
-    return <p className="text-sm text-[var(--text-muted)]">lendo o estado da VPS…</p>;
-  }
-
-  const nivel = mudo ? "vermelho" : (vivo?.nivel ?? hoje?.saude?.nivel);
-  const ui = NIVEL_UI[nivel as keyof typeof NIVEL_UI];
-  const problemasBrutos: string[] = mudo
+  const nivel = (mudo ? "vermelho" : (vivo?.nivel ?? hoje?.saude?.nivel)) as keyof typeof NIVEL_UI | undefined;
+  const ui = nivel ? NIVEL_UI[nivel] : undefined;
+  const problemas: string[] = mudo
     ? ["A VPS parou de publicar o estado — pode estar fora do ar"]
     : (vivo?.problemas ?? hoje?.saude?.problemas ?? []);
-  // Modo Servidora: problema que cita assunto pessoal continua contando, mas o
-  // texto fica genérico (o número de pontos de atenção não muda).
-  const problemas = servidora
-    ? problemasBrutos.map((p) => (ehPessoal(p) ? `Um serviço de uso pessoal precisa de atenção (${ROTULO_OCULTO})` : p))
-    : problemasBrutos;
-  const sinais = Object.entries((vivo?.sinais_vitais ?? hoje?.saude?.sinais ?? {}) as Record<string, boolean>);
-  const fila = vivo?.fila_kanban ?? hoje?.fila;
-  const automacoes = vivo?.automacoes ?? hoje?.automacoes;
+  const sinais = (vivo?.sinais_vitais ?? {}) as Record<string, boolean | undefined>;
+  const disco = vivo?.disco_pct ?? hoje?.saude?.disco_pct ?? null;
+  const memLivre = vivo?.vigias?.memoria_livre_pct;
+  const memUso = memLivre != null ? Math.round(100 - memLivre) : null;
 
-  return (
-    <div className="space-y-4">
-      <p className="text-xs text-[var(--text-secondary)]">
-        Estado ao vivo, republicado a cada 5 minutos pela VPS
-        {vivo?.gerado_em && <> · última leitura {tempoRelativo(vivo.gerado_em)}</>}
-      </p>
+  // ── Serviços ──
+  const sim = (v: boolean | undefined | null, ok: string, fora: string): Pick<Linha, "tom" | "rotulo"> =>
+    v === true ? { tom: "ok", rotulo: ok } : v === false ? { tom: "fora", rotulo: fora } : { tom: "neutro", rotulo: "sem dado" };
+  const pm2 = vivo?.vigias?.pm2?.["squad-api"];
+  const pausado = vivo?.fila_kanban?.envio_pausado;
+  const servicos: Linha[] = [
+    { chave: "tg", titulo: "Jarbas no Telegram", detalhe: (sinais.bot_telegram ?? sinais.telegram) === false ? "não está respondendo" : "respondendo",
+      ...sim(sinais.bot_telegram ?? sinais.telegram, "no ar", "fora") },
+    { chave: "wa", titulo: "Donna no WhatsApp", detalhe: sinais.whatsapp === false ? "desconectada" : "conectada",
+      ...sim(sinais.whatsapp, "no ar", "fora") },
+    { chave: "painel", titulo: "Painel e chat", detalhe: "squad-api ativa",
+      ...(pm2 ? sim(pm2 === "online", "no ar", "fora") : extra ? { tom: "ok" as Tom, rotulo: "no ar" } : { tom: "neutro" as Tom, rotulo: "sem dado" }) },
+    extra
+      ? { chave: "remoto", titulo: "Controle remoto", detalhe: "sessão permanente", ...sim(extra.servicos.claude_remoto, "no ar", "fora") }
+      : SEM_DADO("remoto", "Controle remoto", erroExtra ? "a VPS não respondeu" : "lendo…"),
+    pausado === undefined
+      ? SEM_DADO("grupo", "Grupo da comunidade")
+      : { chave: "grupo", titulo: "Grupo da comunidade",
+          detalhe: pausado ? "trava ligada (seu pedido)" : "envio automático ligado",
+          tom: pausado ? "atencao" : "ok", rotulo: pausado ? "pausado" : "enviando" },
+  ];
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Tile titulo="Estado geral" valor={ui ? `${ui.dot} ${ui.label}` : `⚪ ${nivel ?? "?"}`}
-          sub={problemas.length ? `${problemas.length} ponto(s) de atenção abaixo` : "nenhum problema aberto"} />
-        <Tile icone="⏰" titulo="Rotinas automáticas"
-          valor={`${hoje?.saude?.crons_ok ?? "?"}/${hoje?.saude?.crons_total ?? "?"}`}
-          sub="rodando no horário" />
-        <Tile icone="💾" titulo="Disco da VPS"
-          valor={`${vivo?.disco_pct ?? hoje?.saude?.disco_pct ?? "?"}%`} sub="usado" />
-        <Tile icone="📬" titulo="Fila do grupo IA"
-          valor={fila?.pausado ? "⏸ pausada" : `${fila?.aprovados ?? 0} na fila`}
-          sub={`${fila?.pendentes ?? 0} aguardando sua avaliação`} />
-      </div>
+  // ── Conexões ──
+  const conexoes: Linha[] = [];
+  const cal = sinais.container, drive = vivo?.crons?.backup_diario?.ok;
+  conexoes.push(cal === undefined && drive === undefined
+    ? SEM_DADO("google", "Google (Agenda e Drive)")
+    : { chave: "google", titulo: "Google (Agenda e Drive)", detalhe: "conta do Jarbas e conectores do Claude",
+        tom: cal === false || drive === false ? "fora" : "ok", rotulo: cal === false || drive === false ? "com problema" : "ok" });
+  const notion = integracoes?.find((i) => i.nome === "Notion");
+  conexoes.push(!notion || notion.ok == null
+    ? SEM_DADO("notion", "Notion", "tarefas, radar, finanças")
+    : { chave: "notion", titulo: "Notion", detalhe: "tarefas, radar, finanças", tom: notion.ok ? "ok" : "fora", rotulo: notion.ok ? "ok" : "com problema" });
+  const ol = extra?.conexoes.outlook;
+  if (!ol || !ol.ultima_atividade_em) conexoes.push(SEM_DADO("outlook", "Outlook (ponte do ChatGPT)", "sem registro da ponte"));
+  else {
+    const h = idadeH(ol.ultima_atividade_em) ?? 0;
+    conexoes.push({ chave: "outlook", titulo: "Outlook (ponte do ChatGPT)",
+      detalhe: `última atividade ${tempoRelativo(ol.ultima_atividade_em)}${ol.prazos_abertos != null ? ` · ${ol.prazos_abertos} ${ol.prazos_abertos === 1 ? "prazo" : "prazos"} a vencer` : ""}`,
+      tom: h > 24 * 7 ? "atencao" : "ok", rotulo: h > 24 * 7 ? "parada" : "ok" });
+  }
+  const cx = extra?.conexoes.codex;
+  conexoes.push(!cx || !cx.ultimo_uso_em
+    ? SEM_DADO("codex", "ChatGPT / Codex", "imagens pela sua assinatura")
+    : { chave: "codex", titulo: "ChatGPT / Codex",
+        detalhe: `último uso ${tempoRelativo(cx.ultimo_uso_em)}${cx.imagens_mes != null ? ` · ${cx.imagens_mes} imagens no mês` : ""}`,
+        tom: cx.ultimo_ok === false ? "atencao" : "ok", rotulo: cx.ultimo_ok === false ? "atenção" : "ok" });
+  const pl = extra?.conexoes.pluggy.ultima_leitura_em;
+  conexoes.push(!pl
+    ? SEM_DADO("pluggy", "Pluggy (bancos)", "sem registro de leitura")
+    : { chave: "pluggy", titulo: "Pluggy (bancos)", detalhe: `última leitura ${tempoRelativo(pl)}`,
+        tom: (idadeH(pl) ?? 0) > 36 ? "atencao" : "ok", rotulo: (idadeH(pl) ?? 0) > 36 ? "atenção" : "ok" });
 
-      <Atencao problemas={problemas} />
+  // ── Rotinas de hoje ──
+  const PRINCIPAIS: [RegExp, string][] = [
+    [/Heartbeat/i, "Notícias e dicas do grupo"],
+    [/Ronda di[aá]ria/i, "Ronda diária"],
+    [/Backup di[aá]rio/i, "Backup"],
+    [/Snapshot di[aá]rio de m[eé]tricas/i, "Snapshot de métricas"],
+    [/Ponte Radar/i, "Radar → Instagram"],
+  ];
+  const rotinas = automacoes
+    ? PRINCIPAIS.map(([re, rotulo]) => {
+        const a: AutomacaoCron | undefined = automacoes.find((x) => re.test(x.nome));
+        if (!a) return null;
+        const info = interpretaCron(a.agenda);
+        const idade = idadeH(a.ultima_execucao);
+        const limiteH = (info.frequenciaMin * 1.5 + 30) / 60;
+        const tom: Tom = idade == null ? "neutro" : idade <= limiteH ? "ok" : "atencao";
+        return { chave: rotulo, titulo: rotulo,
+          detalhe: `próxima ${formataProxima(info.proxima)} · ${a.ultima_execucao ? `última ${tempoRelativo(a.ultima_execucao)}` : "sem registro da última"}`,
+          tom, rotulo: tom === "ok" ? "em dia" : tom === "atencao" ? "atrasada" : "sem dado",
+          dica: a.log_compartilhado ? "o registro dessa rotina é compartilhado: sinal indireto" : undefined };
+      }).filter((x): x is NonNullable<typeof x> => !!x)
+    : null;
 
-      <div className="grid md:grid-cols-2 2xl:grid-cols-3 gap-3">
-        <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
-          <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">Sinais vitais</h3>
-          <ul className="space-y-1 text-sm text-[var(--text-primary)]">
-            {sinais.length === 0 && <li className="text-[var(--text-muted)]">sem leitura agora</li>}
-            {sinais.map(([nome, ok]) => (
-              <li key={nome} className="flex justify-between">
-                <span className="capitalize">{nome}</span>
-                <span>{ok ? "✅ no ar" : "❌ fora"}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+  // ── Gasto do mês ──
+  const cu = extra?.custos;
+  const gastos: Linha[] = extra && cu ? [
+    cu.claude
+      ? { chave: "claude", titulo: "Claude (assinatura)", detalhe: `uso dos últimos ${cu.claude.dias} dias${cu.claude.medido_em ? ` · medido ${tempoRelativo(cu.claude.medido_em)}` : ""}`, tom: "neutro", rotulo: `${cu.claude.mensagens_semana} mensagens` }
+      : SEM_DADO("claude", "Claude (assinatura)", "ainda sem medição de uso"),
+    { chave: "gemini", titulo: "Gemini (Donna e Louis)",
+      detalhe: cu.gemini.valor_brl == null
+        ? `${cu.gemini.chamadas_mes} chamadas medidas no mês · valor em R$ ainda não é medido`
+        : "até hoje no mês",
+      tom: "neutro", rotulo: cu.gemini.valor_brl == null ? "sem valor em R$" : `R$ ${cu.gemini.valor_brl.toFixed(2).replace(".", ",")}` },
+    cx && cx.imagens_mes != null
+      ? { chave: "codex", titulo: "Codex (imagens)", detalhe: `dentro da sua assinatura${cx.falhas_mes ? ` · ${cx.falhas_mes} tentativas falharam` : ""}`, tom: "neutro", rotulo: `${cx.imagens_mes} imagens` }
+      : SEM_DADO("codex", "Codex (imagens)", "sem registro de uso"),
+  ] : [SEM_DADO("claude", "Claude (assinatura)", erroExtra ? "a VPS não respondeu" : "lendo…"),
+       SEM_DADO("gemini", "Gemini (Donna e Louis)", erroExtra ? "a VPS não respondeu" : "lendo…"),
+       SEM_DADO("codex", "Codex (imagens)", erroExtra ? "a VPS não respondeu" : "lendo…")];
 
-        <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
-          <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">Última execução das automações</h3>
-          <ul className="space-y-1 text-sm text-[var(--text-primary)]">
-            {Object.entries((automacoes ?? {}) as Record<string, string | null>).filter(([k]) => !(servidora && ehPessoal(k, NOME_AUTOMACAO[k]))).map(([k, iso]) => (
-              <li key={k} className="flex justify-between gap-2">
-                <span>{NOME_AUTOMACAO[k] ?? k}</span>
-                <span className="text-[var(--text-secondary)] whitespace-nowrap">{tempoRelativo(iso)}</span>
-              </li>
-            ))}
-          </ul>
-          <a href="/maquina?aba=mapa" className="text-xs underline decoration-dotted text-[var(--text-secondary)] mt-2 inline-block">
-            ver todas as automações →
-          </a>
-        </div>
+  const visivel = <T extends { titulo: string; detalhe: string }>(l: T[]) =>
+    servidora ? l.filter((x) => !ehPessoal(x.titulo, x.detalhe)) : l;
 
-        <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)]">
-          <h3 className="text-sm font-semibold mb-2 text-[var(--text-primary)]">Onde os avisos chegam</h3>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Problema novo é avisado no <strong>WhatsApp</strong>; se o problema for justamente o
-            WhatsApp, o aviso vai pelo <strong>Telegram</strong>. Isso sai direto da VPS e funciona
-            com o painel fechado.
-          </p>
-        </div>
-      </div>
-    </div>
+  const corBanner = nivel ? TOM_BANNER[nivel] : "var(--text-secondary)";
+  const textoSub = carregando && !vivo
+    ? "lendo o estado da VPS…"
+    : [
+        problemas.length ? `${problemas.length} ${problemas.length === 1 ? "ponto" : "pontos"} de atenção abaixo` : "Nenhum problema aberto",
+        vivo?.gerado_em ? `última conferência ${tempoRelativo(vivo.gerado_em)}` : null,
+        "o Junior vigia isso pra você",
+      ].filter(Boolean).join(" · ");
+
+  const Lista = ({ itens }: { itens: (Linha & { dica?: string })[] }) => (
+    <ul>
+      {itens.map((i) => (
+        <LinhaItem key={i.chave} titulo={i.titulo} detalhe={i.detalhe} direita={<Pilula tom={i.tom} title={i.dica}>{i.rotulo}</Pilula>} />
+      ))}
+    </ul>
   );
-}
-
-function AbaIntegracoes() {
-  const { status } = useStatus();
-  const { integracoes: todas, erro } = useIntegracoes();
-  const { servidora } = usePainel();
-  const integracoes = todas && servidora
-    ? todas.filter((i) => !ehPessoal(i.nome, i.detalhe, i.onde))
-    : todas;
-
-  if (erro) return <p className="text-sm text-[var(--text-secondary)]">Não consegui falar com a VPS pra medir as integrações.</p>;
-  if (!integracoes) return <p className="text-sm text-[var(--text-muted)]">medindo cada integração…</p>;
-
-  // Cada item diz COMO é medido — e o que a medição respondeu.
-  const avalia = (i: Integracao): { bolinha: string; texto: string; como: string } => {
-    if (i.medicao === "ping") {
-      if (i.ok === true) return { bolinha: "🟢", texto: "funcionando", como: `perguntei agora — ${i.nota}` };
-      if (i.ok === false) return { bolinha: "🔴", texto: "com problema", como: `perguntei agora — ${i.nota}` };
-      return { bolinha: "⚪", texto: "não sei dizer", como: i.nota || COMO_MEDIMOS.ping };
-    }
-    if (i.medicao === "sinal") {
-      const v = (status?.sinais_vitais as Record<string, boolean> | undefined)?.[i.sinal || ""];
-      if (v === true) return { bolinha: "🟢", texto: "no ar", como: COMO_MEDIMOS.sinal };
-      if (v === false) return { bolinha: "🔴", texto: "fora do ar", como: COMO_MEDIMOS.sinal };
-      return { bolinha: "⚪", texto: "sem leitura agora", como: COMO_MEDIMOS.sinal };
-    }
-    if (i.medicao === "cron") {
-      const c = status?.crons?.[i.cron || ""];
-      if (c?.ok) return { bolinha: "🟢", texto: "rodou no horário", como: COMO_MEDIMOS.cron };
-      if (c) return { bolinha: "🟡", texto: "a rotina atrasou", como: COMO_MEDIMOS.cron };
-      return { bolinha: "⚪", texto: "sem leitura agora", como: COMO_MEDIMOS.cron };
-    }
-    return { bolinha: "⚪", texto: "não medimos", como: COMO_MEDIMOS.nenhum };
-  };
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-[var(--text-secondary)]">
-        Cada integração diz como é medida. Chaves e tokens ficam na VPS — nunca aqui.
-      </p>
-      <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-        {integracoes.map((i) => {
-          const a = avalia(i);
-          return (
-            <div key={i.nome} className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[var(--border)] flex gap-3 items-start">
-              <span className="text-2xl">{i.icone}</span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-[var(--text-primary)]">{i.nome}</span>
-                  <span className="text-xs">{a.bolinha} {a.texto}</span>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] mt-0.5">{i.detalhe}</p>
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">
-                  Como sei disso: {a.como}
-                </p>
-                <p className="text-[11px] text-[var(--text-muted)]">Onde vive: {i.onde}</p>
-                {i.links && i.links.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {i.links.map((l) => (
-                      <a key={l.url} href={l.url} target="_blank" rel="noreferrer"
-                        className="text-xs px-3 py-1.5 rounded-full border font-medium hover:opacity-80"
-                        style={{ borderColor: "#2D6B6B", color: "#2D6B6B" }}>
-                        {l.rotulo} ↗
-                      </a>
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="p-4 md:p-6 space-y-4 w-full">
+        <div className="rounded-2xl p-4 md:p-5 flex flex-wrap items-center gap-x-4 gap-y-3"
+          style={{ background: `color-mix(in srgb, ${corBanner} 14%, var(--bg-secondary))`, border: `1px solid color-mix(in srgb, ${corBanner} 25%, transparent)` }}>
+          <Mascote nome="junior" emoji="💻" tamanho={56} />
+          <div className="min-w-0 flex-1 basis-60">
+            <h2 className="fonte-maquina text-[26px] leading-tight" style={{ color: `color-mix(in srgb, ${corBanner} 80%, var(--text-primary))` }}>
+              {ui ? ui.label : carregando ? "Conferindo…" : "Sem leitura"}
+            </h2>
+            <p className="text-[14.5px] text-[var(--text-primary)] mt-0.5">{textoSub}</p>
+          </div>
+          <span className="rounded-full px-4 py-2 text-[13.5px] font-bold bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)] whitespace-nowrap">
+            disco {disco != null ? `${disco}%` : "sem dado"} · memória {memUso != null ? `${memUso}%` : "sem dado"}
+          </span>
+        </div>
+
+        <Atencao problemas={problemas} />
+
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
+          <CartaoSecao titulo="Serviços"><Lista itens={visivel(servicos)} /></CartaoSecao>
+          <CartaoSecao titulo="Conexões"><Lista itens={visivel(conexoes)} /></CartaoSecao>
+          <CartaoSecao titulo="Rotinas de hoje"
+            direita={<Link href="/maquina?aba=mapa" className="text-[13.5px] font-extrabold text-[var(--ac)] hover:underline whitespace-nowrap">ver no Mapa ›</Link>}>
+            {rotinas === null
+              ? <p className="text-sm text-[var(--text-secondary)] py-3">sem dado: não consegui ler as rotinas da VPS agora.</p>
+              : <Lista itens={visivel(rotinas)} />}
+          </CartaoSecao>
+        </div>
+
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+          <CartaoSecao titulo="Gasto do mês"><Lista itens={visivel(gastos)} /></CartaoSecao>
+          <CartaoSecao titulo="Últimos avisos">
+            {!extra
+              ? <p className="text-sm text-[var(--text-secondary)] py-3">{erroExtra ? "sem dado: a VPS não respondeu." : "lendo…"}</p>
+              : extra.avisos.length === 0
+                ? <p className="text-sm text-[var(--text-secondary)] py-3">Nenhum aviso no registro do vigia.</p>
+                : (
+                  <ul>
+                    {extra.avisos.map((a, i) => (
+                      <LinhaItem key={i} titulo={a.texto}
+                        detalhe={`${a.quando_texto}${a.duracao_min ? ` · durou ${a.duracao_min} min` : ""}`}
+                        direita={<Pilula tom={a.resolvido ? "ok" : "atencao"}>{a.resolvido ? "resolvido" : "aberto"}</Pilula>} />
                     ))}
-                  </div>
+                  </ul>
                 )}
-              </div>
-            </div>
-          );
-        })}
+          </CartaoSecao>
+        </div>
       </div>
     </div>
   );
 }
+
 // ── Tradutor de problemas ──────────────────────────────────────────────
 // A VPS descreve os problemas em linguagem de máquina ("sinal vital caído:
 // whatsapp"). Aqui cada um vira um tópico com: o que significa, o que fazer, e
