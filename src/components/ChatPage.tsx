@@ -5,13 +5,14 @@
 
 import Mascote from "./Mascote";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { chatApi, dividirResposta, enviarMensagem, type Acao, type Agente, type Assunto, type ConversaResumo, type Mensagem, type ModeloOpcao, type Uso } from "@/lib/chat";
+import { chatApi, obraApi, dividirResposta, enviarMensagem, type Acao, type Agente, type Assunto, type ConversaResumo, type EstadoObra, type Mensagem, type ModeloOpcao, type Uso } from "@/lib/chat";
 import { usePainel } from "@/lib/painel-context";
 import type { Collaborator } from "@/lib/types";
 import { ehColaboradorOculto } from "@/lib/modo";
 import TextoSeguro from "./chat/TextoSeguro";
 import Visuais from "./chat/Visuais";
 import { MenuHabilidades, ChipHabilidade } from "./chat/MenuHabilidades";
+import { CartaoArquivoObra, ControleObra } from "./chat/ModoObra";
 import { AVISO_OBRA, detectarHabilidadeFalada, filtrarHabilidades, gatilhoBarra, useHabilidadesChat, type HabChat } from "@/lib/habilidadesChat";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -126,6 +127,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState("");
   const [uso, setUso] = useState<Uso | null>(null);
+  // ── Modo obra (só o Jarbas): estado vem do servidor; o relógio só atualiza o "1h52" na tela ──
+  const [obra, setObra] = useState<EstadoObra | null>(null);
+  const [agoraMs, setAgoraMs] = useState(() => Date.now());
+  const obraDisponivel = agenteId === "jarbas" && !servidora;
+  const obraLigada = obraDisponivel && !!obra?.ligado;
   const [texto, setTexto] = useState("");
   const [anexos, setAnexos] = useState<{ id: string; nome: string }[]>([]);
   const [gravando, setGravando] = useState(false);
@@ -224,6 +230,15 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     chatApi.conversas(agenteId).then((cs) => { setConversas(cs); if (cs[0] && !servidora) abrirConversa(cs[0].id); }).catch((e) => setErro(e.message));
   }, [agenteId, agentes.length, abrirConversa, servidora]);
 
+  useEffect(() => {
+    if (!obraDisponivel) { setObra(null); return; }
+    let vivo = true;
+    const ler = () => obraApi.estado().then((e) => { if (vivo) setObra(e); }).catch(() => {});
+    ler();
+    const t = setInterval(() => { setAgoraMs(Date.now()); ler(); }, 30000);
+    return () => { vivo = false; clearInterval(t); };
+  }, [obraDisponivel]);
+
   useEffect(() => { fim.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [msgs, fluxo, status]);
 
   const enviar = useCallback(async (conteudo: string, assuntoIdParam?: string) => {
@@ -251,7 +266,8 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     if (idConv) { try { const c = await chatApi.conversa(idConv); setMsgs(c.mensagens); setAssuntos(c.assuntos || []); setModeloSel(c.modelo); } catch { /* mantém o que está na tela */ } }
     chatApi.conversas(agenteId).then(setConversas).catch(() => {});
     chatApi.uso().then(setUso).catch(() => {});
-  }, [ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel]);
+    if (obraDisponivel) obraApi.estado().then(setObra).catch(() => {});
+  }, [obraDisponivel, ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel]);
 
   // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
   const escolherModelo = async (chave: string) => {
@@ -337,10 +353,10 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     "aria-activedescendant": menuAberto && opcoesMenu.length ? `menu-habilidades-${Math.min(idxMenu, opcoesMenu.length - 1)}` : undefined,
   };
   const menuNode = menuAberto ? <MenuHabilidades itens={opcoesMenu} ativo={Math.min(idxMenu, Math.max(opcoesMenu.length - 1, 0))} consulta={gatilho?.consulta ?? ""} carregando={!habilidadesProntas}
-    aoEscolher={escolherHabilidade} aoPassar={setIdxMenu} idLista="menu-habilidades" /> : null;
+    aoEscolher={escolherHabilidade} aoPassar={setIdxMenu} idLista="menu-habilidades" obraLigada={obraLigada} /> : null;
   const chipNode = habilidadeSel ? <ChipHabilidade h={habilidadeSel} aoRemover={tirarHabilidade} /> : null;
   const avisosHab = (<>
-    {habilidadeSel?.obra && <p role="status" className="text-[12.5px] mt-2 px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">🔒 {AVISO_OBRA}</p>}
+    {habilidadeSel?.obra && !obraLigada && <p role="status" className="text-[12.5px] mt-2 px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">🔒 {AVISO_OBRA}</p>}
     {habFalada && <p className="mt-2"><button type="button" onClick={() => setHabSel(habFalada.id)} className="text-[12.5px] font-bold rounded-full px-3 py-1 border border-[var(--ac)]/50 bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-95 cursor-pointer">usar {habFalada.icone} {habFalada.rotulo.toLowerCase()}?</button></p>}
   </>);
 
@@ -432,6 +448,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               )}
             </select>
           </label>
+          {obraDisponivel && <ControleObra estado={obra} agora={agoraMs} ocupado={ocupado} aoMudar={setObra} />}
           {uso && (
             <span className={`${compacto ? "hidden md:inline" : ""} text-xs px-2 py-1 rounded-lg border ${uso.aviso ? "border-[var(--warning)] bg-[var(--warning)]/15" : "border-[var(--border)]"} text-[var(--text-secondary)]`}
               title="Cada mensagem gasta uma parte da assinatura do Claude">
@@ -598,6 +615,7 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
         <div className="rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
           <Resposta texto={m.texto} onEscolha={(t) => onEscolha(t, m.assuntoId)} desativado={ocupado} />
           {m.acoes?.map((a, i) => <CartaoAcao key={i} a={a} ocupado={ocupado} onDecidir={(c) => onAcao(i, c)} />)}
+          {m.arquivos?.map((f) => <CartaoArquivoObra key={f.url} f={f} />)}
           <p className="text-[10px] text-[var(--text-muted)] mt-1">{hora(m.ts)}{m.modeloRotulo ? ` · ${m.modeloRotulo}` : ""}</p>
         </div>
       </div>

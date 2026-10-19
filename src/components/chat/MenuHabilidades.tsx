@@ -5,10 +5,11 @@
 import { useEffect, useRef } from "react";
 import type { HabChat } from "@/lib/habilidadesChat";
 
-const SELO_OBRA = "🔒 modo obra (em breve)";
+const SELO_OBRA = "🔒 precisa do modo obra";
+const SELO_LIBERADA = "🔨 liberada (obra ligada)";
 
-export function MenuHabilidades({ itens, ativo, consulta, carregando, aoEscolher, aoPassar, idLista }: {
-  itens: HabChat[]; ativo: number; consulta: string; carregando: boolean;
+export function MenuHabilidades({ itens, ativo, consulta, carregando, aoEscolher, aoPassar, idLista, obraLigada = false }: {
+  itens: HabChat[]; ativo: number; consulta: string; carregando: boolean; obraLigada?: boolean;
   aoEscolher: (h: HabChat) => void; aoPassar: (i: number) => void; idLista: string;
 }) {
   const ref = useRef<HTMLUListElement>(null);
@@ -30,7 +31,7 @@ export function MenuHabilidades({ itens, ativo, consulta, carregando, aoEscolher
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="text-sm font-bold text-[var(--text-primary)]">{h.rotulo}</span>
-                  {h.obra && <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] whitespace-nowrap">{SELO_OBRA}</span>}
+                  {h.obra && <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 whitespace-nowrap ${obraLigada ? "bg-[var(--accent-soft)] text-[var(--text-primary)]" : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"}`}>{obraLigada ? SELO_LIBERADA : SELO_OBRA}</span>}
                 </span>
                 {h.descricao && <span className="block text-[12.5px] leading-snug text-[var(--text-secondary)] mt-0.5 line-clamp-2">{h.descricao}</span>}
               </span>

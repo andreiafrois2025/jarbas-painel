@@ -18,7 +18,11 @@ export interface Mensagem {
   id: string; papel: "user" | "assistant" | "sistema"; texto: string; ts: string;
   anexos?: { id: string; nome: string }[]; acoes?: Acao[]; habilidade?: string;
   assuntoId?: string; modeloRotulo?: string; respostaDe?: string;
+  obra?: boolean; arquivos?: ArquivoObra[];
 }
+/** Arquivo que uma tarefa do modo obra deixou na pasta de trabalho (aparece como cartão no chat). */
+export interface ArquivoObra { nome: string; rel: string; tamanho: number; tipo: "imagem" | "pdf" | "arquivo"; url: string }
+export interface EstadoObra { ligado: boolean; expira_em: string | null; tarefas_hoje: number; limite: number; ocupada: boolean; permitido: boolean }
 export interface ConversaResumo { id: string; agente: string; titulo: string; criada: string; atualizada: string; mensagens: number }
 export interface Uso {
   hora: { usadas: number; limite: number }; dia: { usadas: number; limite: number };
@@ -60,6 +64,17 @@ export const chatApi = {
       body: JSON.stringify({ conversaId, mensagemId, indice, cancelar }),
     })),
   urlArquivo: (nome: string) => squadUrlComToken(`/api/chat/arquivo/${encodeURIComponent(nome)}`),
+};
+
+// ── Modo obra (O1): código no Telegram, estado no servidor ──
+const post = (path: string, corpo?: unknown) =>
+  squadFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo ?? {}) });
+export const obraApi = {
+  estado: async () => json<EstadoObra>(await squadFetch("/api/obra/estado")),
+  pedirCodigo: async () => json<{ ok: boolean; vale_min: number }>(await post("/api/obra/pedir-codigo")),
+  ativar: async (codigo: string) => json<EstadoObra>(await post("/api/obra/ativar", { codigo })),
+  desligar: async () => json<EstadoObra>(await post("/api/obra/desligar")),
+  urlArquivo: (url: string, baixar = false) => squadUrlComToken(url + (baixar ? "?baixar=1" : "")),
 };
 
 // ── Envio com resposta aparecendo aos poucos (SSE lido do corpo do fetch) ──
