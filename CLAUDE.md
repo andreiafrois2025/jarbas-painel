@@ -37,6 +37,7 @@ Nunca mostrar dado operacional "de agora" lendo o snapshot noturno.
 | `/producao/fluxos` | FlowsPageV2 (FlowKanban + FlowCanvas) | Desenho de fluxos estilo excalidraw + kanban por categoria |
 | `/producao/estudio` | EstudioPage | Revisão da edição automática de reels (blocos, zooms, legendas, re-render) |
 | `/pessoal` | PessoalPage | Luiz (escola) + finanças (resumo do mês via squad-api) |
+| `/areas` | AreasPage | Porta Áreas (19/10/2026): abas Igam (processos + prazos do Outlook), Conteúdo (Esteira, Radar, Reels, Calendário) e Casa (Luiz, Finanças, Rotina). Faixa "Fazer agora" configurada em `src/lib/fazer-agora.ts`. Dados novos vêm de `/api/areas/{esteira,prazos-outlook,casa}` (squad-api, módulo `areas-v2.js`, só leitura). `?aba=casa&sub=financas` = tela completa de finanças |
 | `/metricas` | MetricasPage | Abas: Painel Geral, Produtividade IA, Saúde do sistema (ao vivo), Diário de bordo |
 | `/metricas/palestra` | (publico)/metricas/palestra | Modo palco público pra projetar em palestras |
 | `/biblioteca` | BibliotecaPage | Criações, Skills, Grafo do ecossistema (GrafoView), Grafo de conhecimento (GrafoConteudoView) |

@@ -13,6 +13,7 @@ import {
   statusRerender,
   urlVideo,
   formatarMMSS,
+  nomeLegivel,
   type ProjetoResumo,
   type ProjetoDetalhe,
   type Bloco,
@@ -52,7 +53,7 @@ function ListaProjetos({
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[var(--text-primary)] truncate">{p.titulo || p.name}</span>
+            <span className="text-sm font-medium text-[var(--text-primary)] truncate">{nomeLegivel(p)}</span>
             {p.renderizando && <span className="text-xs animate-pulse">⏳</span>}
           </div>
           <span className="text-xs text-[var(--text-muted)]">editado {tempoRelativo(p.criado_em)}</span>
@@ -412,7 +413,7 @@ function DetalheProjeto({
 
   const renomear = async () => {
     if (!projeto || renomeando) return;
-    const atual = projeto.titulo || name;
+    const atual = nomeLegivel(projeto);
     const novo = window.prompt("Novo nome do projeto:", atual)?.trim();
     if (!novo || novo === atual) return;
     setRenomeando(true);
@@ -440,7 +441,7 @@ function DetalheProjeto({
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-6">
       <div className="flex items-center gap-2 mb-4">
-        <h1 className="text-sm font-semibold text-[var(--text-primary)] truncate">{projeto.titulo || projeto.name}</h1>
+        <h1 className="text-sm font-semibold text-[var(--text-primary)] truncate">{nomeLegivel(projeto)}</h1>
         <button
           onClick={renomear}
           disabled={renomeando}

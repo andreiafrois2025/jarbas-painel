@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import Mascote from "./Mascote";
+import { fetchCatalogo } from "@/lib/biblioteca";
+import { ehPessoal } from "@/lib/modo";
+import { useRotaAreas, diaMes, hojeBR, type PrazosOutlook } from "@/lib/areas";
 import { useUI, Botao, Cartao, Vazio } from "./ui";
 import MarkdownLeve from "./MarkdownLeve";
 import {
@@ -164,12 +169,14 @@ function LinhaDoTempo({ etapas, estados }: { etapas: EtapaLic[]; estados: Estado
   const refAtual = useRef<HTMLLIElement>(null);
   const idxAtual = estados.findIndex((e) => e === "agora" || e === "espera" || e === "parou");
   useEffect(() => {
-    refAtual.current?.scrollIntoView({ block: "nearest" });
+    // rola só a lista de etapas; scrollIntoView arrastava a página inteira
+    const li = refAtual.current, lista = li?.parentElement;
+    if (li && lista) lista.scrollTop = Math.max(0, li.offsetTop - lista.clientHeight / 2);
   }, [idxAtual]);
 
   if (etapas.length === 0) return <p className="text-sm text-[var(--text-muted)]">Etapas indisponíveis agora.</p>;
   return (
-    <ol className="space-y-1.5 max-h-[26rem] overflow-y-auto pr-1">
+    <ol className="relative space-y-1.5 max-h-[26rem] overflow-y-auto pr-1">
       {etapas.map((e, i) => {
         const est = estados[i];
         const quem = nomeAgente(e.agent);
@@ -243,78 +250,6 @@ function ListaDocumentos({ backend, job, docs, aprox, onDrive }: {
   );
 }
 
-// ── Card de processo (uma execução) ─────────────────────────────────────
-function CardProcesso({ backend, job, area, onArea, docs, aprox, espera, selecionado, onSelecionar, onAlternar, onDrive }: {
-  backend: Backend; job: JobLic; area: AreaProc; onArea: (a: AreaTipo, setor: string) => Promise<void>; docs: ArquivoLic[]; aprox: boolean; espera: boolean; selecionado: boolean;
-  onSelecionar: () => void; onAlternar: () => void; onDrive: () => void;
-}) {
-  const [aberto, setAberto] = useState(false);
-  const [editandoArea, setEditandoArea] = useState(false);
-  const [areaTmp, setAreaTmp] = useState<AreaTipo>(area.area);
-  const [setorTmp, setSetorTmp] = useState(area.setor);
-  const [gravando, setGravando] = useState(false);
-  const st = STATUS_JOB[job.status] || STATUS_JOB.cancelled;
-  return (
-    <li className={`rounded-lg border transition-colors ${selecionado ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)]"}`}>
-      <button onClick={onSelecionar} aria-current={selecionado ? "true" : undefined} className="w-full text-left p-2.5 cursor-pointer">
-        <div className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
-          <span className="font-semibold text-[var(--text-primary)]">Processo {numeroProcesso(job)}</span>
-          <span>· {nomeSquad(job.squad)}</span>
-          <span className="ml-auto">{dataHoraCurta(job.startedAt)}</span>
-        </div>
-        <div className="text-sm line-clamp-2 mt-0.5">{job.topic}</div>
-        <div className="mt-1 flex flex-wrap gap-1.5 items-center">
-          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${st.cor}`}>{st.rotulo}</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${area.area === "geirh" ? "border-[var(--accent)] text-[var(--accent)]" : "border-[#A0583C] text-[#A0583C]"}`}>{rotuloArea(area)}</span>
-          {espera && <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#C4A460] bg-[#C4A460]/20">⏸ espera você</span>}
-          <span className="text-[10px] text-[var(--text-secondary)]">📄 {docs.length} {docs.length === 1 ? "documento" : "documentos"}{aprox ? " (aprox.)" : ""}</span>
-        </div>
-      </button>
-      <div className="flex gap-2 px-2.5 pb-2.5">
-        <button onClick={() => setAberto(!aberto)} aria-expanded={aberto} className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer">
-          {aberto ? "▾ Esconder documentos" : "▸ Documentos"}
-        </button>
-        <button
-          onClick={() => { setAreaTmp(area.area); setSetorTmp(area.setor); setEditandoArea(!editandoArea); }}
-          aria-expanded={editandoArea}
-          className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer"
-        >🏷️ Área</button>
-        <button
-          onClick={onAlternar}
-          aria-pressed={selecionado}
-          className={`text-xs px-2 py-1 rounded border cursor-pointer ${selecionado ? "border-[var(--accent)] bg-[var(--accent)] text-white" : "border-[var(--border)] hover:border-[var(--accent)]"}`}
-        >{selecionado ? "📂 Fechar processo" : "📁 Abrir processo"}</button>
-      </div>
-      {editandoArea && (
-        <div className="px-2.5 pb-2.5 border-t border-[var(--border)] pt-2 flex flex-wrap items-end gap-2">
-          <label className="text-xs">
-            <span className="block text-[var(--text-secondary)] mb-0.5">De quem é este processo?</span>
-            <select value={areaTmp} onChange={(e) => setAreaTmp(e.target.value as AreaTipo)} className="text-sm px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)]">
-              <option value="geirh">Geirh</option>
-              <option value="outras">Outras áreas</option>
-            </select>
-          </label>
-          {areaTmp === "outras" && (
-            <label className="text-xs">
-              <span className="block text-[var(--text-secondary)] mb-0.5">Setor (opcional)</span>
-              <input value={setorTmp} onChange={(e) => setSetorTmp(e.target.value)} maxLength={60} placeholder="ex.: GERUR" className="text-sm px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] w-32" />
-            </label>
-          )}
-          <Botao
-            disabled={gravando}
-            onClick={async () => { setGravando(true); try { await onArea(areaTmp, setorTmp); setEditandoArea(false); } finally { setGravando(false); } }}
-          >{gravando ? "Gravando…" : "Salvar"}</Botao>
-        </div>
-      )}
-      {aberto && (
-        <div className="px-2.5 pb-2.5 border-t border-[var(--border)] pt-2">
-          <ListaDocumentos backend={backend} job={job} docs={docs} aprox={aprox} onDrive={onDrive} />
-        </div>
-      )}
-    </li>
-  );
-}
-
 // ── Visão completa de um processo (painel à direita) ────
 function DetalheProcesso({ backend, job, area, etapas, estados, paradas, docs, aprox, aoVivo, ocupado, onDecidir, onParar, onDrive }: {
   backend: Backend; job: JobLic; area: AreaProc; etapas: EtapaLic[]; estados: EstadoEtapa[]; paradas: ParadaLic[];
@@ -355,7 +290,7 @@ function DetalheProcesso({ backend, job, area, etapas, estados, paradas, docs, a
         />
       ))}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(16rem,20rem)_1fr] items-start">
+      <div className="grid gap-4 2xl:grid-cols-[minmax(16rem,20rem)_1fr] items-start">
         <Cartao>
           <h2 className="font-semibold">Onde este processo está agora</h2>
           <p className="text-[11px] text-[var(--text-secondary)] mb-2">
@@ -390,8 +325,272 @@ function DetalheProcesso({ backend, job, area, etapas, estados, paradas, docs, a
   );
 }
 
+
+// ═══ Igam (redesenho 19/10/2026): cartões de processo + gaveta de novo processo ═══
+
+/** Primeira linha útil do pedido, sem marcação, como título do cartão. */
+function tituloDe(topic: string): string {
+  const linha = (topic || "").split("\n").map((l) => l.replace(/^[#>*\-\s]+/, "").trim()).find((l) => l.length > 3) || "Processo sem título";
+  return linha.length > 90 ? linha.slice(0, 87) + "…" : linha;
+}
+
+const NUMERO_DE_PASSOS = (estados: EstadoEtapa[]) => {
+  const i = estados.findIndex((e) => e !== "feita");
+  return i === -1 ? estados.length : i + 1;
+};
+
+function BarraEtapas({ estados }: { estados: EstadoEtapa[] }) {
+  if (estados.length === 0) return <div className="h-1.5 rounded-full bg-[var(--border)] opacity-60" aria-hidden />;
+  return (
+    <div className="flex gap-1" role="img" aria-label={`etapa ${NUMERO_DE_PASSOS(estados)} de ${estados.length}`}>
+      {estados.map((e, i) => (
+        <span
+          key={i}
+          className="h-1.5 flex-1 rounded-full"
+          style={{ background: e === "feita" ? "var(--af-teal)" : e === "fila" ? "var(--border)" : "var(--ouro)" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CartaoProcesso({
+  backend, job, area, onArea, docs, etapas, estados, paradas, aberto, onAlternar, children,
+}: {
+  backend: Backend; job: JobLic; area: AreaProc; onArea: (a: AreaTipo, setor: string) => Promise<void>;
+  docs: ArquivoLic[]; etapas: EtapaLic[]; estados: EstadoEtapa[]; paradas: ParadaLic[];
+  aberto: boolean; onAlternar: () => void; children?: React.ReactNode;
+}) {
+  const [editandoArea, setEditandoArea] = useState(false);
+  const [areaTmp, setAreaTmp] = useState<AreaTipo>(area.area);
+  const [setorTmp, setSetorTmp] = useState(area.setor);
+  const [gravando, setGravando] = useState(false);
+  const st = STATUS_JOB[job.status] || STATUS_JOB.cancelled;
+  const concluido = job.status === "completed";
+  const espera = paradas[0];
+  const idx = estados.findIndex((e) => e !== "feita");
+  const etapaAtual = idx >= 0 ? etapas[idx] : undefined;
+  const total = etapas.length;
+  const n = NUMERO_DE_PASSOS(estados);
+  const pacote = docs.find((d) => /pacote/i.test(d.name) && temDocx(d.name)) || docs.find((d) => temDocx(d.name));
+
+  const ultimaLinha = () => {
+    if (espera) {
+      const oque = espera.stepName.replace(/^checkpoint-/, "").replace(/-/g, " ");
+      return (
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0" style={{ background: "var(--ouro)", color: "var(--on-ac)" }} aria-hidden>AF</span>
+          <p className="text-sm min-w-0"><b>Esperando você:</b> <span className="text-[var(--text-secondary)]">{oque}</span></p>
+          <button onClick={aberto ? undefined : onAlternar} className="ml-auto shrink-0 px-4 py-1.5 rounded-full text-[13px] font-bold cursor-pointer" style={{ background: "var(--ac)", color: "var(--on-ac)" }}>
+            {aberto ? "Aberto abaixo" : "Revisar"}
+          </button>
+        </div>
+      );
+    }
+    if (concluido) {
+      return (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span>✅ Pronto</span>
+          {pacote
+            ? <BaixarDoc backend={backend} job={job} nome={pacote.name} />
+            : <span className="text-[var(--text-muted)] text-xs">{docs.length === 0 ? "sem documentos" : "pacote em formato não convertível"}</span>}
+        </div>
+      );
+    }
+    if (job.status === "running") {
+      const quem = nomeAgente(etapaAtual?.agent);
+      return (
+        <div className="flex items-center gap-2.5 min-w-0 text-sm">
+          <Mascote nome={etapaAtual?.agent} emoji="🤖" tamanho={30} />
+          <span className="min-w-0 truncate">{quem || "A squad"} trabalhando{etapaAtual ? <span className="text-[var(--text-secondary)]">: {rotuloEtapa(etapaAtual)}</span> : null}</span>
+        </div>
+      );
+    }
+    return (
+      <p className="text-sm text-[var(--text-secondary)]">
+        <span className={`text-[11px] px-1.5 py-0.5 rounded border mr-2 ${st.cor}`}>{st.rotulo}</span>
+        {etapaAtual ? `parou em: ${rotuloEtapa(etapaAtual)}` : "encerrado"}
+      </p>
+    );
+  };
+
+  return (
+    <li className={`rounded-xl border ${espera ? "border-[var(--ouro)]" : "border-[var(--border)]"} bg-[var(--bg-secondary)]`} style={{ boxShadow: "0 1px 2px var(--sombra)" }}>
+      <div className="p-4">
+        <div className="flex items-start gap-2">
+          <h3 className="text-[15px] md:text-base font-bold leading-snug min-w-0 flex-1 break-words">{tituloDe(job.topic)}</h3>
+          <button
+            onClick={() => { setAreaTmp(area.area); setSetorTmp(area.setor); setEditandoArea(!editandoArea); }}
+            aria-expanded={editandoArea}
+            title="De quem é este processo?"
+            className="text-[11px] px-2 py-0.5 rounded-full border border-[var(--border-light)] text-[var(--text-secondary)] hover:border-[var(--ac)] cursor-pointer shrink-0"
+          >🏷️ {rotuloArea(area)}</button>
+        </div>
+        <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">
+          {nomeSquad(job.squad)} · aberto em {dataHoraCurta(job.startedAt).slice(0, 5)}
+          {total > 0 ? ` · ${concluido ? `${total} etapas` : `etapa ${n} de ${total}`}` : ""}
+        </p>
+        <div className="mt-2.5"><BarraEtapas estados={estados} /></div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="flex-1 min-w-[12rem]">{ultimaLinha()}</div>
+          {!(espera && !aberto) && (
+            <button
+              onClick={onAlternar}
+              aria-expanded={aberto}
+              className="text-[13px] px-3 py-1.5 rounded-full border border-[var(--border-light)] hover:border-[var(--ac)] font-semibold cursor-pointer"
+            >{aberto ? "▾ Fechar processo" : espera ? "Abrir processo" : "Ver documentos"}</button>
+          )}
+        </div>
+        {editandoArea && (
+          <div className="mt-3 pt-3 border-t border-[var(--border)] flex flex-wrap items-end gap-2">
+            <label className="text-xs">
+              <span className="block text-[var(--text-secondary)] mb-0.5">De quem é este processo?</span>
+              <select value={areaTmp} onChange={(e) => setAreaTmp(e.target.value as AreaTipo)} className="text-sm px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)]">
+                <option value="geirh">Geirh</option>
+                <option value="outras">Outras áreas</option>
+              </select>
+            </label>
+            {areaTmp === "outras" && (
+              <label className="text-xs">
+                <span className="block text-[var(--text-secondary)] mb-0.5">Setor (opcional)</span>
+                <input value={setorTmp} onChange={(e) => setSetorTmp(e.target.value)} maxLength={60} placeholder="ex.: GERUR" className="text-sm px-2 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] w-32" />
+              </label>
+            )}
+            <Botao
+              disabled={gravando}
+              onClick={async () => { setGravando(true); try { await onArea(areaTmp, setorTmp); setEditandoArea(false); } finally { setGravando(false); } }}
+            >{gravando ? "Gravando…" : "Salvar"}</Botao>
+          </div>
+        )}
+      </div>
+      {aberto && <div className="border-t border-[var(--border)] p-3 md:p-4 bg-[var(--bg-primary)] rounded-b-xl">{children}</div>}
+    </li>
+  );
+}
+
+// ── Coluna da direita ───────────────────────────────────────────────────
+const TituloCartao = ({ children, direita }: { children: React.ReactNode; direita?: React.ReactNode }) => (
+  <div className="flex items-baseline justify-between gap-2 mb-3">
+    <h2 className="text-xs font-bold uppercase tracking-[0.09em] text-[var(--text-secondary)]">{children}</h2>
+    {direita}
+  </div>
+);
+
+function PrazosOutlook() {
+  const { dados, erro, carregando } = useRotaAreas<PrazosOutlook>("/api/areas/prazos-outlook");
+  const hoje = hojeBR();
+  const quando = dados?.atualizado_em
+    ? (() => {
+        const d = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(dados.atualizado_em));
+        return `${d === hoje ? "hoje" : diaMes(d)} ${dataHoraCurta(dados.atualizado_em).split(" ")[1]}`;
+      })()
+    : "";
+  return (
+    <Cartao>
+      <TituloCartao direita={quando && <span className="text-[11px] font-bold text-[var(--ac)] text-right">pela ponte do ChatGPT · {quando}</span>}>Prazos do Outlook</TituloCartao>
+      {carregando ? <p className="text-sm text-[var(--text-muted)]">carregando…</p>
+        : erro || dados?.erro ? <p className="text-sm text-[var(--text-secondary)]">Não consegui ler os prazos agora. Os que já viraram tarefa continuam no Notion.</p>
+        : !dados || dados.itens.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">Nenhum prazo novo.</p>
+        : (
+          <ul>
+            {dados.itens.map((p) => (
+              <li key={p.url} className="grid grid-cols-[3.2rem_1fr_auto] gap-x-2 items-start py-2 border-b border-dashed border-[var(--border)] last:border-0">
+                <span className="text-sm font-bold" style={{ color: p.prazo < hoje ? "var(--danger)" : "var(--uau)" }}>{diaMes(p.prazo)}</span>
+                <span className="text-sm min-w-0">
+                  {p.assunto}
+                  {p.fazer && <span className="block text-xs text-[var(--text-secondary)]">{p.fazer}</span>}
+                </span>
+                <a href={p.url} target="_blank" rel="noreferrer" className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--ac)] whitespace-nowrap">Notion ↗</a>
+              </li>
+            ))}
+          </ul>
+        )}
+    </Cartao>
+  );
+}
+
+const ehDoIgam = (...t: (string | undefined)[]) => /igam|seirh|infohidro|geoportal|geirh|licita|norma|outorga|hidric|hídric/i.test(t.filter(Boolean).join(" "));
+
+function AtalhosIgam() {
+  const [lista, setLista] = useState<{ rotulo: string; url: string; icone: string }[] | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    fetchCatalogo().then((c) => {
+      if (!vivo) return;
+      const itens: { rotulo: string; url: string; icone: string }[] = [];
+      for (const cr of c?.criacoes || []) {
+        for (const l of cr.links) {
+          if (!ehDoIgam(cr.nome, cr.descricao, l.rotulo, l.url)) continue;
+          if (ehPessoal(cr.nome, cr.descricao, l.rotulo)) continue;
+          const nome = /^igam$/i.test(cr.nome.trim()) ? l.rotulo : cr.nome + (l.rotulo && l.rotulo !== "Abrir" ? ` · ${l.rotulo}` : "");
+          itens.push({ rotulo: nome, url: l.url, icone: cr.icone });
+        }
+      }
+      setLista(itens);
+    });
+    return () => { vivo = false; };
+  }, []);
+  return (
+    <Cartao>
+      <TituloCartao direita={<Link href="/config" className="text-[11px] font-bold text-[var(--ac)]">editar em Ajustes ›</Link>}>Atalhos do Igam</TituloCartao>
+      {lista === null ? <p className="text-sm text-[var(--text-muted)]">carregando…</p>
+        : lista.length === 0 ? <p className="text-sm text-[var(--text-secondary)]">Nenhum atalho do Igam cadastrado ainda. Eles vêm de Ajustes › Atalhos.</p>
+        : (
+          <div className="flex flex-wrap gap-2">
+            {lista.map((l) => (
+              <a key={l.url} href={l.url} target="_blank" rel="noreferrer"
+                className="px-3 py-1.5 rounded-full border border-[var(--border-light)] text-[13px] font-semibold hover:border-[var(--ac)]">{l.icone} {l.rotulo}</a>
+            ))}
+          </div>
+        )}
+    </Cartao>
+  );
+}
+
+const EQUIPE_IGAM = ["donna", "katrina", "harvey", "mike", "louis", "eric"];
+function EquipeQueCuida() {
+  return (
+    <Cartao>
+      <TituloCartao>Equipe que cuida</TituloCartao>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex gap-1.5">
+          {EQUIPE_IGAM.map((id) => (
+            <span key={id} title={nomeAgente(id) || id}><Mascote nome={id} emoji="🤖" tamanho={44} /></span>
+          ))}
+        </div>
+        <p className="text-[13px] text-[var(--text-secondary)] flex-1 min-w-[10rem]">documentos, parecer, parte técnica, normas e preços</p>
+      </div>
+    </Cartao>
+  );
+}
+
+// ── Gaveta lateral (novo processo) ──────────────────────────────────────
+function Gaveta({ titulo, onFechar, children }: { titulo: React.ReactNode; onFechar: () => void; children: React.ReactNode }) {
+  const caixa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const aoTeclar = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); onFechar(); } };
+    document.addEventListener("keydown", aoTeclar);
+    caixa.current?.querySelector<HTMLElement>("textarea, button")?.focus();
+    return () => { document.removeEventListener("keydown", aoTeclar); document.body.style.overflow = antes; };
+  }, [onFechar]);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/45 flex justify-end" onClick={onFechar} role="presentation">
+      <div ref={caixa} role="dialog" aria-modal="true" aria-label="Novo processo" onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg h-full bg-[var(--bg-primary)] border-l border-[var(--border)] flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border)] shrink-0">
+          <h2 className="font-bold">{titulo}</h2>
+          <button onClick={onFechar} aria-label="Fechar (Esc)" className="text-xl leading-none text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer">✕</button>
+        </div>
+        <div className="p-4 overflow-y-auto flex-1">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Página ──────────────────────────────────────────────────────────────
-export default function LicitacaoPage() {
+export default function LicitacaoPage({ pedidoNovo = 0 }: { pedidoNovo?: number }) {
   const { confirmar, avisar } = useUI();
   const [demo, setDemo] = useState(false);
   const backend = demo ? backendDemo : backendReal;
@@ -406,11 +605,12 @@ export default function LicitacaoPage() {
   const [carregou, setCarregou] = useState(false);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [aoVivo, setAoVivo] = useState("");
-  const [verEtapas, setVerEtapas] = useState(false);
   const [areas, setAreas] = useState<Record<string, AreaProc>>({});
   const [filtroArea, setFiltroArea] = useState<"todas" | AreaTipo>("todas");
+  const [verConcluidos, setVerConcluidos] = useState(false);
+  const [gaveta, setGaveta] = useState(false);
 
-  // formulário
+  // formulário (mesmo de antes, agora dentro da gaveta)
   const [squad, setSquad] = useState<SquadId>("apoio-licitacao-outro-setor");
   const [topic, setTopic] = useState("");
   const [anexos, setAnexos] = useState<File[]>([]);
@@ -419,8 +619,10 @@ export default function LicitacaoPage() {
   const [exemploCarregado, setExemploCarregado] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const job = jobs.find((j) => j.jobId === selecionado) || null;
   const grupoDe = useCallback((j: JobLic) => (demo ? j.jobId : j.squad), [demo]);
+
+  // o botão "Nova licitação" da faixa Fazer agora abre a gaveta
+  useEffect(() => { if (pedidoNovo > 0) setGaveta(true); }, [pedidoNovo]);
 
   // ── atualização periódica ─────────────────────────────────────────────
   const atualizar = useCallback(async () => {
@@ -437,7 +639,6 @@ export default function LicitacaoPage() {
       }));
       setParadas(mapa);
       backend.areas().then(setAreas).catch(() => {});
-      // um pedido de arquivos por grupo (basta um processo de cada squad: a pasta é a mesma)
       const grupos = new Map<string, string>();
       lista.forEach((j) => { const g = backend.demo ? j.jobId : j.squad; if (!grupos.has(g)) grupos.set(g, j.jobId); });
       const novos: Record<string, ArquivoLic[]> = {};
@@ -459,43 +660,32 @@ export default function LicitacaoPage() {
     return () => clearInterval(id);
   }, [atualizar]);
 
-  // trocar entre real e demonstração zera a seleção
   useEffect(() => {
     setJobs([]); setParadas({}); setSelecionado(null); setArquivosGrupo({}); setAreas({}); setCarregou(false); setAoVivo("");
   }, [demo]);
 
-  // só a Licitação com parada esperando seleciona sozinha; fora isso ela escolhe
+  // etapas do pipeline de cada squad que aparece na lista (precisa para "etapa N de M")
+  const squadsNaLista = useMemo(() => [...new Set(jobs.map((j) => j.squad))], [jobs]);
   useEffect(() => {
-    if (selecionado) return;
-    const esperando = jobs.find((j) => paradas[j.jobId]);
-    if (esperando) setSelecionado(esperando.jobId);
-  }, [jobs, paradas, selecionado]);
+    squadsNaLista.forEach((sq) => {
+      if (etapasPorSquad[sq]) return;
+      backend.etapas(sq).then((e) => setEtapasPorSquad((p) => ({ ...p, [sq]: e }))).catch(() => {});
+    });
+  }, [backend, squadsNaLista, etapasPorSquad]);
 
-  // etapas do pipeline: da squad do processo escolhido, ou da squad do formulário ao "ver as etapas"
-  const squadEtapas = job?.squad || (verEtapas ? squad : undefined);
-  useEffect(() => {
-    if (!squadEtapas || etapasPorSquad[squadEtapas]) return;
-    backend.etapas(squadEtapas).then((e) => setEtapasPorSquad((p) => ({ ...p, [squadEtapas]: e }))).catch(() => {});
-  }, [backend, squadEtapas, etapasPorSquad]);
-
-  // acompanhamento ao vivo do processo escolhido
+  const job = jobs.find((j) => j.jobId === selecionado) || null;
   const statusSel = job?.status;
   const jobSel = job?.jobId;
   useEffect(() => {
     setAoVivo("");
     if (!jobSel || statusSel !== "running") return;
-    const fechar = backend.acompanhar(jobSel, (t) => setAoVivo((a) => (a + t).slice(-4000)));
-    return fechar;
+    return backend.acompanhar(jobSel, (t) => setAoVivo((a) => (a + t).slice(-4000)));
   }, [backend, jobSel, statusSel]);
 
   const docsDe = useCallback(
     (j: JobLic) => arquivosDoJob(arquivosGrupo[grupoDe(j)] || [], j),
     [arquivosGrupo, grupoDe],
   );
-  const etapas = job ? etapasPorSquad[job.squad] || [] : [];
-  const paradasDoJob = job ? paradas[job.jobId] || [] : [];
-  const estados = job ? estadoDasEtapas(etapas, job, paradasDoJob) : [];
-  const totalParadas = Object.values(paradas).reduce((n, p) => n + p.length, 0);
 
   // ── formulário ────────────────────────────────────────────────────────
   function adicionarArquivos(lista: FileList | File[]) {
@@ -528,7 +718,7 @@ export default function LicitacaoPage() {
     try {
       const id = await backend.iniciar(squad, topic, anexos);
       setTopic(""); setAnexos([]); setExemploCarregado(false);
-      setSelecionado(id); setVerEtapas(false);
+      setSelecionado(id); setGaveta(false);
       await atualizar();
     } catch (e) {
       avisar(msgErro(e));
@@ -538,7 +728,10 @@ export default function LicitacaoPage() {
   }
 
   const areaDe = (j: JobLic) => areaDoProcesso(j, areas);
-  const jobsFiltrados = filtroArea === "todas" ? jobs : jobs.filter((j) => areaDe(j).area === filtroArea);
+  const filtrados = filtroArea === "todas" ? jobs : jobs.filter((j) => areaDe(j).area === filtroArea);
+  const emAndamento = filtrados.filter((j) => ["running", "paused", "interrupted", "failed"].includes(j.status));
+  const encerrados = filtrados.filter((j) => !["running", "paused", "interrupted", "failed"].includes(j.status));
+  const [recente, ...maisConcluidos] = encerrados;
 
   async function definirArea(j: JobLic, area: AreaTipo, setor: string) {
     try {
@@ -555,7 +748,6 @@ export default function LicitacaoPage() {
     setOcupado(`${p.jobId}:${p.stepId}`);
     try {
       await backend.decidir(p.jobId, p.stepId, aprovado, comentario);
-      // some o cartão na hora; o próximo ciclo traz a parada seguinte, se houver
       setParadas((m) => ({ ...m, [p.jobId]: (m[p.jobId] || []).filter((x) => x.stepId !== p.stepId) }));
       avisar(aprovado ? "Aprovado. A squad segue." : "Pedido de ajuste enviado. A squad vai refazer a etapa.");
       setTimeout(atualizar, 1500);
@@ -576,23 +768,30 @@ export default function LicitacaoPage() {
     try { await backend.salvarNoDrive(j.jobId); avisar(demo ? "Na demonstração não há Drive." : "Enviando ao Drive. Confira em cerca de 30 segundos."); } catch (e) { avisar(msgErro(e)); }
   }
 
-  const detalhe = job && (
-    <DetalheProcesso
-      backend={backend}
-      job={job}
-      area={areaDe(job)}
-      etapas={etapas}
-      estados={estados}
-      paradas={paradasDoJob}
-      docs={docsDe(job)}
-      aprox={atribuicaoAproximada(job, jobs) && !demo}
-      aoVivo={aoVivo}
-      ocupado={ocupado}
-      onDecidir={decidir}
-      onParar={() => parar(job)}
-      onDrive={() => salvarNoDrive(job)}
-    />
-  );
+  const cartao = (j: JobLic) => {
+    const etapas = etapasPorSquad[j.squad] || [];
+    const pj = paradas[j.jobId] || [];
+    const estados = estadoDasEtapas(etapas, j, pj);
+    const aberto = selecionado === j.jobId;
+    return (
+      <CartaoProcesso
+        key={j.jobId}
+        backend={backend} job={j} area={areaDe(j)} onArea={(a, st) => definirArea(j, a, st)}
+        docs={docsDe(j)} etapas={etapas} estados={estados} paradas={pj}
+        aberto={aberto}
+        onAlternar={() => setSelecionado(aberto ? null : j.jobId)}
+      >
+        {aberto && (
+          <DetalheProcesso
+            backend={backend} job={j} area={areaDe(j)} etapas={etapas} estados={estados} paradas={pj}
+            docs={docsDe(j)} aprox={atribuicaoAproximada(j, jobs) && !demo}
+            aoVivo={aoVivo} ocupado={ocupado}
+            onDecidir={decidir} onParar={() => parar(j)} onDrive={() => salvarNoDrive(j)}
+          />
+        )}
+      </CartaoProcesso>
+    );
+  };
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -600,6 +799,7 @@ export default function LicitacaoPage() {
         <div className="px-3 md:px-5 py-2 bg-[#C4A460]/25 border-b border-[#C4A460] text-sm flex flex-wrap items-center gap-2" role="status">
           <b>Demonstração simulada.</b>
           <span>Nada vai para a VPS, nenhuma squad roda de verdade e todo o conteúdo é EXEMPLO FICTÍCIO.</span>
+          <button onClick={() => setDemo(false)} className="underline cursor-pointer">sair da demonstração</button>
         </div>
       )}
       {semResposta && !demo && (
@@ -608,174 +808,123 @@ export default function LicitacaoPage() {
           <span className="text-[var(--text-secondary)]">Não consegui falar com a VPS agora, então <b>não sei dizer</b> o andamento dos processos.</span>
         </div>
       )}
-      {totalParadas > 0 && (
-        <button
-          onClick={() => setSelecionado(Object.keys(paradas)[0])}
-          className="w-full text-left px-3 md:px-5 py-2 bg-[#C4A460]/20 border-b border-[#C4A460] text-sm cursor-pointer"
-        >
-          ⏸ <b>{totalParadas} {totalParadas === 1 ? "parada esperando" : "paradas esperando"} você.</b> Clique para ver.
-        </button>
-      )}
 
-      <div className="p-3 md:p-5 grid gap-4 lg:grid-cols-[minmax(20rem,26rem)_1fr] items-start">
-        {/* ── coluna da esquerda: nova execução + processos ── */}
-        <div className="space-y-4 min-w-0">
-          <Cartao>
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-semibold">Novo processo</h2>
-              <label className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} />
-                demonstração simulada
-              </label>
-            </div>
-
-            <div className="space-y-2 mb-3" role="radiogroup" aria-label="Qual squad">
-              {SQUADS_LICITACAO.map((s) => (
-                <label
-                  key={s.id}
-                  className={`block rounded-lg border p-3 cursor-pointer transition-colors ${squad === s.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)] hover:border-[var(--accent)]"}`}
-                >
-                  <input type="radio" name="squad-licitacao" className="sr-only" checked={squad === s.id} onChange={() => setSquad(s.id)} />
-                  <div className="text-sm font-medium">{s.icone} {s.nome}</div>
-                  <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{s.resumo}</div>
-                </label>
+      <div className="p-3 md:p-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)] items-start">
+        {/* ── processos ── */}
+        <Cartao className="min-w-0 !p-4 md:!p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-[0.09em] text-[var(--text-secondary)]">Processos em andamento</h2>
+            <button onClick={() => setGaveta(true)} className="px-4 py-2 rounded-full text-[13px] font-bold uppercase tracking-wide cursor-pointer" style={{ background: "var(--ac)", color: "var(--on-ac)" }}>
+              + Novo processo
+            </button>
+          </div>
+          {jobs.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="Filtrar por área">
+              {([["todas", "Todas"], ["geirh", "Geirh"], ["outras", "Outras áreas"]] as const).map(([v, r]) => (
+                <button key={v} onClick={() => setFiltroArea(v)} aria-pressed={filtroArea === v}
+                  className={`text-xs px-3 py-1 rounded-full border cursor-pointer ${filtroArea === v ? "bg-[var(--ac)] border-[var(--ac)] text-[var(--on-ac)]" : "border-[var(--border-light)] hover:border-[var(--ac)]"}`}>{r}</button>
               ))}
             </div>
-
-            <label className="block text-sm font-medium mb-1" htmlFor="topic-licitacao">Pedido / demanda</label>
-            <textarea
-              id="topic-licitacao"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="Cole aqui o pedido do setor, o objeto, o nº do SEI, a modalidade e o que já se sabe."
-              className="w-full min-h-[130px] px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-            />
-
-            <div
-              onDragOver={(e) => { e.preventDefault(); setArrastando(true); }}
-              onDragLeave={() => setArrastando(false)}
-              onDrop={(e) => { e.preventDefault(); setArrastando(false); adicionarArquivos(e.dataTransfer.files); }}
-              onClick={() => inputRef.current?.click()}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); } }}
-              role="button"
-              tabIndex={0}
-              className={`mt-3 rounded-lg border-2 border-dashed p-3 text-center text-xs cursor-pointer transition-colors ${arrastando ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)] text-[var(--text-secondary)]"}`}
-            >
-              📎 Arraste os anexos aqui ou clique para escolher
-              <div className="text-[10px] text-[var(--text-muted)] mt-0.5">ofício, carta de exclusividade, proposta, planilhas… ficam na VPS, protegidos por login</div>
-              <input
-                ref={inputRef} type="file" multiple accept={TIPOS_ANEXO} className="hidden"
-                onChange={(e) => { if (e.target.files) adicionarArquivos(e.target.files); e.target.value = ""; }}
-              />
-            </div>
-
-            {anexos.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {anexos.map((f) => (
-                  <li key={`${f.name}-${f.size}`} className="flex items-center gap-2 text-xs bg-[var(--bg-tertiary)] rounded px-2 py-1">
-                    <span className="flex-1 truncate" title={f.name}>{f.name}</span>
-                    <span className="text-[var(--text-muted)] shrink-0">{tamanho(f.size)}</span>
-                    <button
-                      aria-label={`Remover ${f.name}`}
-                      onClick={() => setAnexos((a) => a.filter((x) => x !== f))}
-                      className="text-[var(--text-muted)] hover:text-red-500 cursor-pointer"
-                    >×</button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="flex flex-wrap gap-2 mt-3">
-              <Botao tipo="secundario" onClick={carregarExemplo} disabled={iniciando}>🎓 Carregar exemplo do curso</Botao>
-              <Botao onClick={iniciar} disabled={iniciando || !topic.trim()} className="flex-1">
-                {iniciando ? "Iniciando…" : "▶️ Iniciar"}
-              </Botao>
-            </div>
-            {exemploCarregado && (
-              <p className="text-[11px] text-[#A0583C] mt-2">
-                Exemplo FICTÍCIO da Geirh carregado (software e empresa inventados). Pode editar o texto antes de iniciar.
-              </p>
-            )}
-          </Cartao>
-
-          <Cartao>
-            <h2 className="font-semibold mb-1">Processos</h2>
-            <p className="text-[11px] text-[var(--text-secondary)] mb-2">Cada card é um processo (uma execução da squad) com os documentos que ele gerou.</p>
-            {!carregou ? (
-              <p className="text-sm text-[var(--text-muted)]">carregando…</p>
-            ) : jobs.length === 0 ? (
-              <p className="text-sm text-[var(--text-muted)]">Nenhum processo ainda.</p>
-            ) : (
-              <>
-              <div className="flex flex-wrap gap-1.5 mb-2" role="group" aria-label="Filtrar por área">
-                {([["todas", "Todas"], ["geirh", "Geirh"], ["outras", "Outras áreas"]] as const).map(([v, r]) => (
-                  <button
-                    key={v}
-                    onClick={() => setFiltroArea(v)}
-                    aria-pressed={filtroArea === v}
-                    className={`text-xs px-3 py-1 rounded-full border cursor-pointer ${filtroArea === v ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "border-[var(--border)] hover:border-[var(--accent)]"}`}
-                  >{r}</button>
-                ))}
-              </div>
-              {jobsFiltrados.length === 0 && <p className="text-sm text-[var(--text-muted)]">Nenhum processo nesta área.</p>}
-              <ul className="space-y-2">
-                {jobsFiltrados.map((j) => (
-                  <CardProcesso
-                    key={j.jobId}
-                    backend={backend}
-                    job={j}
-                    area={areaDe(j)}
-                    onArea={(a, st) => definirArea(j, a, st)}
-                    docs={docsDe(j)}
-                    aprox={!demo && atribuicaoAproximada(j, jobs)}
-                    espera={!!paradas[j.jobId]}
-                    selecionado={selecionado === j.jobId}
-                    onSelecionar={() => { setSelecionado(j.jobId); setVerEtapas(false); }}
-                    onAlternar={() => { setSelecionado(selecionado === j.jobId ? null : j.jobId); setVerEtapas(false); }}
-                    onDrive={() => salvarNoDrive(j)}
-                  />
-                ))}
-              </ul>
-              </>
-            )}
-            <p className="text-[10px] text-[var(--text-muted)] mt-2">Mostra os últimos 20 processos registrados na squad-api.</p>
-          </Cartao>
-        </div>
-
-        {/* ── coluna da direita: o processo escolhido ── */}
-        <div className="min-w-0">
-          {!job ? (
-            <Cartao>
-              <Vazio
-                icone="🗂️"
-                titulo="Escolha um processo à esquerda ou inicie um novo"
-                descricao="Ao escolher um processo, você vê aqui onde ele está agora, as paradas que esperam você e os documentos dele."
-                acao={
-                  <button
-                    onClick={() => setVerEtapas(!verEtapas)}
-                    className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer mt-1"
-                  >{verEtapas ? "Esconder as etapas" : `Ver as etapas da squad ${nomeSquad(squad)}`}</button>
-                }
-              />
-              {verEtapas && (
-                <div className="border-t border-[var(--border)] pt-3 mt-2">
-                  <h3 className="font-semibold text-sm">Como esta squad trabalha</h3>
-                  <p className="text-[11px] text-[var(--text-secondary)] mb-2">
-                    {nomeSquad(squad)}: a sequência de etapas que ela segue em todo processo. Não é o andamento de nenhum processo específico.
-                  </p>
-                  <LinhaDoTempo
-                    etapas={etapasPorSquad[squad] || []}
-                    estados={(etapasPorSquad[squad] || []).map(() => "fila" as EstadoEtapa)}
-                  />
-                </div>
-              )}
-            </Cartao>
-          ) : (
-            detalhe
           )}
+          {!carregou ? (
+            <p className="text-sm text-[var(--text-muted)]">carregando…</p>
+          ) : jobs.length === 0 ? (
+            <Vazio icone="🗂️" titulo="Nenhum processo ainda"
+              descricao="Use “+ Novo processo” para abrir o primeiro. Cada processo é uma execução da squad, com paradas para você aprovar."
+              acao={<button onClick={() => setGaveta(true)} className="text-xs px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer mt-1">+ Novo processo</button>} />
+          ) : (
+            <>
+              {emAndamento.length === 0 && <p className="text-sm text-[var(--text-secondary)] mb-3">Nada em andamento agora.</p>}
+              <ul className="space-y-3">
+                {emAndamento.map(cartao)}
+                {recente && cartao(recente)}
+              </ul>
+              {maisConcluidos.length > 0 && (
+                <>
+                  <button onClick={() => setVerConcluidos(!verConcluidos)} aria-expanded={verConcluidos}
+                    className="mt-3 w-full text-left text-sm text-[var(--text-secondary)] rounded-xl border border-dashed border-[var(--border-light)] px-4 py-3 hover:border-[var(--ac)] cursor-pointer">
+                    {verConcluidos ? "▾ Esconder os concluídos" : `Mais ${maisConcluidos.length} ${maisConcluidos.length === 1 ? "concluído" : "concluídos"} ›`}
+                  </button>
+                  {verConcluidos && <ul className="space-y-3 mt-3">{maisConcluidos.map(cartao)}</ul>}
+                </>
+              )}
+            </>
+          )}
+          <p className="text-[10px] text-[var(--text-muted)] mt-3">Mostra os últimos 20 processos registrados na squad-api.</p>
+        </Cartao>
+
+        {/* ── coluna da direita ── */}
+        <div className="space-y-4 min-w-0">
+          <PrazosOutlook />
+          <AtalhosIgam />
+          <EquipeQueCuida />
         </div>
       </div>
 
+      {gaveta && (
+        <Gaveta titulo="Novo processo" onFechar={() => setGaveta(false)}>
+          <label className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1.5 cursor-pointer mb-3">
+            <input type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} />
+            demonstração simulada
+          </label>
+
+          <div className="space-y-2 mb-3" role="radiogroup" aria-label="Qual squad">
+            {SQUADS_LICITACAO.map((s) => (
+              <label key={s.id}
+                className={`block rounded-lg border p-3 cursor-pointer transition-colors ${squad === s.id ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)] hover:border-[var(--accent)]"}`}>
+                <input type="radio" name="squad-licitacao" className="sr-only" checked={squad === s.id} onChange={() => setSquad(s.id)} />
+                <div className="text-sm font-medium">{s.icone} {s.nome}</div>
+                <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{s.resumo}</div>
+              </label>
+            ))}
+          </div>
+
+          <label className="block text-sm font-medium mb-1" htmlFor="topic-licitacao">Pedido / demanda</label>
+          <textarea id="topic-licitacao" value={topic} onChange={(e) => setTopic(e.target.value)}
+            placeholder="Cole aqui o pedido do setor, o objeto, o nº do SEI, a modalidade e o que já se sabe."
+            className="w-full min-h-[160px] px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-tertiary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]" />
+
+          <div
+            onDragOver={(e) => { e.preventDefault(); setArrastando(true); }}
+            onDragLeave={() => setArrastando(false)}
+            onDrop={(e) => { e.preventDefault(); setArrastando(false); adicionarArquivos(e.dataTransfer.files); }}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); } }}
+            role="button" tabIndex={0}
+            className={`mt-3 rounded-lg border-2 border-dashed p-3 text-center text-xs cursor-pointer transition-colors ${arrastando ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--border)] text-[var(--text-secondary)]"}`}
+          >
+            📎 Arraste os anexos aqui ou clique para escolher
+            <div className="text-[10px] text-[var(--text-muted)] mt-0.5">ofício, carta de exclusividade, proposta, planilhas… ficam na VPS, protegidos por login</div>
+            <input ref={inputRef} type="file" multiple accept={TIPOS_ANEXO} className="hidden"
+              onChange={(e) => { if (e.target.files) adicionarArquivos(e.target.files); e.target.value = ""; }} />
+          </div>
+
+          {anexos.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {anexos.map((f) => (
+                <li key={`${f.name}-${f.size}`} className="flex items-center gap-2 text-xs bg-[var(--bg-tertiary)] rounded px-2 py-1">
+                  <span className="flex-1 truncate" title={f.name}>{f.name}</span>
+                  <span className="text-[var(--text-muted)] shrink-0">{tamanho(f.size)}</span>
+                  <button aria-label={`Remover ${f.name}`} onClick={() => setAnexos((a) => a.filter((x) => x !== f))}
+                    className="text-[var(--text-muted)] hover:text-red-500 cursor-pointer">×</button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="flex flex-wrap gap-2 mt-3">
+            <Botao tipo="secundario" onClick={carregarExemplo} disabled={iniciando}>🎓 Carregar exemplo do curso</Botao>
+            <Botao onClick={iniciar} disabled={iniciando || !topic.trim()} className="flex-1">
+              {iniciando ? "Iniciando…" : "▶️ Iniciar"}
+            </Botao>
+          </div>
+          {exemploCarregado && (
+            <p className="text-[11px] text-[#A0583C] mt-2">
+              Exemplo FICTÍCIO da Geirh carregado (software e empresa inventados). Pode editar o texto antes de iniciar.
+            </p>
+          )}
+        </Gaveta>
+      )}
     </div>
   );
 }

@@ -24,8 +24,10 @@ const LINKS_FINANCAS = [
   { rotulo: "Revisão Diária (registrar o dia)", url: "https://app.notion.com/p/2fbb90b9061d81f8910aca4a14eb484e" },
 ];
 
-export default function PessoalPage() {
-  const [aba, setAba] = useState<Aba>("luiz");
+// `abaInicial="financas"` + `voltar`: usado em /areas?aba=casa&sub=financas (tela completa de finanças,
+// aberta pelo cartão Finanças da Casa). Sem props, continua igual ao de antes.
+export default function PessoalPage({ abaInicial = "luiz", voltar }: { abaInicial?: Aba; voltar?: () => void } = {}) {
+  const [aba, setAba] = useState<Aba>(abaInicial);
   const { dados } = useHoje();
   const { financas, erroFin } = useFinancas();
   const escola = dados?.escola ?? [];
@@ -63,9 +65,18 @@ export default function PessoalPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0 overflow-x-auto">
-        <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">🤎 Pessoal</h1>
-        {botao("luiz", "🎒 Luiz — escola")}
-        {botao("financas", "💰 Finanças")}
+        {voltar ? (
+          <>
+            <button onClick={voltar} className="text-sm font-semibold text-[var(--ac)] py-3 mr-3 cursor-pointer">‹ voltar para a Casa</button>
+            <h1 className="text-base md:text-lg font-semibold py-3">💰 Finanças completo</h1>
+          </>
+        ) : (
+          <>
+            <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">🤎 Pessoal</h1>
+            {botao("luiz", "🎒 Luiz — escola")}
+            {botao("financas", "💰 Finanças")}
+          </>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
