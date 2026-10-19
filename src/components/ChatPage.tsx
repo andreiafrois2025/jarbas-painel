@@ -12,7 +12,7 @@ import { ehColaboradorOculto } from "@/lib/modo";
 import TextoSeguro from "./chat/TextoSeguro";
 import Visuais from "./chat/Visuais";
 import { MenuHabilidades, ChipHabilidade } from "./chat/MenuHabilidades";
-import { Bastidores, BotaoDesfazer, CartaoArquivoObra, CartoesPosso, ControleObra } from "./chat/ModoObra";
+import { Bastidores, BotaoDesfazer, CartaoArquivoObra, CartoesPosso } from "./chat/ModoObra";
 import { AVISO_OBRA, detectarHabilidadeFalada, filtrarHabilidades, gatilhoBarra, useHabilidadesChat, type HabChat } from "@/lib/habilidadesChat";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -458,7 +458,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           </>}
           {/* Conversa avançada: abre a sessão permanente do Claude Code (endereço fixo /remoto) */}
           {agenteId === "jarbas" && !servidora && (
-            <a href="/remoto" target="_blank" rel="noopener" title="Conversa avançada: abre o Jarbas no Claude Code (pode mexer no sistema)"
+            <a href="/remoto" title="Conversa avançada: abre o Jarbas no Claude Code (pode mexer no sistema)"
               className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] no-underline">
               🧠<span className="max-md:hidden">Conversa avançada</span>
             </a>
@@ -477,7 +477,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               )}
             </select>
           </label>
-          {obraDisponivel && <ControleObra estado={obra} agora={agoraMs} ocupado={ocupado} aoMudar={setObra} />}
+          {/* 19/10: sem botão 🔨 nem código — o chat usa as "mãos" sozinho quando o pedido precisa */}
           {uso && (
             <span className={`${compacto ? "hidden md:inline" : ""} text-xs px-2 py-1 rounded-lg border ${uso.aviso ? "border-[var(--warning)] bg-[var(--warning)]/15" : "border-[var(--border)]"} text-[var(--text-secondary)]`}
               title="Cada mensagem gasta uma parte da assinatura do Claude">
