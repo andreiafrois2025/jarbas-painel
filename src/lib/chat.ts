@@ -19,10 +19,17 @@ export interface Mensagem {
   anexos?: { id: string; nome: string }[]; acoes?: Acao[]; habilidade?: string;
   assuntoId?: string; modeloRotulo?: string; respostaDe?: string;
   obra?: boolean; arquivos?: ArquivoObra[];
+  /** Modo obra O2/O3: id da tarefa (AAAA-MM-DD/id) para os bastidores e o botão de desfazer. */
+  tarefaId?: string; mudancas?: boolean;
 }
 /** Arquivo que uma tarefa do modo obra deixou na pasta de trabalho (aparece como cartão no chat). */
 export interface ArquivoObra { nome: string; rel: string; tamanho: number; tipo: "imagem" | "pdf" | "arquivo"; url: string }
-export interface EstadoObra { ligado: boolean; expira_em: string | null; tarefas_hoje: number; limite: number; ocupada: boolean; permitido: boolean }
+export interface EstadoObra { ligado: boolean; expira_em: string | null; tarefas_hoje: number; limite: number; ocupada: boolean; permitido: boolean; o2?: boolean }
+/** Cartão "posso fazer?" (O2): o servidor descreve em linguagem simples; o painel só mostra e devolve a resposta dela. */
+export interface PedidoObra { id: string; titulo: string; descricao: string; detalhe: string; volta: boolean; reinicia: boolean; expira_em: string }
+export type DecisaoPasso = "permitido" | "pediu_aprovado" | "pediu_negado" | "pediu_expirou" | "pediu_aguardando" | "bloqueado";
+export interface PassoObra { hora: string; ferramenta: string; resumo: string; decisao: DecisaoPasso; motivo: string }
+export interface ResultadoDesfazer { ok: boolean; restaurados: number; removidos: number; erros: string[]; aviso: string }
 export interface ConversaResumo { id: string; agente: string; titulo: string; criada: string; atualizada: string; mensagens: number }
 export interface Uso {
   hora: { usadas: number; limite: number }; dia: { usadas: number; limite: number };
@@ -74,6 +81,11 @@ export const obraApi = {
   pedirCodigo: async () => json<{ ok: boolean; vale_min: number }>(await post("/api/obra/pedir-codigo")),
   ativar: async (codigo: string) => json<EstadoObra>(await post("/api/obra/ativar", { codigo })),
   desligar: async () => json<EstadoObra>(await post("/api/obra/desligar")),
+  // O2/O3
+  pedidos: async () => json<{ ativo: boolean; pedidos: PedidoObra[] }>(await squadFetch("/api/obra/pedidos")),
+  responder: async (id: string, decisao: "permitir" | "negar") => json<{ ok: boolean }>(await post(`/api/obra/pedidos/${encodeURIComponent(id)}`, { decisao })),
+  desfazer: async (tarefa: string) => json<ResultadoDesfazer>(await post("/api/obra/desfazer", { tarefa })),
+  bastidores: async (tarefa: string) => json<{ passos: PassoObra[]; rodando: boolean; mudancas: boolean }>(await squadFetch(`/api/obra/bastidores/${tarefa.split("/").map(encodeURIComponent).join("/")}`)),
   urlArquivo: (url: string, baixar = false) => squadUrlComToken(url + (baixar ? "?baixar=1" : "")),
 };
 
@@ -84,6 +96,7 @@ export interface EventosEnvio {
   onModelo?: (m: { chave: string; mensagem: Mensagem }) => void;
   onDelta: (t: string) => void;
   onStatus: (t: string) => void;
+  onObra?: (o: { tarefa: string; o2: boolean }) => void;
   onDone: (d: { mensagem: Mensagem | null; uso: Uso; aviso: string | null }) => void;
   onErro: (e: string) => void;
 }
@@ -118,7 +131,7 @@ export async function enviarMensagem(
         let d: any; try { d = JSON.parse(dados); } catch { continue; }
         if (nome === "meta") ev.onMeta(d); else if (nome === "delta") ev.onDelta(d.texto);
         else if (nome === "assunto") ev.onAssunto?.(d); else if (nome === "modelo") ev.onModelo?.(d);
-        else if (nome === "status") ev.onStatus(d.texto); else if (nome === "done") ev.onDone(d);
+        else if (nome === "status") ev.onStatus(d.texto); else if (nome === "obra") ev.onObra?.(d); else if (nome === "done") ev.onDone(d);
         else if (nome === "erro") ev.onErro(d.erro);
       }
     }

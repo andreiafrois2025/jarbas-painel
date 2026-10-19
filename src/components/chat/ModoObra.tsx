@@ -1,10 +1,10 @@
 "use client";
 
-// Modo obra (O1) no chat do Jarbas: botão para ligar com o código do Telegram, selo com o tempo que resta,
+// Modo obra (O1/O2/O3) no chat do Jarbas: botão para ligar com o código do Telegram, selo com o tempo que resta,
 // e o cartão de arquivo que a tarefa gerou. Quem decide o que pode ou não é o servidor (guarda.py), não esta tela.
 
 import { useEffect, useRef, useState } from "react";
-import { obraApi, type ArquivoObra, type EstadoObra } from "@/lib/chat";
+import { obraApi, type ArquivoObra, type EstadoObra, type PassoObra, type PedidoObra } from "@/lib/chat";
 
 export function tempoRestante(iso: string | null, agora: number): string {
   if (!iso) return "";
@@ -130,6 +130,165 @@ export function CartaoArquivoObra({ f }: { f: ArquivoObra }) {
         <p className="m-0 text-xs text-[var(--text-secondary)] mt-0.5">{tamanhoLegivel(f.tamanho)}</p>
       </div>
       {baixarUrl && <a href={baixarUrl} download={f.nome} className="self-center shrink-0 rounded-lg bg-[var(--ac)] text-[var(--on-ac)] px-3 py-2 text-sm font-bold no-underline hover:brightness-95">Baixar</a>}
+    </div>
+  );
+}
+
+
+// ═════════════════════ O2: cartão "posso fazer?" ═════════════════════
+// Quem decide o que vira cartão é o servidor (guarda.py). Aqui só se mostra o pedido e se devolve o "pode" ou o "agora não".
+// Sem resposta em 10 minutos o servidor já conta como NEGADO.
+
+/** Fica de olho nos pedidos enquanto a tarefa roda e mostra um cartão para cada um. */
+export function CartoesPosso({ ativo }: { ativo: boolean }) {
+  const [lista, setLista] = useState<PedidoObra[]>([]);
+  const respondidos = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!ativo) { setLista([]); return; }
+    let vivo = true;
+    const ler = () => obraApi.pedidos().then((r) => { if (vivo) setLista(r.pedidos.filter((p) => !respondidos.current.has(p.id))); }).catch(() => {});
+    ler();
+    const t = setInterval(ler, 1500);
+    return () => { vivo = false; clearInterval(t); };
+  }, [ativo]);
+  if (!ativo || lista.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-3" aria-live="polite">
+      {lista.map((p) => (
+        <CartaoPosso key={p.id} p={p} aoResponder={(id) => { respondidos.current.add(id); setLista((x) => x.filter((y) => y.id !== id)); }} />
+      ))}
+    </div>
+  );
+}
+
+function minutosAte(iso: string, agora: number) { return Math.max(0, Math.ceil((new Date(iso).getTime() - agora) / 60000)); }
+
+export function CartaoPosso({ p, aoResponder }: { p: PedidoObra; aoResponder: (id: string) => void }) {
+  const [detalhes, setDetalhes] = useState(false);
+  const [enviando, setEnviando] = useState<"permitir" | "negar" | null>(null);
+  const [erro, setErro] = useState("");
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 15000); return () => clearInterval(t); }, []);
+  const responder = async (d: "permitir" | "negar") => {
+    if (enviando) return;
+    setEnviando(d); setErro("");
+    try { await obraApi.responder(p.id, d); aoResponder(p.id); }
+    catch (e) { setErro((e as Error).message); setEnviando(null); }
+  };
+  const resta = minutosAte(p.expira_em, agora);
+  return (
+    <section role="group" aria-label="Pedido de permissão do modo obra"
+      className="w-full max-w-[min(48rem,100%)] rounded-2xl border-2 border-[var(--warning)] bg-[var(--bg-secondary)] p-4 shadow-[0_8px_24px_var(--sombra)]">
+      <h3 className="m-0 text-base font-bold text-[var(--text-primary)]">🛠️ Posso fazer?</h3>
+      <p className="mt-2 mb-0 text-[15px] leading-snug text-[var(--text-primary)] break-words">{p.descricao}</p>
+      {p.reinicia && <p className="mt-2 mb-0 text-sm text-[var(--text-secondary)]">⏱️ O chat reinicia por uns 10 segundos e esta conversa pode ser cortada. Depois é só abrir de novo.</p>}
+      {p.volta && <p className="mt-2 mb-0 text-sm text-[var(--text-secondary)]">↩ Antes, guardo uma cópia para voltar se der errado.</p>}
+      {detalhes && (
+        <pre className="mt-3 mb-0 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-2.5 text-xs leading-snug text-[var(--text-primary)]">{p.detalhe}</pre>
+      )}
+      {erro && <p role="alert" className="mt-2 mb-0 text-sm text-[var(--danger)]">{erro}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => responder("permitir")} disabled={!!enviando}
+          className="flex-1 min-w-[8.5rem] min-h-11 rounded-xl bg-[var(--ac)] text-[var(--on-ac)] px-4 py-2 text-sm font-bold disabled:opacity-50 cursor-pointer">{enviando === "permitir" ? "Enviando…" : "Pode fazer"}</button>
+        <button type="button" onClick={() => setDetalhes((x) => !x)} aria-expanded={detalhes}
+          className="flex-1 min-w-[8.5rem] min-h-11 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer">{detalhes ? "Esconder detalhes" : "Ver detalhes"}</button>
+        <button type="button" onClick={() => responder("negar")} disabled={!!enviando}
+          className="flex-1 min-w-[8.5rem] min-h-11 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 cursor-pointer">{enviando === "negar" ? "Enviando…" : "Agora não"}</button>
+      </div>
+      <p className="mt-2 mb-0 text-xs text-[var(--text-muted)]">Sem resposta em {resta > 0 ? `${resta} min` : "instantes"}, conta como “agora não”.</p>
+    </section>
+  );
+}
+
+// ═════════════════════ O2: voltar atrás ═════════════════════
+
+/** "↩ Desfazer as mudanças desta tarefa", com a confirmação dentro da própria página (sem janelinha do navegador). */
+export function BotaoDesfazer({ tarefa }: { tarefa: string }) {
+  const [fase, setFase] = useState<"botao" | "confirma" | "indo" | "feito" | "erro">("botao");
+  const [msg, setMsg] = useState("");
+  const desfazer = async () => {
+    setFase("indo"); setMsg("");
+    try {
+      const r = await obraApi.desfazer(tarefa);
+      setMsg(r.aviso || "Pronto, voltou como estava."); setFase("feito");
+    } catch (e) { setMsg((e as Error).message); setFase("erro"); }
+  };
+  if (fase === "feito") return <p role="status" className="mt-2 mb-0 text-sm text-[var(--text-secondary)]">✅ Mudanças desfeitas. {msg}</p>;
+  if (fase === "confirma" || fase === "indo") {
+    return (
+      <div role="alertdialog" aria-label="Confirmar desfazer" className="mt-2 rounded-xl border border-[var(--warning)] bg-[var(--bg-primary)] p-3">
+        <p className="m-0 text-sm text-[var(--text-primary)]">Desfazer tudo o que esta tarefa mudou no sistema? Os arquivos voltam como estavam antes. O que foi instalado ou publicado não volta por aqui.</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" onClick={desfazer} disabled={fase === "indo"} className="min-h-11 rounded-xl bg-[var(--ac)] text-[var(--on-ac)] px-4 py-2 text-sm font-bold disabled:opacity-50 cursor-pointer">{fase === "indo" ? "Desfazendo…" : "Sim, desfazer"}</button>
+          <button type="button" onClick={() => setFase("botao")} disabled={fase === "indo"} className="min-h-11 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer">Cancelar</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setFase("confirma")}
+        className="min-h-10 rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer">↩ Desfazer as mudanças desta tarefa</button>
+      {fase === "erro" && <p role="alert" className="mt-1 mb-0 text-sm text-[var(--danger)]">{msg}</p>}
+    </div>
+  );
+}
+
+// ═════════════════════ O3: ver bastidores ═════════════════════
+
+const NOME_FERRAMENTA: Record<string, string> = { Bash: "Comando", Read: "Leitura", Write: "Gravou arquivo", Edit: "Editou arquivo", Grep: "Busca", Glob: "Busca de arquivos" };
+function nomeFerramenta(f: string) { return f.startsWith("mcp__") ? "Google" : NOME_FERRAMENTA[f] ?? f; }
+const ROTULO_DECISAO: Record<PassoObra["decisao"], { icone: string; texto: string }> = {
+  permitido: { icone: "✅", texto: "permitido" },
+  pediu_aprovado: { icone: "🙋", texto: "pediu e você aprovou" },
+  pediu_negado: { icone: "🙋", texto: "pediu e você disse não" },
+  pediu_expirou: { icone: "🙋", texto: "pediu e ficou sem resposta (negado)" },
+  pediu_aguardando: { icone: "🙋", texto: "esperando você" },
+  bloqueado: { icone: "⛔", texto: "bloqueado" },
+};
+
+/** Recolhível com os passos da tarefa (a verdade vem do log do guarda). Durante a tarefa (`vivo`) a lista cresce sozinha. */
+export function Bastidores({ tarefa, vivo = false }: { tarefa: string; vivo?: boolean }) {
+  const [aberto, setAberto] = useState(false);
+  const [passos, setPassos] = useState<PassoObra[] | null>(null);
+  const [erro, setErro] = useState("");
+  useEffect(() => {
+    if (!aberto) return;
+    let ativo = true;
+    const ler = () => obraApi.bastidores(tarefa).then((r) => { if (ativo) { setPassos(r.passos); setErro(""); } }).catch((e) => { if (ativo) setErro((e as Error).message); });
+    ler();
+    if (!vivo) return () => { ativo = false; };
+    const t = setInterval(ler, 2000);
+    return () => { ativo = false; clearInterval(t); };
+  }, [aberto, vivo, tarefa]);
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setAberto((x) => !x)} aria-expanded={aberto}
+        className="text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer min-h-9 px-1">🔍 {aberto ? "Esconder bastidores" : "Ver bastidores"}</button>
+      {aberto && (
+        <div className="mt-1 rounded-xl border border-[var(--border)] bg-[var(--bg-primary)] p-2.5">
+          {erro && <p role="alert" className="m-0 text-sm text-[var(--danger)]">{erro}</p>}
+          {!erro && passos === null && <p className="m-0 text-sm text-[var(--text-muted)] animate-pulse">carregando…</p>}
+          {passos && passos.length === 0 && <p className="m-0 text-sm text-[var(--text-muted)]">Nenhum passo registrado ainda.</p>}
+          {passos && passos.length > 0 && (
+            <ol className="m-0 p-0 list-none flex flex-col gap-2">
+              {passos.map((s, i) => {
+                const d = ROTULO_DECISAO[s.decisao] ?? ROTULO_DECISAO.bloqueado;
+                const motivo = s.motivo.replace(/^Bloqueado pelo modo obra:?\s*/i, "");
+                return (
+                  <li key={i} className="text-[13px] leading-snug text-[var(--text-primary)]">
+                    <span className="text-[var(--text-muted)] tabular-nums">{s.hora}</span>{" "}
+                    <span className="font-semibold">{nomeFerramenta(s.ferramenta)}</span>{" "}
+                    <span>{d.icone} {d.texto}</span>
+                    {s.resumo && <code className="block mt-0.5 text-xs text-[var(--text-secondary)] break-all whitespace-pre-wrap">{s.resumo}</code>}
+                    {(s.decisao === "bloqueado" || s.decisao === "pediu_negado" || s.decisao === "pediu_expirou") && motivo && <span className="block mt-0.5 text-xs text-[var(--text-secondary)]">Motivo: {motivo}</span>}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      )}
     </div>
   );
 }

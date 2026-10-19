@@ -12,7 +12,7 @@ import { ehColaboradorOculto } from "@/lib/modo";
 import TextoSeguro from "./chat/TextoSeguro";
 import Visuais from "./chat/Visuais";
 import { MenuHabilidades, ChipHabilidade } from "./chat/MenuHabilidades";
-import { CartaoArquivoObra, ControleObra } from "./chat/ModoObra";
+import { Bastidores, BotaoDesfazer, CartaoArquivoObra, CartoesPosso, ControleObra } from "./chat/ModoObra";
 import { AVISO_OBRA, detectarHabilidadeFalada, filtrarHabilidades, gatilhoBarra, useHabilidadesChat, type HabChat } from "@/lib/habilidadesChat";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -124,6 +124,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const [msgs, setMsgs] = useState<Mensagem[]>([]);
   const [fluxo, setFluxo] = useState(""); // resposta chegando aos poucos
   const [status, setStatus] = useState("");
+  const [tarefaViva, setTarefaViva] = useState<string | null>(null); // tarefa de obra em andamento (O2/O3)
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState("");
   const [uso, setUso] = useState<Uso | null>(null);
@@ -258,10 +259,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       onModelo: (mm) => { setModeloSel(mm.chave); setMsgs((x) => [...x, mm.mensagem]); },
       onDelta: (t) => { acumulado += t; setFluxo(acumulado); setStatus(""); },
       onStatus: setStatus,
+      onObra: (o) => setTarefaViva(o.tarefa),
       onDone: (d) => { setUso(d.uso); },
       onErro: (e) => { setErro(e); },
     }, ctl.current.signal);
-    setFluxo(""); setStatus(""); setOcupado(false); ctl.current = null;
+    setFluxo(""); setStatus(""); setOcupado(false); setTarefaViva(null); ctl.current = null;
     // o servidor é a fonte da verdade (assuntos, etiquetas, resposta interrompida): recarrega a conversa
     if (idConv) { try { const c = await chatApi.conversa(idConv); setMsgs(c.mensagens); setAssuntos(c.assuntos || []); setModeloSel(c.modelo); } catch { /* mantém o que está na tela */ } }
     chatApi.conversas(agenteId).then(setConversas).catch(() => {});
@@ -504,9 +506,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               <div className="max-w-[min(48rem,100%)] rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
                 {fluxo ? <Resposta texto={fluxo} andamento onEscolha={(t) => enviar(t)} desativado /> : <p className="text-sm text-[var(--text-muted)] animate-pulse">{status || "pensando…"}</p>}
                 {fluxo && status && <p className="text-xs text-[var(--text-muted)] mt-1 animate-pulse">{status}</p>}
+                {tarefaViva && <Bastidores tarefa={tarefaViva} vivo />}
               </div>
             </div>
           )}
+          {ocupado && obraLigada && !!obra?.o2 && <CartoesPosso ativo />}
           {erro && <p role="alert" className="text-sm text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/30 rounded-lg px-3 py-2">{erro}</p>}
           <div ref={fim} />
         </div>
@@ -618,6 +622,8 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
           <Resposta texto={m.texto} onEscolha={(t) => onEscolha(t, m.assuntoId)} desativado={ocupado} />
           {m.acoes?.map((a, i) => <CartaoAcao key={i} a={a} ocupado={ocupado} onDecidir={(c) => onAcao(i, c)} />)}
           {m.arquivos?.map((f) => <CartaoArquivoObra key={f.url} f={f} />)}
+          {m.obra && m.tarefaId && <Bastidores tarefa={m.tarefaId} />}
+          {m.obra && m.tarefaId && m.mudancas && <BotaoDesfazer tarefa={m.tarefaId} />}
           <p className="text-[10px] text-[var(--text-muted)] mt-1">{hora(m.ts)}{m.modeloRotulo ? ` · ${m.modeloRotulo}` : ""}</p>
         </div>
       </div>
