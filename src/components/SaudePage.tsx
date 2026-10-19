@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import Link from "next/link";
 import { useStatus, NIVEL_UI } from "@/lib/status";
 import { useMetricsHistory, tempoRelativo } from "@/lib/metrics";
@@ -318,6 +320,12 @@ function explica(problema: string): Explicacao {
     solucao: "É correção de configuração no servidor — me peça pra ajustar.",
     quem: "claude",
   };
+  if (p.includes("vigia de segurança") || p.includes("security-monitor")) return {
+    titulo: "O vigia de segurança parou de conferir",
+    significa: "É a rotina que olha, a cada 5 minutos, tentativas de invasão e acessos estranhos na VPS. Parado, nada de errado acontece na hora, mas ninguém está olhando.",
+    solucao: "Se aparecer só uma vez e sumir, foi um engano de horário (corrigido em 19/10). Se ficar, me peça pra religar.",
+    quem: "claude",
+  };
   if (p.startsWith("ronda diária")) return {
     titulo: "A ronda da manhã achou algo",
     significa: problema.replace(/^ronda diária:\s*/i, ""),
@@ -330,6 +338,25 @@ function explica(problema: string): Explicacao {
     solucao: "Me mande esta linha que eu explico e resolvo.",
     quem: "claude",
   };
+}
+
+// "Pedir ao Jarbas VPS" (19/10/2026): copia um pedido pronto e abre a conversa avançada; lá ela só cola e envia.
+// (Escrever sozinho na sessão do Claude Code foi barrado pela proteção dele: quem manda é sempre ela.)
+function PedirJarbasVps({ aviso }: { aviso: string }) {
+  const [copiado, setCopiado] = useState(false);
+  const pedir = () => {
+    const texto = `[Painel › Saúde] Investigue e resolva este aviso; no fim, explique em linguagem simples o que era e o que você fez: ${aviso}`;
+    try { navigator.clipboard?.writeText(texto); setCopiado(true); } catch { /* sem área de transferência */ }
+    window.open("/remoto?ir=1", "_blank");
+  };
+  return (
+    <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+      <button onClick={pedir} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[var(--ac)] text-[var(--on-ac)] cursor-pointer">
+        🧠 Pedir ao Jarbas VPS
+      </button>
+      {copiado && <span className="text-[11px] text-[var(--text-secondary)]">Pedido copiado: lá, é só colar e enviar.</span>}
+    </div>
+  );
 }
 
 function Atencao({ problemas }: { problemas: string[] }) {
@@ -357,6 +384,7 @@ function Atencao({ problemas }: { problemas: string[] }) {
               <p className="text-xs text-[var(--text-secondary)] mt-1">
                 <strong className="text-[var(--text-primary)]">O que fazer:</strong> {e.solucao}
               </p>
+              {e.quem === "claude" && <PedirJarbasVps aviso={p} />}
               <details className="mt-2">
                 <summary className="text-[10px] text-[var(--text-muted)] cursor-pointer select-none">
                   texto técnico original
