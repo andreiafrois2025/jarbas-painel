@@ -111,6 +111,12 @@ export default function CerebroPage() {
   }, [notas]);
   const porId = useMemo(() => new Map((notas ?? []).map((n) => [n.id, n])), [notas]);
 
+  // [[nome]] aparece com o TÍTULO da nota (o nome técnico fica só no link)
+  const comTitulos = (t: string) => t.replace(/\[\[([^\]|]+)\]\]/g, (m, nome) => {
+    const n = porNome.get(norm(nome.trim()));
+    return n ? `[[${nome}|${n.titulo}]]` : m;
+  });
+
   const abrirPorNome = (nome: string) => {
     const n = porNome.get(norm(nome));
     if (n) setAberta(n.id);
@@ -292,7 +298,7 @@ export default function CerebroPage() {
           ) : !conteudo ? (
             <p className="text-sm text-[var(--text-secondary)] animate-pulse">Abrindo…</p>
           ) : (
-            <div className="text-[15px]"><MarkdownLeve texto={conteudo.corpo} aoLigacao={abrirPorNome} /></div>
+            <div className="text-[15px]"><MarkdownLeve texto={comTitulos(conteudo.corpo)} aoLigacao={abrirPorNome} /></div>
           )}
         </div>
         {conteudo && (
@@ -456,11 +462,23 @@ function GrafoNotas({ notas, todas, aoAbrir }: { notas: Nota[]; todas: Nota[]; a
   }, [sel, arestas]);
 
   // reposiciona/zoom ao arrastar com dedo ou mouse
+  // pinça com dois dedos (19/10/2026): guarda os dedos na tela; com dois, a distância entre eles vira o zoom
+  const dedos = useRef(new Map<number, { x: number; y: number }>());
+  const pinca = useRef<{ d: number; z: number } | null>(null);
+  const distDedos = () => { const [a, b] = [...dedos.current.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
   const aoPressionar = (e: React.PointerEvent) => {
+    dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (dedos.current.size === 2) { pinca.current = { d: distDedos(), z: zoom }; arrasto.current = null; moveuUltimo.current = true; return; }
     arrasto.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y, moveu: false };
     moveuUltimo.current = false;
   };
   const aoMover = (e: React.PointerEvent) => {
+    if (dedos.current.has(e.pointerId)) dedos.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinca.current && dedos.current.size === 2) {
+      const p0 = pinca.current;
+      setZoom(Math.max(0.5, Math.min(5, p0.z * (distDedos() / p0.d))));
+      return;
+    }
     const a = arrasto.current; const el = caixa.current;
     if (!a || !el) return;
     const dx = e.clientX - a.x, dy = e.clientY - a.y;
@@ -470,14 +488,18 @@ function GrafoNotas({ notas, todas, aoAbrir }: { notas: Nota[]; todas: Nota[]; a
     const esc = (W / el.clientWidth) / zoom;
     setPan({ x: a.px - dx * esc, y: a.py - dy * esc });
   };
-  const aoSoltar = () => { arrasto.current = null; };
+  const aoSoltar = (e: React.PointerEvent) => {
+    dedos.current.delete(e.pointerId);
+    if (dedos.current.size < 2) pinca.current = null;
+    arrasto.current = null;
+  };
   const aoRolar = (e: React.WheelEvent) => {
     setZoom((z) => Math.max(0.5, Math.min(5, z * (e.deltaY < 0 ? 1.12 : 0.89))));
   };
 
   const vw = W / zoom, vh = H / zoom;
   const vbx = W / 2 + pan.x - vw / 2, vby = H / 2 + pan.y - vh / 2;
-  const mostrarTodosRotulos = zoom >= 1.8;
+  const mostrarTodosRotulos = zoom >= 1.6;
   const selNo = sel ? posPorId.get(sel) : undefined;
 
   if (nos.length === 0) return <Vazio icone="🕸️" titulo="Nada para mostrar no grafo" descricao="Ajuste a busca ou os filtros." />;
@@ -495,7 +517,7 @@ function GrafoNotas({ notas, todas, aoAbrir }: { notas: Nota[]; todas: Nota[]; a
         })}
         {nos.map((p) => {
           const apagado = sel && p.id !== sel && !vizinhos.has(p.id);
-          const rotulo = p.n.pasta === "projetos" || mostrarTodosRotulos || p.id === sel || vizinhos.has(p.id);
+          const rotulo = mostrarTodosRotulos || p.id === sel || vizinhos.has(p.id) || (!sel && p.n.pasta === "projetos" && p.grau >= 3);
           return (
             <g key={p.id} opacity={apagado ? 0.2 : 1} className="cursor-pointer"
               onClick={(e) => { e.stopPropagation(); if (!moveuUltimo.current) setSel(p.id); }}>
@@ -504,7 +526,7 @@ function GrafoNotas({ notas, todas, aoAbrir }: { notas: Nota[]; todas: Nota[]; a
               {rotulo && (
                 <text x={p.x} y={p.y + p.r + 11} textAnchor="middle" fontSize={10} fill="var(--text-primary)"
                   stroke="var(--bg-primary)" strokeWidth={3} paintOrder="stroke" style={{ pointerEvents: "none" }}>
-                  {(p.n.titulo || p.n.nome).slice(0, 28)}
+                  {(() => { const t = p.n.titulo || p.n.nome; return t.length > 24 ? t.slice(0, 23) + "…" : t; })()}
                 </text>
               )}
             </g>
