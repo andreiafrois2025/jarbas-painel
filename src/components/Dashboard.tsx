@@ -140,7 +140,8 @@ export default function Dashboard({ session, children }: DashboardProps) {
     };
   }, [servidora, collaborators, assignments, categories, quickLinks]);
 
-  if (loading) {
+  // A Conversa abre na hora (o chat não depende desses dados); as outras páginas esperam
+  if (loading && pathname !== "/conversa") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
         <div className="flex flex-col items-center gap-3">

@@ -200,9 +200,13 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   useEffect(() => {
     if (!compacto || servidora || !agentes.length) return;
     let vivo = true;
-    agentes.forEach((a) => chatApi.conversas(a.id).then((cs) => {
-      if (vivo && cs[0]) setPrevias((p) => ({ ...p, [a.id]: { texto: cs[0].ultima?.texto || cs[0].titulo, ts: cs[0].atualizada, minha: cs[0].ultima?.minha } }));
-    }).catch(() => {}));
+    // um pedido só pra todos (já vem da mais recente pra mais antiga): fica a 1ª de cada agente
+    chatApi.conversas().then((cs) => {
+      if (!vivo) return;
+      const pv: Record<string, Previa> = {};
+      for (const c of cs) if (!pv[c.agente]) pv[c.agente] = { texto: c.ultima?.texto || c.titulo, ts: c.atualizada, minha: c.ultima?.minha };
+      setPrevias((p) => ({ ...p, ...pv }));
+    }).catch(() => {});
     return () => { vivo = false; };
   }, [compacto, servidora, agentes]);
   const [dicaAberta, setDicaAberta] = useState(true);

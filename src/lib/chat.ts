@@ -45,8 +45,8 @@ async function json<T>(r: Response): Promise<T> {
 export const chatApi = {
   agentes: async () => (await json<{ agentes: Agente[] }>(await squadFetch("/api/chat/agentes"))).agentes,
   uso: async () => json<Uso>(await squadFetch("/api/chat/uso")),
-  conversas: async (agente: string) =>
-    (await json<{ conversas: ConversaResumo[] }>(await squadFetch(`/api/chat/conversas?agente=${encodeURIComponent(agente)}`))).conversas,
+  conversas: async (agente?: string) =>
+    (await json<{ conversas: ConversaResumo[] }>(await squadFetch(`/api/chat/conversas${agente ? `?agente=${encodeURIComponent(agente)}` : ""}`))).conversas,
   conversa: async (id: string) => json<{ conversa: { id: string; agente: string; titulo: string }; mensagens: Mensagem[]; assuntos: Assunto[]; modelo: string; assuntosAuto: boolean }>(await squadFetch(`/api/chat/conversas/${id}`)),
   habilidades: async () => (await json<{ habilidades: Record<string, { obra: boolean; dono: string | null }> }>(await squadFetch("/api/chat/habilidades"))).habilidades,
   modelos: async () => (await json<{ modelos: ModeloOpcao[] }>(await squadFetch("/api/chat/modelos"))).modelos,
