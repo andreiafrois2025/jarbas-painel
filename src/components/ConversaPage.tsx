@@ -225,9 +225,9 @@ export default function ConversaPage() {
             <h1 className="fonte-maquina m-0 text-[22px] md:text-[28px] leading-tight text-[var(--text-primary)]">{saudacao()}, Andréia</h1>
             <p className="m-0 mt-0.5 text-sm text-[var(--text-secondary)]">{dataPorExtenso()}{espera}</p>
           </div>
-          {/* 19/10/2026: conversa avançada (Jarbas na VPS, Claude Code). Abre no Safari de verdade (ver /remoto) */}
+          {/* 19/10/2026: conversa avançada (Jarbas na VPS, Claude Code): /remoto mostra o botão que abre o app do Claude */}
           {!servidora && (
-            <Link href="/remoto?ir=1" title="Conversa avançada: o Jarbas na VPS (Claude Code), que mexe no sistema"
+            <Link href="/remoto" title="Conversa avançada: o Jarbas na VPS (Claude Code), que mexe no sistema"
               className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm font-bold text-[var(--text-primary)] no-underline hover:bg-[var(--bg-tertiary)]">
               💻<span className="max-md:hidden">VPS</span>
             </Link>
