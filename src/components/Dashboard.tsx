@@ -94,6 +94,29 @@ export default function Dashboard({ session, children }: DashboardProps) {
     loadData();
   }, [loadData]);
 
+  // Celular: busca vira ícone que abre uma linha extra; teclado aberto esconde o menu inferior
+  // e a altura do painel segue a área realmente visível (visualViewport), pra caixa de mensagem não sumir.
+  const [buscaAberta, setBuscaAberta] = useState(false);
+  const [teclado, setTeclado] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const ajustar = () => {
+      const aberto = window.innerWidth < 768 && window.innerHeight - vv.height > 120;
+      setTeclado(aberto);
+      document.documentElement.style.setProperty("--app-h", aberto ? `${vv.height}px` : "100dvh");
+      if (aberto) window.scrollTo(0, 0);
+    };
+    ajustar();
+    vv.addEventListener("resize", ajustar);
+    vv.addEventListener("scroll", ajustar);
+    return () => { vv.removeEventListener("resize", ajustar); vv.removeEventListener("scroll", ajustar); };
+  }, []);
+  const abrirBusca = () => {
+    setBuscaAberta(true);
+    setTimeout(() => document.querySelector<HTMLInputElement>("input[aria-label='Procurar em tudo']")?.focus(), 50);
+  };
+
   const handleLogout = async () => {
     await signOut();
     window.location.href = "/";
@@ -136,7 +159,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
         title={p.title}
         aria-label={p.rotulo}
         aria-current={ativo ? "page" : undefined}
-        className={`flex flex-col items-center justify-center gap-1 rounded-xl cursor-pointer transition-colors w-16 md:w-[62px] py-1.5 md:py-2.5 ${extra} ${
+        className={`flex flex-col items-center justify-center gap-1 rounded-xl cursor-pointer transition-colors flex-1 min-w-0 max-w-[4.5rem] md:flex-none md:max-w-none md:w-[62px] py-1.5 md:py-2.5 ${extra} ${
           ativo ? "bg-[var(--accent-soft)] text-[var(--ac)]" : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
         }`}
       >
@@ -158,40 +181,42 @@ export default function Dashboard({ session, children }: DashboardProps) {
   return (
     <PainelContext.Provider value={{ ...visivel, modo, servidora, setModo, reload: loadData, esperando, erroEsperando, recarregarEsperando }}>
       <ProvedorUI>
-      <div className="h-dvh flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <div className="flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]" style={{ height: "var(--app-h, 100dvh)" }}>
         {/* ===== BARRA DO TOPO ===== */}
-        <header className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-2 px-3 md:px-5 py-2 md:py-0 md:h-[60px] border-b border-[var(--border)] bg-[var(--bg-secondary)]">
-          <button onClick={() => router.push("/conversa")} className="order-1 flex items-center gap-2.5 cursor-pointer" title="Ir para a Conversa">
-            <Mascote nome="jarbas" emoji="⚡" tamanho={36} />
-            <span className="fonte-maquina text-[22px] leading-none text-[var(--ac)]">Jarbas</span>
+        <header className="shrink-0 flex flex-wrap items-center gap-x-1.5 md:gap-x-3 gap-y-2 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] md:px-5 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)] pb-2 md:pt-0 md:pb-0 md:h-[60px] border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+          <button onClick={() => router.push("/conversa")} className="order-1 flex items-center gap-2 md:gap-2.5 cursor-pointer min-w-0" title="Ir para a Conversa">
+            <Mascote nome="jarbas" emoji="⚡" tamanho={36} grande className="max-md:!w-8 max-md:!h-8" />
+            <span className="fonte-maquina max-md:!font-[family-name:var(--font-manrope)] max-md:!font-extrabold text-[22px] max-md:text-[18px] leading-none text-[var(--ac)] max-md:text-[var(--text-primary)]">Jarbas</span>
           </button>
           <div className="order-2 md:order-3 flex-1" />
-          <div className="order-3 md:order-5"><BotaoTema /></div>
-          <div className="order-4 md:order-6 relative">
+          <div className="order-3 md:order-5 max-md:hidden"><BotaoTema /></div>
+          <button onClick={abrirBusca} aria-label="Procurar em tudo" className="order-3 md:hidden w-8 h-8 rounded-full grid place-items-center text-lg cursor-pointer bg-[var(--bg-tertiary)]">🔎</button>
+          <div className="order-5 md:order-6 relative">
             <button onClick={() => setMenuAvatar((v) => !v)} aria-label="Menu da conta" aria-expanded={menuAvatar}
-              className="w-[34px] h-[34px] rounded-full grid place-items-center text-[13px] font-extrabold cursor-pointer text-white"
+              className="w-8 h-8 md:w-[34px] md:h-[34px] rounded-full grid place-items-center text-[13px] font-extrabold cursor-pointer text-white"
               style={{ background: "var(--ouro)" }}>AF</button>
             {menuAvatar && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setMenuAvatar(false)} />
-                <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg p-1 text-sm">
+                <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg p-1 text-sm">
+                  <div className="md:hidden px-2 py-2 flex items-center justify-between gap-2 border-b border-[var(--border)] mb-1"><span className="text-xs font-bold text-[var(--text-secondary)]">Tema</span><BotaoTema /></div>
                   <button onClick={() => { setMenuAvatar(false); router.push("/config"); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer">🔧 Ajustes</button>
                   <button onClick={handleLogout} className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--bg-tertiary)] cursor-pointer">🚪 Sair da conta</button>
                 </div>
               </>
             )}
           </div>
-          <div className="order-5 basis-full md:hidden" />
-          <div className="order-6 md:order-2 flex-1 md:flex-none md:w-[280px] min-w-0"><BuscaGlobal /></div>
+          <div className="order-6 basis-full md:hidden max-md:h-0" />
+          <div className={`order-7 md:order-2 flex-1 md:flex-none md:w-[280px] min-w-0 ${buscaAberta ? "" : "max-md:hidden"}`}><BuscaGlobal /></div>
           {/* Só Igam / Tudo: liga o modo servidora/tudo, que vale em todas as páginas */}
           <div role="group" aria-label="O que mostrar"
-            className="order-7 md:order-4 flex shrink-0 rounded-full p-1 gap-0.5 text-[13px] font-bold bg-[var(--bg-tertiary)]">
+            className="order-4 md:order-4 flex shrink-0 rounded-full p-0.5 md:p-1 gap-0.5 text-[12px] md:text-[13px] font-bold bg-[var(--bg-tertiary)]">
             {([["servidora", "🏛️ Só Igam", "Só Igam: esconde finanças, Luiz, casa e agentes pessoais (para projetar em aula)"], ["tudo", "✨ Tudo", "Tudo: mostra o painel completo"]] as const).map(([m, rotulo, dica]) => (
               <button key={m} onClick={() => setModo(m)} aria-pressed={modo === m} title={dica}
-                className={`px-3 md:px-3.5 py-1.5 rounded-full cursor-pointer whitespace-nowrap transition-colors ${
+                className={`px-2 md:px-3.5 py-1.5 rounded-full cursor-pointer whitespace-nowrap transition-colors ${
                   modo === m ? "bg-[var(--ac)] text-[var(--on-ac)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 }`}>
-                {rotulo}
+                {m === "servidora" ? <>🏛️ <span className="max-md:hidden">Só </span>Igam</> : rotulo}
               </button>
             ))}
           </div>
@@ -200,7 +225,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
         <div className="flex-1 min-h-0 flex flex-col md:flex-row">
           {/* ===== MENU: 5 portas + ajustes ===== */}
           <nav aria-label="Menu principal"
-            className="order-2 md:order-none shrink-0 md:w-[76px] border-t md:border-t-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)] flex md:flex-col items-center justify-around md:justify-start md:pt-[18px] md:gap-2 py-1 md:py-0 pb-[max(0.25rem,env(safe-area-inset-bottom))] md:pb-0">
+            className={`order-2 md:order-none shrink-0 md:w-[76px] border-t md:border-t-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)] flex md:flex-col items-center justify-around md:justify-start md:pt-[18px] md:gap-2 py-1 md:py-0 pb-[max(0.25rem,env(safe-area-inset-bottom))] md:pb-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:px-0 ${teclado ? "max-md:hidden" : ""}`}>
             {PORTAS.map((p) => portaBtn(p))}
             <div className="hidden md:block flex-1" />
             {portaBtn(PORTA_CONFIG, "md:mb-[18px]")}

@@ -33,6 +33,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // cobre a tela toda (inclusive atrás da barra de status e do indicador de home do iPhone);
+  // o painel desconta as áreas seguras com env(safe-area-inset-*)
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#FAFAF7" },
     { media: "(prefers-color-scheme: dark)", color: "#0F2A2E" },

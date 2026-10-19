@@ -215,7 +215,7 @@ export default function ConversaPage() {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row">
       {/* ===== CENTRO: saudação + chat ===== */}
-      <div className="flex flex-col min-w-0 lg:flex-1 lg:min-h-0 h-[calc(100dvh-10rem)] min-h-[460px] lg:h-auto shrink-0 lg:shrink">
+      <div className="flex flex-col min-w-0 lg:flex-1 lg:min-h-0 h-full min-h-[420px] lg:h-auto shrink-0 lg:shrink">
         <ChatPage compacto servidora={servidora} cabecalho={(
           <div className="flex items-center gap-3.5 px-4 md:px-6 2xl:px-10 pt-4 md:pt-[22px] pb-1 shrink-0">
           <Mascote nome="jarbas" emoji="⚡" tamanho={64} className="max-md:!w-10 max-md:!h-10" />

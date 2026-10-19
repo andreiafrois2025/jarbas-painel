@@ -64,7 +64,7 @@ function ListaAgentes({ agentes, ativo, previas, recolhida, onAlternar, aoEscolh
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className={recolhida ? "rotate-180" : ""}><path d="M12 5l-5 5 5 5" /></svg>
         </button>
       </div>
-      <ul className="flex-1 min-h-0 overflow-y-auto p-2 space-y-0.5 m-0 list-none" aria-label="Pessoas da equipe">
+      <ul className="flex-1 min-h-0 overflow-y-auto p-2 pb-6 space-y-0.5 m-0 list-none" aria-label="Pessoas da equipe">
         {agentes.map((a) => {
           const pv = previas[a.id]; const on = a.id === ativo;
           return (
@@ -143,6 +143,14 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   // a lista é a primeira tela e o chat abre ao tocar num agente.
   const [recolhida, setRecolhida] = useState(false);
   const [telaCelular, setTelaCelular] = useState<"lista" | "chat">("lista");
+  // Celular: placeholder curto, cabe em uma linha
+  const [celular, setCelular] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const ler = () => setCelular(mq.matches);
+    ler(); mq.addEventListener("change", ler);
+    return () => mq.removeEventListener("change", ler);
+  }, []);
   const [previas, setPrevias] = useState<Record<string, Previa>>({});
   const fim = useRef<HTMLDivElement>(null);
   const ctl = useRef<AbortController | null>(null);
@@ -517,7 +525,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
         </div>
 
         {/* ===== CAIXA DE ENVIO ===== */}
-        <footer className={compacto ? "px-4 md:px-6 2xl:px-10 pt-2 pb-4 md:pb-5" : "border-t border-[var(--border)] bg-[var(--bg-secondary)] p-3"}>
+        <footer className={compacto ? "px-4 md:px-6 2xl:px-10 pt-2 pb-3 md:pb-5 shrink-0" : "border-t border-[var(--border)] bg-[var(--bg-secondary)] p-3"}>
           {fixarAssunto && (
             <p className="text-xs mb-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent-hover)]">📁 A próxima mensagem vai para: {assuntos.find((a) => a.id === fixarAssunto)?.titulo}
               <button onClick={() => setFixarAssunto(null)} aria-label="Tirar a fixação do assunto" className="cursor-pointer">×</button></p>
@@ -539,7 +547,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               {chipNode}
               <textarea {...camposHab} style={{ outline: "none" }} value={texto} rows={1} maxLength={8000}
-                placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… toque no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : habilidadeSel ? "Escreva o pedido…" : `Fale ou escreva para ${agente?.nome ?? "o Jarbas"}… (digite / para habilidades)`}
+                placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… toque no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : habilidadeSel ? "Escreva o pedido…" : (celular ? "Escreva ou fale…" : `Fale ou escreva para ${agente?.nome ?? "o Jarbas"}… (digite / para habilidades)`)}
                 disabled={limiteBatido}
                 className="flex-1 min-w-[6rem] resize-none bg-transparent px-0 py-2.5 text-[15px] leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none max-h-40" aria-label="Mensagem" />
             </div>
