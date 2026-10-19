@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   title: "Jarbas — AI Agent Orchestrator",
   description: "Centralize, execute and automate your AI agents",
   manifest: "/manifest.json",
-  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  icons: { icon: "/icon-192.png?v=2", apple: "/apple-touch-icon.png?v=2" },
   appleWebApp: { capable: true, title: "Jarbas", statusBarStyle: "default" },
 };
 
