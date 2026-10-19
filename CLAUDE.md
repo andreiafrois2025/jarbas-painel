@@ -38,10 +38,11 @@ Nunca mostrar dado operacional "de agora" lendo o snapshot noturno.
 | `/producao/estudio` | EstudioPage | Revisão da edição automática de reels (blocos, zooms, legendas, re-render) |
 | `/pessoal` | PessoalPage | Luiz (escola) + finanças (resumo do mês via squad-api) |
 | `/areas` | AreasPage | Porta Áreas (19/10/2026): abas Igam (processos + prazos do Outlook), Conteúdo (Esteira, Radar, Reels, Calendário) e Casa (Luiz, Finanças, Rotina). Faixa "Fazer agora" configurada em `src/lib/fazer-agora.ts`. Dados novos vêm de `/api/areas/{esteira,prazos-outlook,casa}` (squad-api, módulo `areas-v2.js`, só leitura). `?aba=casa&sub=financas` = tela completa de finanças |
-| `/metricas` | MetricasPage | Abas: Painel Geral, Produtividade IA, Saúde do sistema (ao vivo), Diário de bordo |
+| `/numeros` | MetricasPage + HorasEquipe | Abas: Visão geral (horas economizadas, livro-caixa via `/api/numeros/resumo`), Por agente, Diário de bordo. Botão leva ao modo palco |
+| `/maquina?aba=saude` | SaudePage | Tela única: estado geral, serviços, conexões, rotinas, gasto do mês, últimos avisos (`status.json` + `/api/saude/resumo`; sem fonte = "sem dado") |
 | `/metricas/palestra` | (publico)/metricas/palestra | Modo palco público pra projetar em palestras |
 | `/biblioteca` | BibliotecaPage | Criações, Skills, Grafo do ecossistema (GrafoView), Grafo de conhecimento (GrafoConteudoView) |
-| `/config` | ConfigPage | Conta + integrações |
+| `/config` | ConfigPage | Ajustes: menu de seções (`?s=`) com Conta, Aparência, Avisos, Modo obra, App no celular, Atalhos, Organização, Grafo. "Abrir o painel em" fica em localStorage `painelInicio` e é lido por `src/app/page.tsx` (rota `/`) |
 
 O shell (sidebar + JobsMonitor + dados compartilhados) vive em
 `src/app/(painel)/layout.tsx` → `Dashboard.tsx` e persiste entre rotas

@@ -3,7 +3,7 @@
   "short_name": "Jarbas",
   "description": "Central inteligente da Andréia: conversa com o Jarbas e com a equipe.",
   "lang": "pt-BR",
-  "start_url": "/conversa",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

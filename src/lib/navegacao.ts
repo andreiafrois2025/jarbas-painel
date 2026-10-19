@@ -24,7 +24,7 @@ export const PORTAS: Porta[] = [
 ];
 
 export const PORTA_CONFIG: Porta = {
-  id: "config", path: "/config", icone: "🔧", rotulo: "Ajustes", title: "Ajustes: sua conta e as integrações",
+  id: "config", path: "/config", icone: "🔧", rotulo: "Ajustes", title: "Ajustes: conta, aparência, avisos e modo obra",
 };
 
 /** A rota atual pertence a esta porta? */
@@ -55,10 +55,15 @@ export const PAGINAS_BUSCA: EntradaBusca[] = [
   { tipo: "página", titulo: "Máquina › Saúde", detalhe: "tudo funcionando?", ir: "/maquina?aba=saude", chave: "status semaforo vps integracoes" },
   { tipo: "página", titulo: "Equipe › Agentes", detalhe: "quem trabalha por você", ir: "/equipe?aba=agentes", chave: "colaboradores personas fichas" },
   { tipo: "página", titulo: "Equipe › Habilidades", detalhe: "skills, prompts e plugins", ir: "/equipe?aba=habilidades", chave: "biblioteca skills prompts plugins habilidades" },
-  { tipo: "página", titulo: "Números", detalhe: "métricas e diário", ir: "/numeros", chave: "metricas diario de bordo produtividade" },
-  { tipo: "página", titulo: "Ajustes", detalhe: "conta e atalhos", ir: "/config", chave: "config conta senha integracoes criacoes links notion drive" },
-  { tipo: "página", titulo: "Ajustes › Organização da equipe", detalhe: "setores e atalhos rápidos (avançado)", ir: "/config", chave: "setores atalhos rapidos rh" },
-  { tipo: "página", titulo: "Ajustes › Grafo", detalhe: "grafo de conhecimento (avançado)", ir: "/config", chave: "grafo conhecimento" },
+  { tipo: "página", titulo: "Números", detalhe: "horas economizadas, por agente e diário", ir: "/numeros", chave: "metricas horas economizadas diario de bordo produtividade palestra" },
+  { tipo: "página", titulo: "Ajustes", detalhe: "conta, aparência, avisos", ir: "/config", chave: "config conta senha foto nome tema escuro noturno claro" },
+  { tipo: "página", titulo: "Ajustes › Aparência", detalhe: "tema, animações, sons, abrir em", ir: "/config?s=aparencia", chave: "tema escuro noturno claro animacoes sons escritorio abrir painel inicio" },
+  { tipo: "página", titulo: "Ajustes › Avisos", detalhe: "onde cada aviso chega", ir: "/config?s=avisos", chave: "whatsapp bom dia prazos noticias parei esperando notificacao" },
+  { tipo: "página", titulo: "Ajustes › Modo obra", detalhe: "estado, registro e desligar", ir: "/config?s=obra", chave: "obra registro desligar codigo telegram tarefas" },
+  { tipo: "página", titulo: "Ajustes › App no celular", detalhe: "instalar no Android ou iPhone", ir: "/config?s=celular", chave: "celular app instalar android iphone pwa tela inicio" },
+  { tipo: "página", titulo: "Ajustes › Atalhos", detalhe: "links e criações", ir: "/config?s=atalhos", chave: "atalhos links criacoes notion drive" },
+  { tipo: "página", titulo: "Ajustes › Organização da equipe", detalhe: "setores e atalhos rápidos (avançado)", ir: "/config?s=organizacao", chave: "setores atalhos rapidos rh" },
+  { tipo: "página", titulo: "Ajustes › Grafo", detalhe: "grafo de conhecimento (avançado)", ir: "/config?s=grafo", chave: "grafo conhecimento" },
 ];
 
 /**

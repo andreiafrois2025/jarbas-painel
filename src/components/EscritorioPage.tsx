@@ -16,6 +16,7 @@ import Mascote from "./Mascote";
 import Ambiente from "./EscritorioAmbiente";
 import { usePainel } from "@/lib/painel-context";
 import { ehColaboradorOculto, ehPessoal } from "@/lib/modo";
+import { CHAVE_SOM, CHAVE_ANIM } from "@/lib/preferencias";
 import {
   AGENTES, ALTURA, arrumaBaloes, geomMascote, SENTADO_PADRAO, CAFE, CP_DURACAO, CP_ESPERA, POS_ANDREIA, LARGURA, ROTEIROS, SALAS, SOFA,
   buscaEscritorio, buscaPosicoes, liberaSom, perfil, salvaPosicoes, somDoisTons, somPlim, somTecla,
@@ -29,8 +30,6 @@ const INTERVALO_SOFA = 150_000;
 const PERMANENCIA_SOFA = 4 * 60_000;
 const SEM_TAREFA_SOFA = 24 * 3600_000;
 const ATUALIZA_MS = 25_000;
-const CHAVE_SOM = "escritorioSom";
-const CHAVE_ANIM = "escritorioAnim";
 const PERMANENCIA_ENTREGA = 20_000; // quem estava livre vai à mesa e fica ~20 s com o balão ✅
 
 type Alvo = "trab" | "livre";

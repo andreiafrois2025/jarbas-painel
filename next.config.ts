@@ -11,7 +11,7 @@ const redirecionar = (source: string, destination: string) => ({ source, destina
 const nextConfig: NextConfig = {
   async redirects() {
     return [
-      redirecionar("/", "/conversa"),
+      // "/" é uma página (src/app/page.tsx) que respeita Ajustes › "Abrir o painel em".
       redirecionar("/inicio", "/conversa"),
       redirecionar("/chat", "/conversa"),
       redirecionar("/producao", "/maquina?aba=mapa"),

@@ -22,9 +22,18 @@ function lerEscolha(): Escolha {
   }
 }
 
-export default function BotaoTema() {
+export type EscolhaTema = Escolha;
+const EVENTO = "tema-mudou";
+
+/** Tema atual + como trocar. Vários controles na mesma tela (topo e Ajustes) ficam em sincronia. */
+export function useTema(): [Escolha, (e: Escolha) => void] {
   const [escolha, setEscolha] = useState<Escolha>("sistema");
-  useEffect(() => setEscolha(lerEscolha()), []);
+  useEffect(() => {
+    setEscolha(lerEscolha());
+    const aoMudar = (ev: Event) => setEscolha((ev as CustomEvent<Escolha>).detail);
+    window.addEventListener(EVENTO, aoMudar);
+    return () => window.removeEventListener(EVENTO, aoMudar);
+  }, []);
 
   const escolher = (e: Escolha) => {
     setEscolha(e);
@@ -34,7 +43,13 @@ export default function BotaoTema() {
     } catch { /* navegador bloqueou: vale só nesta aba */ }
     if (e === "sistema") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.setAttribute("data-theme", e);
+    window.dispatchEvent(new CustomEvent<Escolha>(EVENTO, { detail: e }));
   };
+  return [escolha, escolher];
+}
+
+export default function BotaoTema() {
+  const [escolha, escolher] = useTema();
 
   return (
     <div role="group" aria-label="Tema da tela"
