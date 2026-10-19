@@ -1,152 +1,22 @@
 "use client";
 
-// Página de Métricas v5 (12/07/2026) — menu superior com 3 visões:
-//   Painel Geral (default, resumo tipo palestra) · Produtividade IA · Saúde do sistema
-// Fonte: metrics-history.json publicado toda noite pelo metrics-snapshot.py.
+// Números (19/10/2026, mock aprovado "numeros-novo"): três abas.
+//   Visão geral  · horas economizadas (HorasEquipe.tsx; dados do livro-caixa)
+//   Por agente   · atividades por agente (hoje e 30 dias) + "outros gráficos"
+//   Diário de bordo · linha do tempo dos snapshots diários
+// Fontes: metrics-history.json (snapshot noturno) e /api/numeros/resumo (livro-caixa).
+// ChipsArea/Area continuam exportados: o modo palco público (/metricas/palestra) os usa.
 
 import { useState, useEffect } from "react";
 import { GraficoLinha, GraficoBarras, GraficoPizza } from "./charts";
 import { usePainel } from "@/lib/painel-context";
-import { ehPessoal, ehColaboradorOculto, limpaTexto, pareceComando } from "@/lib/modo";
-import {
-  useMetricsHistory, semanasOrdenadas, tempoRelativo,
-} from "@/lib/metrics";
+import { ehPessoal, ehColaboradorOculto, pareceComando } from "@/lib/modo";
+import { useMetricsHistory, semanasOrdenadas, tempoRelativo } from "@/lib/metrics";
+import { useNumerosResumo } from "@/lib/saude";
+import { useAbaUrl } from "@/lib/navegacao";
 import HorasEquipe from "./HorasEquipe";
-import { fetchEquipePublica, fallbackPublico, type AgentePublico } from "@/lib/equipe";
+import { Abas, CartaoSecao } from "./ui";
 
-// Grid da equipe clicável: abre a bio do agente num popover. A descrição vinha
-// da página "modo palco"; como ela vai virar espelho do dash (pedido 19/07), a
-// bio passou a viver aqui também. Fonte: equipe-publica.json (com fallback).
-function EquipeGrid() {
-  const { servidora } = usePainel();
-  const [equipeTodos, setEquipe] = useState<AgentePublico[]>(fallbackPublico());
-  // Modo Servidora: Lara e Dra. Nara não aparecem na grade nem no popover
-  const equipe = servidora
-    ? equipeTodos.filter((a) => !ehColaboradorOculto(a.nome)).map((a) => ({
-        ...a,
-        bio: limpaTexto(a.bio),
-        personalidade: limpaTexto(a.personalidade),
-        skills: (a.skills || []).filter((x) => limpaTexto(x)),
-        funcoes: (a.funcoes || []).filter((f) => limpaTexto(f.nome) && limpaTexto(f.descricao)),
-      }))
-    : equipeTodos;
-  const [sel, setSel] = useState<AgentePublico | null>(null);
-
-  useEffect(() => {
-    fetchEquipePublica().then((e) => e && setEquipe(e));
-  }, []);
-
-  useEffect(() => {
-    if (!sel) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSel(null); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [sel]);
-
-  return (
-    <section className="text-center">
-      <h3 className="text-sm font-semibold mb-3 text-[var(--text-secondary)]">A equipe</h3>
-      <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-        {equipe.map((a) => (
-          <button
-            key={a.nome}
-            onClick={() => setSel(a)}
-            className="rounded-xl py-2.5 px-1 bg-[var(--bg-secondary)] border border-[#E5DED4] hover:border-[var(--accent)] hover:shadow-sm transition-all cursor-pointer"
-            title={`Ver ${a.nome}`}
-          >
-            <div className="text-xl">{a.icone}</div>
-            <div className="text-[11px] mt-0.5 font-medium text-[var(--text-primary)]">{a.nome}</div>
-          </button>
-        ))}
-      </div>
-
-      {sel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 text-left"
-          style={{ background: "rgba(45,59,59,.45)" }} onClick={() => setSel(null)}>
-          <div className="rounded-2xl p-6 md:p-8 max-w-lg w-full max-h-[85vh] overflow-y-auto"
-            style={{ background: "#F5F0EA", color: "#2D3B3B" }} onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-4">
-              <span className="text-5xl">{sel.icone}</span>
-              <div>
-                <h3 className="text-2xl font-bold">{sel.nome}</h3>
-                {sel.papel && <p className="text-sm uppercase tracking-widest" style={{ color: "#A0583C" }}>{sel.papel}</p>}
-              </div>
-            </div>
-            {sel.bio && <p className="mt-4 text-sm md:text-base leading-relaxed whitespace-pre-line">{sel.bio}</p>}
-            {sel.skills.length > 0 && (
-              <>
-                <p className="mt-5 text-xs font-semibold uppercase tracking-widest" style={{ color: "#6B7A7A" }}>Habilidades</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {sel.skills.map((h) => (
-                    <span key={h} className="text-xs px-3 py-1.5 rounded-full" style={{ background: "#FFFFFF", color: "#2D6B6B", border: "1px solid #2D6B6B" }}>{h}</span>
-                  ))}
-                </div>
-              </>
-            )}
-            {sel.funcoes.length > 0 && (
-              <>
-                <p className="mt-5 text-xs font-semibold uppercase tracking-widest" style={{ color: "#6B7A7A" }}>Funções que executa</p>
-                <ul className="mt-2 space-y-1.5">
-                  {sel.funcoes.map((f, i) => (
-                    <li key={i} className="text-sm rounded-lg px-3 py-2" style={{ background: "#FFFFFF" }}>
-                      <span className="font-medium">{f.descricao || f.nome}</span>
-                      {f.descricao && f.nome && <span className="block text-xs" style={{ color: "#6B7A7A" }}>via {f.nome}</span>}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {sel.personalidade && (
-              <p className="mt-4 text-xs italic leading-relaxed" style={{ color: "#6B7A7A" }}>“{sel.personalidade}”</p>
-            )}
-            <button onClick={() => setSel(null)} className="mt-5 text-sm underline opacity-60 hover:opacity-100">fechar</button>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-export const NOME_AUTOMACAO: Record<string, string> = {
-  style_learner: "Aprendiz de estilo (Mike)",
-  radar_to_ig: "Ponte Radar → Instagram",
-  reels_pipeline: "Pipeline de reels",
-  ronda_diaria: "Ronda diária (Jarbas)",
-  status_saude: "Semáforo de saúde",
-};
-
-const EQUIPE: [string, string][] = [
-  ["🤵", "Jarbas"], ["🗂️", "Donna"], ["🔍", "Mike"], ["✍️", "Izzy"],
-  ["🎨", "Felipe"], ["🗺️", "Eric"], ["⚖️", "Dr. Harvey"], ["📜", "Katrina"],
-  ["💻", "Junior"], ["📊", "Tonny"], ["🎬", "Theo"], ["🧭", "Rafaela"],
-  ["💰", "Louis"], ["🥗", "Lara"], ["🧠", "Dra. Nara"], ["📚", "Sofia"],
-];
-
-export function Tile({ titulo, valor, sub, icone }: {
-  titulo: string; valor: string | number; sub?: string; icone?: string;
-}) {
-  return (
-    <div className="bg-[var(--bg-secondary)] rounded-xl p-4 border border-[#E5DED4]">
-      <div className="text-xs text-[var(--text-secondary)]">{icone} {titulo}</div>
-      <div className="text-2xl font-bold mt-1 text-[var(--text-primary)]">{valor}</div>
-      {sub && <div className="text-xs mt-1 text-[var(--text-secondary)]">{sub}</div>}
-    </div>
-  );
-}
-
-function CartaoGrafico({ titulo, sub, children }: {
-  titulo: string; sub?: string; children: React.ReactNode;
-}) {
-  return (
-    <div className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[#E5DED4]">
-      <h3 className="font-semibold text-[var(--text-primary)]">{titulo}</h3>
-      {sub && <p className="text-xs text-[var(--text-secondary)] mb-3">{sub}</p>}
-      {children}
-    </div>
-  );
-}
-
-type Aba = "geral" | "producao" | "diario";
 // Filtro de área — chip no topo, afeta as abas "Painel Geral" e "Produtividade IA".
 // "tudo" = comportamento de sempre (soma/mostra tudo). "conteudo" = só o que já
 // existe hoje (fila/radar/envios/dicas/reels/horas_conteudo). "servidora" = só
@@ -179,69 +49,143 @@ export function ChipsArea({ area, setArea }: { area: Area; setArea: (a: Area) =>
   );
 }
 
+
+function CartaoGrafico({ titulo, sub, children }: {
+  titulo: string; sub?: string; children: React.ReactNode;
+}) {
+  return (
+    <CartaoSecao titulo={titulo}>
+      {sub && <p className="text-[13px] text-[var(--text-secondary)] mb-3 -mt-1">{sub}</p>}
+      {children}
+    </CartaoSecao>
+  );
+}
+
+
+type Aba = "geral" | "agente" | "diario";
+
 export default function MetricasPage() {
   const { data, erro, hoje } = useMetricsHistory();
-  const [aba, setAba] = useState<Aba>("geral");
-  const [area, setArea] = useState<Area>("tudo");
+  const { dados: numeros, erro: erroNumeros } = useNumerosResumo();
+  const [aba, mudar] = useAbaUrl<Aba>(["geral", "agente", "diario"], "geral");
 
-  if (erro) {
-    return <p className="p-6 text-[var(--text-secondary)]">
-      Não consegui carregar as métricas. A VPS publica o histórico toda noite — se acabou de configurar, aguarde a primeira rodada.
-    </p>;
-  }
-  if (!data || !hoje) {
-    return <p className="p-6 text-[var(--text-secondary)] animate-pulse">Carregando métricas…</p>;
-  }
-
-  const taxaSemanal = semanasOrdenadas(data.radar_semanas)
+  const taxaSemanal = data ? semanasOrdenadas(data.radar_semanas)
     .filter((s) => s.valor?.taxa !== null && s.valor?.taxa !== undefined)
     .map((s) => ({
       label: s.label,
       valor: Math.round((s.valor.taxa as number) * 100),
       detalhe: `${s.valor.aprovados} aprov. / ${s.valor.descartados} desc.`,
-    }));
+    })) : [];
 
-  const botaoAba = (id: Aba, rotulo: string) => (
-    <button
-      onClick={() => setAba(id)}
-      className={`px-3 md:px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-all ${
-        aba === id
-          ? "border-[var(--accent)] text-[var(--text-primary)]"
-          : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-      }`}
-    >
-      {rotulo}
-    </button>
+  const palestra = (
+    <a href="/metricas/palestra" target="_blank" rel="noreferrer"
+      className="my-2 shrink-0 whitespace-nowrap rounded-full border border-[var(--border)] px-4 py-2 text-[13.5px] font-bold text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+      🎤 versão para palestra ↗
+    </a>
   );
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Menu superior */}
-      <div className="bg-[var(--bg-secondary)]/90 backdrop-blur-sm border-b border-[var(--border)] px-3 md:px-5 flex items-center gap-1 shrink-0 overflow-x-auto">
-        <h1 className="text-base md:text-lg font-semibold mr-2 md:mr-4 py-3">📊 Métricas</h1>
-        {botaoAba("geral", "🎤 Painel Geral")}
-        {botaoAba("producao", "🤖 Produtividade IA")}
-        {botaoAba("diario", "📖 Diário de bordo")}
-      </div>
-
-      {/* Filtro de área — só afeta Painel Geral e Produtividade IA */}
-      {(aba === "geral" || aba === "producao") && (
-        <div className="px-3 md:px-5 py-2.5 border-b border-[var(--border)] bg-[var(--bg-primary)]">
-          <ChipsArea area={area} setArea={setArea} />
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-4 md:p-6 w-full space-y-6">
-          <p className="text-xs text-[var(--text-secondary)] text-right">
-            snapshot diário · atualizado {tempoRelativo(data.updated_at)}
-          </p>
-
-          {aba === "geral" && <AbaGeral data={data} hoje={hoje} taxaSemanal={taxaSemanal} area={area} />}
-          {aba === "producao" && <AbaProducao data={data} hoje={hoje} taxaSemanal={taxaSemanal} area={area} />}
-          {aba === "diario" && <AbaDiario data={data} />}
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <Abas titulo="Números" valor={aba} onMuda={(v) => mudar(v)} direita={palestra} opcoes={[
+        { id: "geral", rotulo: "📊 Visão geral" },
+        { id: "agente", rotulo: "🤖 Por agente" },
+        { id: "diario", rotulo: "📖 Diário de bordo" },
+      ]} />
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="p-4 md:p-6 w-full space-y-4">
+          {erro ? (
+            <p className="text-[var(--text-secondary)]">
+              Não consegui carregar as métricas. A VPS publica o histórico toda noite — se acabou de configurar, aguarde a primeira rodada.
+            </p>
+          ) : !data || !hoje ? (
+            <p className="text-[var(--text-secondary)] animate-pulse">Carregando métricas…</p>
+          ) : (
+            <>
+              {aba === "geral" && <HorasEquipe hoje={hoje} tabela={data.tabela_horas} numeros={numeros} semDadoNumeros={erroNumeros} />}
+              {aba === "agente" && <AbaAgente data={data} hoje={hoje} taxaSemanal={taxaSemanal} />}
+              {aba === "diario" && <AbaDiario data={data} />}
+              <p className="text-xs text-[var(--text-muted)] text-right">snapshot diário · atualizado {tempoRelativo(data.updated_at)}</p>
+            </>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function AbaAgente({ data, hoje, taxaSemanal }: {
+  data: any; hoje: any; taxaSemanal: { label: string; valor: number; detalhe?: string }[];
+}) {
+  const { servidora } = usePainel();
+  const dias: any[] = data?.days ?? [];
+
+  const somaAgentes = (janela: any[]) => {
+    const acc: Record<string, number> = {};
+    for (const d of janela) {
+      for (const [quem, qtd] of Object.entries((d.atividades_por_agente ?? {}) as Record<string, number>)) {
+        if (servidora && ehColaboradorOculto(quem)) continue; // modo Servidora
+        acc[quem] = (acc[quem] ?? 0) + qtd;
+      }
+    }
+    return acc;
+  };
+  const hojePorAgente = Object.fromEntries(
+    Object.entries((hoje?.atividades_por_agente ?? {}) as Record<string, number>)
+      .filter(([quem]) => !(servidora && ehColaboradorOculto(quem))),
+  ) as Record<string, number>;
+  const mesPorAgente = somaAgentes(dias.slice(-30));
+  const totalHoje = Object.values(hojePorAgente).reduce((a, b) => a + b, 0);
+  const totalMes = Object.values(mesPorAgente).reduce((a, b) => a + b, 0);
+  const emBarras = (obj: Record<string, number>) =>
+    Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([label, valor]) => ({ label, valor }));
+
+  const r = hoje?.resumo_automacoes;
+  const porCategoria = (() => {
+    if (!r?.itens) return [];
+    const m = new Map<string, number>();
+    for (const i of r.itens) if (!(servidora && (ehPessoal(i.nome, i.categoria) || pareceComando(i.nome)))) m.set(i.categoria || "outros", (m.get(i.categoria || "outros") ?? 0) + 1);
+    return [...m.entries()].map(([rotulo, valor]) => ({ rotulo, valor })).sort((a, b) => b.valor - a.valor);
+  })();
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2 items-start">
+        <CartaoGrafico titulo="Atividades por agente: hoje" sub="quem trabalhou desde a meia-noite">
+          {totalHoje ? <GraficoBarras pontos={emBarras(hojePorAgente)} />
+            : <p className="text-sm text-[var(--text-muted)] py-6 text-center">nenhuma atividade registrada hoje ainda</p>}
+        </CartaoGrafico>
+        <CartaoGrafico titulo="Atividades por agente: últimos 30 dias"
+          sub={`somando os ${Math.min(dias.length, 30)} dias que já temos guardados`}>
+          {totalMes ? <GraficoBarras pontos={emBarras(mesPorAgente)} />
+            : <p className="text-sm text-[var(--text-muted)] py-6 text-center">ainda sem histórico suficiente</p>}
+        </CartaoGrafico>
+      </div>
+
+      {/* Os gráficos das abas antigas (Painel Geral e Produtividade IA) continuam aqui, recolhidos. */}
+      <details className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-5 md:p-6">
+        <summary className="cursor-pointer select-none text-[13px] font-extrabold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+          Outros gráficos: automações, conteúdo e aprendizado da IA
+        </summary>
+        <div className="mt-4 space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2 items-start">
+            <CartaoGrafico titulo="Automações por categoria" sub={`${r?.total ?? 0} no relógio da VPS`}>
+              <GraficoPizza fatias={porCategoria} />
+            </CartaoGrafico>
+            <CartaoGrafico titulo="Quanto do que roda gasta IA" sub="todas foram construídas com IA, poucas precisam dela para rodar">
+              <GraficoPizza fatias={r ? [
+                { rotulo: "Roda sem IA", valor: r.sem_ia },
+                { rotulo: "Consome IA", valor: r.com_ia },
+              ] : []} />
+            </CartaoGrafico>
+            <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈" sub="% do que a IA propõe que eu aprovo, semana a semana">
+              <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
+            </CartaoGrafico>
+            <SecaoIAConstroi />
+          </div>
+          <AbaProducao data={data} hoje={hoje} taxaSemanal={taxaSemanal} area="tudo" />
+        </div>
+      </details>
     </div>
   );
 }
@@ -306,163 +250,6 @@ function SecaoIAConstroi() {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function AbaGeral({ data, hoje, taxaSemanal }: {
-  data: any; hoje: any; taxaSemanal: { label: string; valor: number }[]; area: Area;
-}) {
-  const { collaborators, assignments, servidora } = usePainel();
-
-  // 25/07 (tarde) — o Painel Geral passou a ser sobre o ECOSSISTEMA, não sobre
-  // conteúdo. Pedido dela: "coisas gerais assim, do ecossistema".
-  // Regra que ela deu e vale pra tudo aqui: sempre TOTAL DA VIDA + ÚLTIMOS 30
-  // DIAS, pra mostrar o que já foi feito e a evolução.
-  const dias: any[] = data?.days ?? [];
-  const ultimos = (n: number) => dias.slice(-n);
-
-  const somaAgentes = (janela: any[]) => {
-    const acc: Record<string, number> = {};
-    for (const d of janela) {
-      for (const [quem, qtd] of Object.entries((d.atividades_por_agente ?? {}) as Record<string, number>)) {
-        if (servidora && ehColaboradorOculto(quem)) continue; // modo Servidora
-        acc[quem] = (acc[quem] ?? 0) + qtd;
-      }
-    }
-    return acc;
-  };
-
-  const hojePorAgente = Object.fromEntries(
-    Object.entries((hoje?.atividades_por_agente ?? {}) as Record<string, number>)
-      .filter(([quem]) => !(servidora && ehColaboradorOculto(quem))),
-  ) as Record<string, number>;
-  const mesPorAgente = somaAgentes(ultimos(30));
-  const totalHoje = Object.values(hojePorAgente).reduce((a, b) => a + b, 0);
-  const totalMes = Object.values(mesPorAgente).reduce((a, b) => a + b, 0);
-
-  // Horas: o snapshot guarda o ACUMULADO do dia. "Esta semana" = acumulado de
-  // hoje menos o do último dia ANTES da segunda-feira; "este mês" = menos o do
-  // último dia antes do dia 1. Sem snapshot antes do começo do período, não
-  // inventa: mostra "medindo desde DD/MM".
-  const horasHoje = hoje?.horas_economizadas ?? 0;
-  const brData = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
-  const horasNoPeriodo = (inicioIso: string): { valor: number | null; desde: string | null } => {
-    const antes = dias.filter((d) => d.date < inicioIso && d.horas_economizadas != null);
-    if (!antes.length) {
-      const primeiro = dias.find((d) => d.horas_economizadas != null);
-      return { valor: null, desde: primeiro ? brData(primeiro.date) : null };
-    }
-    return { valor: Math.max(0, horasHoje - antes[antes.length - 1].horas_economizadas), desde: null };
-  };
-  const hojeIso = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10); // data em Brasília
-  const dSemana = new Date(hojeIso + "T12:00:00Z");
-  dSemana.setUTCDate(dSemana.getUTCDate() - ((dSemana.getUTCDay() + 6) % 7)); // volta até a segunda
-  const inicioSemana = dSemana.toISOString().slice(0, 10);
-  const inicioMes = hojeIso.slice(0, 8) + "01";
-  // Com o livro-caixa (18/10/2026) o snapshot já traz semana e mês prontos.
-  const horasSemana = hoje?.horas_semana != null ? { valor: hoje.horas_semana, desde: null } : horasNoPeriodo(inicioSemana);
-  const horasMes = hoje?.horas_mes != null ? { valor: hoje.horas_mes, desde: null } : horasNoPeriodo(inicioMes);
-  const fmtHoras = (v: number) => `${(Math.round(v * 10) / 10).toString().replace(".", ",")}h`;
-
-  const r = hoje?.resumo_automacoes;
-  const porCategoria = (() => {
-    if (!r?.itens) return [];
-    const m = new Map<string, number>();
-    for (const i of r.itens) if (!(servidora && (ehPessoal(i.nome, i.categoria) || pareceComando(i.nome)))) m.set(i.categoria || "outros", (m.get(i.categoria || "outros") ?? 0) + 1);
-    return [...m.entries()].map(([rotulo, valor]) => ({ rotulo, valor })).sort((a, b) => b.valor - a.valor);
-  })();
-
-  const emBarras = (obj: Record<string, number>) =>
-    Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([label, valor]) => ({ label, valor }));
-
-  const cards: [string | number, string, string?][] = [
-    [collaborators.length, "agentes na equipe"],
-    [assignments.length, "assistentes em uso"],
-    [totalMes || "—", "atividades nos últimos 30 dias", "feitas pelos agentes, sozinhos"],
-    [totalHoje || "—", "atividades hoje"],
-  ];
-
-  return (
-    <div className="space-y-5">
-      <section>
-        <p className="text-xs uppercase tracking-[0.3em] mb-4" style={{ color: "#A0583C" }}>
-          Meu ecossistema
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-          {([
-            ["horas economizadas esta semana", horasSemana,
-              "tudo o que a equipe entregou desde segunda-feira"],
-            ["horas economizadas este mês", horasMes,
-              "tudo o que a equipe entregou desde o dia 1"],
-          ] as const).map(([rot, h, fonte]) => (
-            <div key={rot} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
-              <div className="text-4xl font-bold leading-none" style={{ color: "#2D6B6B" }}>
-                {h.valor == null ? "—" : fmtHoras(h.valor)}
-              </div>
-              <div className="mt-1.5 text-sm text-[var(--text-secondary)]">{rot}</div>
-              <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-                {h.valor == null ? `medindo desde ${h.desde ?? "hoje"}` : fonte}
-              </div>
-            </div>
-          ))}
-          <div className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
-            <div className="text-xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{fmtHoras(horasHoje)}</div>
-            <div className="mt-1.5 text-xs text-[var(--text-secondary)]">no total acumulado</div>
-            <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-              entregas de todos os agentes, desde {dias[0]?.date ? brData(dias[0].date) : "o início"}
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {cards.map(([v, r1, sub]) => (
-            <div key={String(r1)} className="bg-[var(--bg-secondary)] rounded-xl border border-[#E5DED4] px-4 py-4">
-              <div className="text-3xl font-bold leading-none" style={{ color: "#2D6B6B" }}>{v}</div>
-              <div className="mt-1.5 text-xs text-[var(--text-secondary)]">{r1}</div>
-              {sub && <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">{sub}</div>}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {hoje && <HorasEquipe hoje={hoje} tabela={data.tabela_horas} />}
-
-      <div className="grid gap-4 lg:grid-cols-2 items-start">
-        <CartaoGrafico titulo="Atividades por agente — hoje" sub="quem trabalhou desde a meia-noite">
-          {totalHoje ? <GraficoBarras pontos={emBarras(hojePorAgente)} />
-            : <p className="text-sm text-[var(--text-muted)] py-6 text-center">nenhuma atividade registrada hoje ainda</p>}
-        </CartaoGrafico>
-
-        <CartaoGrafico titulo="Atividades por agente — últimos 30 dias"
-          sub={`somando os ${Math.min(dias.length, 30)} dias que já temos guardados`}>
-          {totalMes ? <GraficoBarras pontos={emBarras(mesPorAgente)} />
-            : <p className="text-sm text-[var(--text-muted)] py-6 text-center">ainda sem histórico suficiente</p>}
-        </CartaoGrafico>
-
-        <CartaoGrafico titulo="Automações por categoria" sub={`${r?.total ?? 0} no relógio da VPS`}>
-          <GraficoPizza fatias={porCategoria} />
-        </CartaoGrafico>
-
-        <CartaoGrafico titulo="Quanto do que roda gasta IA"
-          sub="todas foram construídas com IA — poucas precisam dela pra rodar">
-          <GraficoPizza fatias={r ? [
-            { rotulo: "Roda sem IA", valor: r.sem_ia },
-            { rotulo: "Consome IA", valor: r.com_ia },
-          ] : []} />
-        </CartaoGrafico>
-
-        <CartaoGrafico titulo="A IA aprendendo o meu gosto 📈"
-          sub="% do que a IA propõe que eu aprovo, semana a semana"
-          >
-          <GraficoLinha pontos={taxaSemanal} unidade="%" maxY={100} />
-        </CartaoGrafico>
-
-        <div className="space-y-4">
-          <SecaoIAConstroi />
-          <EquipeGrid />
-        </div>
-      </div>
-    </div>
-  );
-
-}
-
 function AbaProducao({ data, hoje, taxaSemanal, area }: {
   data: any; hoje: any; taxaSemanal: { label: string; valor: number; detalhe?: string }[]; area: Area;
 }) {
@@ -585,5 +372,3 @@ function AbaDiario({ data }: { data: any }) {
   );
 }
 
-// 25/07/2026: a aba "Saúde do sistema" saiu daqui e virou a seção 🩺 Saúde.
-// Métricas voltou a ser só métrica.
