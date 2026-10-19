@@ -46,8 +46,9 @@ export interface EntradaBusca {
 export const PAGINAS_BUSCA: EntradaBusca[] = [
   { tipo: "página", titulo: "Conversa", detalhe: "falar com o Jarbas", ir: "/conversa", chave: "chat mensagem hoje agenda" },
   { tipo: "página", titulo: "Áreas › Igam", detalhe: "licitação", ir: "/areas?aba=igam", chave: "licitacao processo etp tr contrato" },
-  { tipo: "página", titulo: "Áreas › Conteúdo", detalhe: "notícias e radar", ir: "/areas?aba=conteudo&sub=noticias", chave: "noticias radar uau instagram aprovacao" },
-  { tipo: "página", titulo: "Áreas › Conteúdo › Estúdio de reels", detalhe: "revisar a edição", ir: "/areas?aba=conteudo&sub=estudio", chave: "reels video corte legenda carrossel" },
+  { tipo: "página", titulo: "Áreas › Conteúdo", detalhe: "esteira de conteúdo", ir: "/areas?aba=conteudo", chave: "esteira ideias produzindo agendado publicado calendario instagram" },
+  { tipo: "página", titulo: "Áreas › Conteúdo › Radar de notícias", detalhe: "notícias e UAU", ir: "/areas?aba=conteudo&sub=radar", chave: "noticias radar uau aprovacao" },
+  { tipo: "página", titulo: "Áreas › Conteúdo › Reels", detalhe: "revisar a edição", ir: "/areas?aba=conteudo&sub=reels", chave: "reels video corte legenda carrossel" },
   { tipo: "página", titulo: "Áreas › Casa", detalhe: "Luiz e finanças", ir: "/areas?aba=casa", chave: "luiz escola financas gastos cartao", pessoal: true },
   { tipo: "página", titulo: "Máquina › Mapa", detalhe: "o que roda sozinho", ir: "/maquina?aba=mapa", chave: "fluxos automacoes cron" },
   { tipo: "página", titulo: "Máquina › Squads", detalhe: "equipes de agentes", ir: "/maquina?aba=squads", chave: "squad opensquad" },
