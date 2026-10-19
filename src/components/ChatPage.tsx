@@ -33,7 +33,7 @@ function Avatar({ a, tamanho = 36 }: { a?: Agente; tamanho?: number }) {
   return <Mascote nome={a?.nome} emoji={a?.emoji} tamanho={tamanho} />;
 }
 
-interface Previa { texto: string; ts: string }
+interface Previa { texto: string; ts: string; minha?: boolean }
 
 const TZ = "America/Sao_Paulo";
 const diaBR = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: TZ }).format(d); // AAAA-MM-DD
@@ -77,7 +77,7 @@ function ListaAgentes({ agentes, ativo, previas, recolhida, onAlternar, aoEscolh
                     <span className="flex-1 min-w-0 truncate text-sm font-bold text-[var(--text-primary)]">{a.nome}</span>
                     {pv && <span className="shrink-0 text-[11px] text-[var(--text-secondary)] tabular-nums">{horaLista(pv.ts)}</span>}
                   </span>
-                  <span className="block truncate text-[12.5px] text-[var(--text-secondary)]">{pv?.texto || a.cargo}</span>
+                  <span className="block truncate text-[12.5px] text-[var(--text-secondary)]">{pv ? <>{pv.minha && <span className="text-[var(--ac)]">Você: </span>}{pv.texto}</> : a.cargo}</span>
                 </span>
               </button>
             </li>
@@ -195,13 +195,13 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const ordem = useMemo(() => grupos.flatMap((g) => g.itens), [grupos]); // Jarbas primeiro, depois por afinidade
   useEffect(() => { try { setRecolhida(window.localStorage.getItem("chatListaRecolhida") === "1"); } catch { /* sem storage */ } }, []);
   const alternarLista = () => setRecolhida((v) => { try { window.localStorage.setItem("chatListaRecolhida", v ? "0" : "1"); } catch { /* sem storage */ } return !v; });
-  // Prévia = título e hora da conversa mais recente de cada agente. No modo Só Igam não
+  // Prévia = última mensagem e hora da conversa mais recente de cada agente (como no WhatsApp). No modo Só Igam não
   // lê histórico (pode citar assunto de casa), então a lista fica só com nome e foto.
   useEffect(() => {
     if (!compacto || servidora || !agentes.length) return;
     let vivo = true;
     agentes.forEach((a) => chatApi.conversas(a.id).then((cs) => {
-      if (vivo && cs[0]) setPrevias((p) => ({ ...p, [a.id]: { texto: cs[0].titulo, ts: cs[0].atualizada } }));
+      if (vivo && cs[0]) setPrevias((p) => ({ ...p, [a.id]: { texto: cs[0].ultima?.texto || cs[0].titulo, ts: cs[0].atualizada, minha: cs[0].ultima?.minha } }));
     }).catch(() => {}));
     return () => { vivo = false; };
   }, [compacto, servidora, agentes]);
@@ -248,7 +248,15 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     return () => { vivo = false; clearInterval(t); };
   }, [obraDisponivel]);
 
-  useEffect(() => { fim.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [msgs, fluxo, status]);
+  // Ao abrir uma conversa vai direto pra última mensagem; depois, novas mensagens rolam suave
+  const pularFim = useRef(true);
+  useEffect(() => { pularFim.current = true; }, [conversaId, agenteId, telaCelular]);
+  useEffect(() => {
+    const salto = pularFim.current && msgs.length > 0;
+    if (salto) pularFim.current = false;
+    const ir = () => fim.current?.scrollIntoView({ behavior: salto ? "auto" : "smooth", block: "end" });
+    ir(); if (salto) requestAnimationFrame(() => setTimeout(ir, 60));
+  }, [msgs, fluxo, status, telaCelular]);
 
   const enviar = useCallback(async (conteudo: string, assuntoIdParam?: string) => {
     const m = conteudo.trim();
@@ -444,6 +452,13 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           </div>
           {agente && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher descrição" : "ver descrição"}</button>}
           </>}
+          {/* Conversa avançada: abre a sessão permanente do Claude Code (endereço fixo /remoto) */}
+          {agenteId === "jarbas" && !servidora && (
+            <a href="/remoto" target="_blank" rel="noopener" title="Conversa avançada: abre o Jarbas no Claude Code (pode mexer no sistema)"
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] no-underline">
+              🧠<span className="max-md:hidden">Conversa avançada</span>
+            </a>
+          )}
           <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
             <span className="sr-only md:not-sr-only">Modelo</span>
             <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado} aria-label="Modelo que responde nesta conversa"

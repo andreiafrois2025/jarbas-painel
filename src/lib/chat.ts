@@ -30,7 +30,7 @@ export interface PedidoObra { id: string; titulo: string; descricao: string; det
 export type DecisaoPasso = "permitido" | "pediu_aprovado" | "pediu_negado" | "pediu_expirou" | "pediu_aguardando" | "bloqueado";
 export interface PassoObra { hora: string; ferramenta: string; resumo: string; decisao: DecisaoPasso; motivo: string }
 export interface ResultadoDesfazer { ok: boolean; restaurados: number; removidos: number; erros: string[]; aviso: string }
-export interface ConversaResumo { id: string; agente: string; titulo: string; criada: string; atualizada: string; mensagens: number }
+export interface ConversaResumo { id: string; agente: string; titulo: string; criada: string; atualizada: string; mensagens: number; ultima?: { texto: string; minha: boolean } | null }
 export interface Uso {
   hora: { usadas: number; limite: number }; dia: { usadas: number; limite: number };
   liberaEmMin: { hora: number; dia: number }; emUso: boolean; aviso?: string;
