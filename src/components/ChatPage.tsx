@@ -459,13 +459,6 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           </div>
           {agente && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher descrição" : "ver descrição"}</button>}
           </>}
-          {/* Conversa avançada: abre a sessão permanente do Claude Code (endereço fixo /remoto) */}
-          {agenteId === "jarbas" && !servidora && (
-            <a href="/remoto" title="Conversa avançada: abre o Jarbas no Claude Code (pode mexer no sistema)"
-              className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] no-underline">
-              🧠<span className="max-md:hidden">Conversa avançada</span>
-            </a>
-          )}
           <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
             <span className="sr-only md:not-sr-only">Modelo</span>
             <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado} aria-label="Modelo que responde nesta conversa"
