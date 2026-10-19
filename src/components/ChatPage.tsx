@@ -11,6 +11,8 @@ import type { Collaborator } from "@/lib/types";
 import { ehColaboradorOculto } from "@/lib/modo";
 import TextoSeguro from "./chat/TextoSeguro";
 import Visuais from "./chat/Visuais";
+import { MenuHabilidades, ChipHabilidade } from "./chat/MenuHabilidades";
+import { AVISO_OBRA, detectarHabilidadeFalada, filtrarHabilidades, gatilhoBarra, useHabilidadesChat, type HabChat } from "@/lib/habilidadesChat";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -140,6 +142,32 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const rec = useRef<MediaRecorder | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // ── Menu "/" de habilidades ──
+  const { lista: habilidades, pronto: habilidadesProntas } = useHabilidadesChat(servidora);
+  const [habSel, setHabSel] = useState<string | null>(null); // id da habilidade escolhida (etiqueta na caixa)
+  const habilidadeSel = useMemo(() => habilidades.find((h) => h.id === habSel) ?? null, [habilidades, habSel]);
+  const campoRef = useRef<HTMLTextAreaElement>(null);
+  const [cursor, setCursor] = useState(0);
+  const [menuFechadoEm, setMenuFechadoEm] = useState<number | null>(null); // Esc fecha o menu desse "/" até digitar outro
+  const [idxMenu, setIdxMenu] = useState(0);
+  const gatilho = useMemo(() => gatilhoBarra(texto, cursor), [texto, cursor]);
+  const opcoesMenu = useMemo(() => (gatilho ? filtrarHabilidades(habilidades, gatilho.consulta) : []), [gatilho, habilidades]);
+  // sem nenhum resultado para o que ela digitou (ex.: um caminho "/root/x"), o menu some em vez de atrapalhar
+  const menuAberto = !!gatilho && gatilho.inicio !== menuFechadoEm && (opcoesMenu.length > 0 || (!gatilho.consulta && !habilidadesProntas));
+  useEffect(() => { setIdxMenu(0); }, [gatilho?.consulta]);
+  const habFalada = useMemo(() => (habilidadeSel || menuAberto ? null : detectarHabilidadeFalada(texto, habilidades)), [habilidadeSel, menuAberto, texto, habilidades]);
+
+  const escolherHabilidade = (h: HabChat) => {
+    if (!gatilho) return;
+    let antes = texto.slice(0, gatilho.inicio); let depois = texto.slice(cursor);
+    if (antes.endsWith(" ") && depois.startsWith(" ")) depois = depois.slice(1);
+    if (!antes.trim() && depois.startsWith(" ")) depois = depois.trimStart();
+    setTexto(antes + depois); setHabSel(h.id); setMenuFechadoEm(null);
+    const pos = antes.length; setCursor(pos);
+    requestAnimationFrame(() => { const c = campoRef.current; if (c) { c.focus(); c.setSelectionRange(pos, pos); } });
+  };
+  const tirarHabilidade = () => { setHabSel(null); requestAnimationFrame(() => campoRef.current?.focus()); };
+
   const agente = useMemo(() => agentes.find((a) => a.id === agenteId), [agentes, agenteId]);
   const grupos = useMemo(() => {
     const usados = new Set<string>();
@@ -191,7 +219,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   useEffect(() => {
     if (!agentes.length) return;
     try { window.localStorage.setItem("chatAgente", agenteId); } catch { /* sem storage */ }
-    setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null);
+    setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null); setHabSel(null);
     setModeloSel(agenteId === "jarbas" ? "sonnet" : "haiku");
     chatApi.conversas(agenteId).then((cs) => { setConversas(cs); if (cs[0] && !servidora) abrirConversa(cs[0].id); }).catch((e) => setErro(e.message));
   }, [agenteId, agentes.length, abrirConversa, servidora]);
@@ -204,11 +232,12 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     setErro(""); setOcupado(true); setFluxo(""); setStatus("pensando…");
     const idsAnexos = anexos.map((a) => a.id);
     const assuntoEnvio = assuntoIdParam ?? fixarAssunto ?? undefined;
-    setMsgs((x) => [...x, { id: "tmp-" + Date.now(), papel: "user", texto: m, ts: new Date().toISOString(), anexos }]);
-    setTexto(""); setAnexos([]); setFixarAssunto(null);
+    const habEnvio = habSel ?? undefined;
+    setMsgs((x) => [...x, { id: "tmp-" + Date.now(), papel: "user", texto: m, ts: new Date().toISOString(), anexos, habilidade: habEnvio }]);
+    setTexto(""); setAnexos([]); setFixarAssunto(null); setHabSel(null);
     ctl.current = new AbortController();
     let acumulado = ""; let idConv = conversaId;
-    await enviarMensagem({ agente: agenteId, conversaId: conversaId ?? undefined, mensagem: m, anexos: idsAnexos, modelo: modeloSel, assuntoId: assuntoEnvio }, {
+    await enviarMensagem({ agente: agenteId, conversaId: conversaId ?? undefined, mensagem: m, anexos: idsAnexos, modelo: modeloSel, assuntoId: assuntoEnvio, habilidade: habEnvio }, {
       onMeta: (meta) => { idConv = meta.conversaId; setConversaId(meta.conversaId); },
       onAssunto: (a) => { if (a.novo) setStatus("novo assunto: " + a.titulo); },
       onModelo: (mm) => { setModeloSel(mm.chave); setMsgs((x) => [...x, mm.mensagem]); },
@@ -222,7 +251,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     if (idConv) { try { const c = await chatApi.conversa(idConv); setMsgs(c.mensagens); setAssuntos(c.assuntos || []); setModeloSel(c.modelo); } catch { /* mantém o que está na tela */ } }
     chatApi.conversas(agenteId).then(setConversas).catch(() => {});
     chatApi.uso().then(setUso).catch(() => {});
-  }, [ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto]);
+  }, [ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel]);
 
   // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
   const escolherModelo = async (chave: string) => {
@@ -288,6 +317,32 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       rec.current = r; r.start(); setGravando(true);
     } catch { setErro("Não consegui usar o microfone. Confira a permissão do navegador."); }
   };
+
+  // teclado da caixa: com o menu aberto, setas/Enter/Tab/Esc são do menu; senão Enter envia
+  const teclas = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (menuAberto && opcoesMenu.length) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setIdxMenu((i) => (i + 1) % opcoesMenu.length); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setIdxMenu((i) => (i - 1 + opcoesMenu.length) % opcoesMenu.length); return; }
+      if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") { e.preventDefault(); escolherHabilidade(opcoesMenu[Math.min(idxMenu, opcoesMenu.length - 1)]); return; }
+    }
+    if (e.key === "Escape" && gatilho) { e.preventDefault(); setMenuFechadoEm(gatilho.inicio); return; }
+    if (e.key === "Backspace" && habSel && e.currentTarget.selectionStart === 0 && e.currentTarget.selectionEnd === 0) { e.preventDefault(); setHabSel(null); return; }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(texto); }
+  };
+  const aoDigitar = (e: React.ChangeEvent<HTMLTextAreaElement>) => { setTexto(e.target.value); setCursor(e.target.selectionStart); };
+  const camposHab = {
+    ref: campoRef, onChange: aoDigitar, onKeyDown: teclas,
+    onSelect: (e: React.SyntheticEvent<HTMLTextAreaElement>) => setCursor(e.currentTarget.selectionStart),
+    role: "combobox" as const, "aria-expanded": menuAberto, "aria-controls": "menu-habilidades", "aria-autocomplete": "list" as const,
+    "aria-activedescendant": menuAberto && opcoesMenu.length ? `menu-habilidades-${Math.min(idxMenu, opcoesMenu.length - 1)}` : undefined,
+  };
+  const menuNode = menuAberto ? <MenuHabilidades itens={opcoesMenu} ativo={Math.min(idxMenu, Math.max(opcoesMenu.length - 1, 0))} consulta={gatilho?.consulta ?? ""} carregando={!habilidadesProntas}
+    aoEscolher={escolherHabilidade} aoPassar={setIdxMenu} idLista="menu-habilidades" /> : null;
+  const chipNode = habilidadeSel ? <ChipHabilidade h={habilidadeSel} aoRemover={tirarHabilidade} /> : null;
+  const avisosHab = (<>
+    {habilidadeSel?.obra && <p role="status" className="text-[12.5px] mt-2 px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">🔒 {AVISO_OBRA}</p>}
+    {habFalada && <p className="mt-2"><button type="button" onClick={() => setHabSel(habFalada.id)} className="text-[12.5px] font-bold rounded-full px-3 py-1 border border-[var(--ac)]/50 bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-95 cursor-pointer">usar {habFalada.icone} {habFalada.rotulo.toLowerCase()}?</button></p>}
+  </>);
 
   const limiteBatido = !!uso && (uso.hora.usadas >= uso.hora.limite || uso.dia.usadas >= uso.dia.limite);
 
@@ -424,7 +479,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             </div>)
           )}
           {msgs.map((m) => (
-            <Balao key={m.id} m={m} agente={agente} ocupado={ocupado} onEscolha={enviar} onAcao={(i, c) => decidir(m, i, c)}
+            <Balao key={m.id} m={m} agente={agente} habilidades={habilidades} ocupado={ocupado} onEscolha={enviar} onAcao={(i, c) => decidir(m, i, c)}
               assuntos={agente?.assuntosAuto ? assuntos : undefined} onMover={moverMsg} />
           ))}
           {(ocupado || fluxo) && (
@@ -456,13 +511,17 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             </div>
           )}
           {compacto ? (
+          <div className="relative">
+          {menuNode}
           <div className="flex items-center gap-2.5 rounded-[18px] border-[1.5px] border-[var(--border)] bg-[var(--bg-secondary)] pl-4 pr-2.5 py-2.5 shadow-[0_6px_24px_var(--sombra)] focus-within:border-[var(--ac)]">
             <input ref={fileRef} type="file" hidden multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.csv,.json" onChange={(e) => anexar(e.target.files)} />
-            <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={1} maxLength={8000}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(texto); } }}
-              placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… toque no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : `Fale ou escreva para ${agente?.nome ?? "o Jarbas"}…`}
-              disabled={limiteBatido}
-              className="flex-1 min-w-0 resize-none bg-transparent px-0 py-2.5 text-[15px] leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none max-h-40" aria-label="Mensagem" />
+            <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              {chipNode}
+              <textarea {...camposHab} style={{ outline: "none" }} value={texto} rows={1} maxLength={8000}
+                placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… toque no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : habilidadeSel ? "Escreva o pedido…" : `Fale ou escreva para ${agente?.nome ?? "o Jarbas"}… (digite / para habilidades)`}
+                disabled={limiteBatido}
+                className="flex-1 min-w-[10rem] resize-none bg-transparent px-0 py-2.5 text-[15px] leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none max-h-40" aria-label="Mensagem" />
+            </div>
             {(texto.trim() || ocupado) && (ocupado
               ? <button onClick={parar} className="h-11 px-4 rounded-xl bg-[var(--danger)] text-white text-sm font-bold cursor-pointer">Parar</button>
               : <button onClick={() => enviar(texto)} disabled={limiteBatido} className="h-11 px-4 rounded-xl bg-[var(--ac)] text-[var(--on-ac)] text-sm font-bold disabled:opacity-40 cursor-pointer">Enviar</button>)}
@@ -471,23 +530,30 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             <button onClick={alternarGravacao} disabled={transcrevendo} title={gravando ? "Parar e transcrever" : "Gravar áudio"} aria-label={gravando ? "Parar gravação" : "Gravar áudio"}
               className={`h-11 w-11 shrink-0 text-xl leading-none rounded-xl cursor-pointer ${gravando ? "bg-[var(--danger)] text-white animate-pulse" : "bg-[var(--ac)] text-[var(--on-ac)]"} disabled:opacity-40`}>{gravando ? "⏹" : "🎙️"}</button>
           </div>
+          </div>
           ) : (
+          <div className="relative">
+          {menuNode}
           <div className="flex items-end gap-2">
             <input ref={fileRef} type="file" hidden multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.csv,.json" onChange={(e) => anexar(e.target.files)} />
             <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 3} title="Anexar PDF, imagem, texto ou planilha CSV (até 10 MB)" aria-label="Anexar arquivo"
               className="h-12 w-12 shrink-0 text-2xl leading-none rounded-xl border border-[var(--border)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 cursor-pointer">📎</button>
             <button onClick={alternarGravacao} disabled={transcrevendo} title={gravando ? "Parar e transcrever" : "Gravar áudio"} aria-label={gravando ? "Parar gravação" : "Gravar áudio"}
               className={`h-12 w-12 shrink-0 text-2xl leading-none rounded-xl border cursor-pointer ${gravando ? "bg-[var(--danger)] text-white border-[var(--danger)] animate-pulse" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"} disabled:opacity-40`}>{gravando ? "⏹" : "🎙"}</button>
-            <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={2} maxLength={8000}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(texto); } }}
-              placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… clique no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : `Mensagem para ${agente?.nome ?? ""} (Enter envia, Shift+Enter quebra a linha)`}
-              disabled={limiteBatido}
-              className="flex-1 resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)]" aria-label="Mensagem" />
+            <div className="flex-1 min-w-0 rounded-xl border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 focus-within:border-[var(--accent)]">
+              {chipNode && <div className="mb-1.5">{chipNode}</div>}
+              <textarea {...camposHab} style={{ outline: "none" }} value={texto} rows={2} maxLength={8000}
+                placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… clique no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : `Mensagem para ${agente?.nome ?? ""} (Enter envia, Shift+Enter quebra a linha, / abre as habilidades)`}
+                disabled={limiteBatido}
+                className="w-full resize-none bg-transparent text-sm focus:outline-none" aria-label="Mensagem" />
+            </div>
             {ocupado
               ? <button onClick={parar} className="h-12 px-4 rounded-xl bg-[var(--danger)] text-white text-sm font-medium cursor-pointer">Parar</button>
               : <button onClick={() => enviar(texto)} disabled={!texto.trim() || limiteBatido} className="h-12 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium disabled:opacity-40 cursor-pointer">Enviar</button>}
           </div>
+          </div>
           )}
+          {avisosHab}
           <p className={`text-[11px] text-[var(--text-muted)] mt-1.5 ${compacto ? "px-2 hidden md:block" : ""}`}>Uma conversa por vez · 20 mensagens por hora e 100 por dia · o áudio vira texto na caixa para você conferir antes de enviar.</p>
         </footer>
       </section>
@@ -507,8 +573,8 @@ function Resposta({ texto, andamento, onEscolha, desativado }: { texto: string; 
   );
 }
 
-function Balao({ m, agente, ocupado, onEscolha, onAcao, assuntos, onMover }: {
-  m: Mensagem; agente?: Agente; ocupado: boolean; onEscolha: (t: string, assuntoId?: string) => void; onAcao: (i: number, cancelar: boolean) => void;
+function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, onMover }: {
+  m: Mensagem; agente?: Agente; habilidades?: HabChat[]; ocupado: boolean; onEscolha: (t: string, assuntoId?: string) => void; onAcao: (i: number, cancelar: boolean) => void;
   assuntos?: Assunto[]; onMover: (mensagemId: string, assuntoId: string, titulo?: string) => void;
 }) {
   if (m.papel === "sistema") return <p className="text-center text-xs text-[var(--text-muted)]">{m.texto}</p>;
@@ -516,6 +582,7 @@ function Balao({ m, agente, ocupado, onEscolha, onAcao, assuntos, onMover }: {
     return (
       <div className="flex justify-end">
         <div className="max-w-[min(40rem,90%)] rounded-2xl rounded-tr-sm bg-[var(--ac)] text-[var(--on-ac)] px-4 py-2.5">
+          {m.habilidade && <p className="text-xs font-bold opacity-90 mb-1">{habilidades?.find((h) => h.id === m.habilidade)?.icone ?? "🧩"} {(habilidades?.find((h) => h.id === m.habilidade)?.rotulo ?? m.habilidade).toLowerCase()}</p>}
           <p className="text-sm whitespace-pre-wrap break-words">{m.texto}</p>
           {m.anexos?.map((a) => <p key={a.id} className="text-xs opacity-80 mt-1">📎 {a.nome}</p>)}
         </div>
