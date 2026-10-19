@@ -6,14 +6,19 @@ import Mascote from "@/components/Mascote";
 
 // Endereço fixo pro atalho do celular: leva sempre pra sessão permanente do Claude Code
 // (o link session_… muda a cada reinício do serviço claude-remoto).
-// Não redireciona sozinho: assim dá pra salvar ESTA página na tela inicial (19/10).
+// Não redireciona sozinho (dá pra salvar esta página); com ?ir=1, o atalho da tela inicial vai direto (19/10).
 export default function RemotoRoute() {
   const [url, setUrl] = useState("");
   const [erro, setErro] = useState("");
   useEffect(() => {
     squadFetch("/api/remoto")
       .then((r) => r.json())
-      .then((d) => { if (d.url) setUrl(d.url); else setErro(d.erro || "Não achei a sessão."); })
+      .then((d) => {
+        if (!d.url) { setErro(d.erro || "Não achei a sessão."); return; }
+        setUrl(d.url);
+        // ?ir=1 (o atalho da tela inicial usa): vai direto, sem precisar tocar no botão
+        if (new URLSearchParams(window.location.search).get("ir") === "1") window.location.replace(d.url);
+      })
       .catch(() => setErro("Não consegui falar com a VPS."));
   }, []);
   return (

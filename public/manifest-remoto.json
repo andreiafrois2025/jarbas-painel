@@ -1,0 +1,15 @@
+{
+  "name": "Jarbas VPS",
+  "short_name": "Jarbas VPS",
+  "description": "Abre direto a conversa avançada com o Jarbas (Claude Code).",
+  "lang": "pt-BR",
+  "start_url": "/remoto?ir=1",
+  "scope": "/remoto",
+  "display": "browser",
+  "background_color": "#FAFAF7",
+  "theme_color": "#1F5C5C",
+  "icons": [
+    { "src": "/icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
