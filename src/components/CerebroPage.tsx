@@ -27,6 +27,7 @@ const PASTAS: Record<string, { rotulo: string; cor: string }> = {
   "sobre-ela": { rotulo: "Sobre ela", cor: "#9B7BB8" },
   referencias: { rotulo: "Referências", cor: "#5A7A85" },
   diario: { rotulo: "Diário", cor: "#8A8A8A" },
+  reunioes: { rotulo: "Reuniões", cor: "#3F7CAC" },
 };
 const infoPasta = (p: string) => PASTAS[p] ?? { rotulo: p || "Outras", cor: "#8A8A8A" };
 
