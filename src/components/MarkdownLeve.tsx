@@ -8,10 +8,24 @@ import { Fragment, type ReactNode } from "react";
 // código, citação e linha. Os marcadores [CONFIRMAR] / [a confirmar] ganham
 // destaque, porque são justamente o que ela precisa resolver ao revisar.
 
-const PADRAO_INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[(?:CONFIRMAR|a confirmar)[^\]]*\])/gi;
+const PADRAO_INLINE = /(\[\[[^\]]+\]\]|\[[^\]]+\]\(https:\/\/[^)\s]+\)|\*\*[^*]+\*\*|`[^`]+`|\[(?:CONFIRMAR|a confirmar)[^\]]*\])/gi;
 
-function inline(texto: string): ReactNode[] {
+function inlineBase(texto: string, aoLigacao?: (nome: string) => void): ReactNode[] {
   return texto.split(PADRAO_INLINE).filter((p) => p !== "").map((p, i) => {
+    // [[nome]] vira botão só quando a página passa aoLigacao (usado no Cérebro)
+    if (aoLigacao && /^\[\[[^\]]+\]\]$/.test(p)) {
+      const nome = p.slice(2, -2).split("|")[0].trim();
+      const rotulo = p.slice(2, -2).split("|").pop()!.trim();
+      return (
+        <button key={i} type="button" onClick={() => aoLigacao(nome)}
+          className="inline text-[var(--accent)] underline decoration-dotted underline-offset-2 cursor-pointer bg-transparent border-0 p-0 font-medium text-left">
+          {rotulo}
+        </button>
+      );
+    }
+    // [texto](https://...) vira link (19/10/2026: links das notas do Cérebro); só https, abre em outra aba
+    const lk = p.match(/^\[([^\]]+)\]\((https:\/\/[^)\s]+)\)$/);
+    if (lk) return <a key={i} href={lk[2]} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] underline underline-offset-2">{lk[1]}</a>;
     if (/^\*\*[^*]+\*\*$/.test(p)) return <strong key={i}>{p.slice(2, -2)}</strong>;
     if (/^`[^`]+`$/.test(p)) {
       return <code key={i} className="px-1 rounded bg-[var(--bg-tertiary)] text-[0.9em]">{p.slice(1, -1)}</code>;
@@ -26,7 +40,8 @@ function inline(texto: string): ReactNode[] {
 const ehTabela = (l: string) => /^\s*\|.*\|\s*$/.test(l);
 const celulas = (l: string) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
 
-export default function MarkdownLeve({ texto }: { texto: string }) {
+export default function MarkdownLeve({ texto, aoLigacao }: { texto: string; aoLigacao?: (nome: string) => void }) {
+  const inline = (t: string) => inlineBase(t, aoLigacao);
   const linhas = texto.replace(/\r\n/g, "\n").split("\n");
   const blocos: ReactNode[] = [];
   let i = 0;

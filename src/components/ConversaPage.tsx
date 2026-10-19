@@ -230,6 +230,10 @@ export default function ConversaPage() {
             className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm font-bold text-[var(--text-primary)] no-underline hover:bg-[var(--bg-tertiary)]">
             🏢<span className="max-md:hidden">Escritório</span>
           </Link>
+          <Link href="/cerebro" title="Abrir o Cérebro: a memória do Jarbas"
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm font-bold text-[var(--text-primary)] no-underline hover:bg-[var(--bg-tertiary)]">
+            🧠<span className="max-md:hidden">Cérebro</span>
+          </Link>
         </div>
         )} />
       </div>

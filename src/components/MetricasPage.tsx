@@ -8,6 +8,7 @@
 // ChipsArea/Area continuam exportados: o modo palco público (/metricas/palestra) os usa.
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { GraficoLinha, GraficoBarras, GraficoPizza } from "./charts";
 import { usePainel } from "@/lib/painel-context";
 import { ehPessoal, ehColaboradorOculto, pareceComando } from "@/lib/modo";
@@ -332,14 +333,26 @@ function AbaProducao({ data, hoje, taxaSemanal, area }: {
 
 function AbaDiario({ data }: { data: any }) {
   const dias = [...(data.days ?? [])].reverse(); // mais recente primeiro
+  const cartaoCerebro = (
+    <Link href="/cerebro" className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 no-underline text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
+        <span className="text-2xl">🧠</span>
+        <span className="text-[15px] font-semibold">Abrir o Cérebro: projetos, decisões e notas do Jarbas</span>
+      </Link>
+  );
   if (dias.length === 0) {
-    return <p className="text-sm text-[var(--text-secondary)]">O diário começa a se preencher com os snapshots diários.</p>;
+    return (
+      <div className="space-y-4">
+        {cartaoCerebro}
+        <p className="text-sm text-[var(--text-secondary)]">O diário começa a se preencher com os snapshots diários.</p>
+      </div>
+    );
   }
   const fmtData = (iso: string) =>
     new Date(iso + "T12:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
 
   return (
     <div className="space-y-4">
+      {cartaoCerebro}
       <p className="text-sm text-[var(--text-secondary)]">
         A linha do tempo do que o ecossistema fez por você. Cresce um marco a cada dia — vira material de palestra e memória do que rodou enquanto você tocava a vida.
       </p>
