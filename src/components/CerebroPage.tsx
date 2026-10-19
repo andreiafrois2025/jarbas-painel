@@ -170,56 +170,52 @@ export default function CerebroPage() {
 
   const abas: { id: Painel; rotulo: string }[] = [
     { id: "inicio", rotulo: "📁 Projetos" },
-    { id: "grafo", rotulo: "🕸️ Grafo" },
     { id: "lista", rotulo: "📝 Notas" },
+    { id: "grafo", rotulo: "🕸️ Grafo" },
   ];
 
-  // ── lista lateral (computador) / aba Notas (celular) ──
+  // ── aba Notas: filtros enxutos e cartões em grade (largura total) ──
+  const TOP_TAGS = 8;
   const lateral = (
-    <div className="flex flex-col min-h-0 h-full">
-      <div className="p-3 space-y-2 border-b border-[var(--border)] shrink-0">
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="px-4 md:px-6 pt-4 pb-3 space-y-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]/60">
         <div className="flex flex-wrap gap-1.5">
           <button type="button" onClick={() => setPasta("")}
-            className={`rounded-full border px-2.5 py-1 text-xs font-semibold cursor-pointer ${!pasta ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)]"}`}>
-            Todas ({notas?.length ?? 0})
+            className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold cursor-pointer ${!pasta ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)]"}`}>
+            Todas · {notas?.length ?? 0}
           </button>
           {Object.keys(PASTAS).filter((p) => contagemPasta[p]).map((p) => (
             <button key={p} type="button" onClick={() => setPasta(pasta === p ? "" : p)}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold cursor-pointer ${pasta === p ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)]"}`}>
-              <Pontinho p={p} />{PASTAS[p].rotulo} ({contagemPasta[p]})
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold cursor-pointer ${pasta === p ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)]"}`}>
+              <Pontinho p={p} />{PASTAS[p].rotulo} · {contagemPasta[p]}
             </button>
           ))}
         </div>
         {tagsFreq.length > 0 && (
           <div className="flex flex-wrap gap-1.5 items-center">
-            {(todasTags ? tagsFreq : tagsFreq.slice(0, 12)).map(([t]) => <Chip key={t} t={t} />)}
-            {tagsFreq.length > 12 && (
-              <button type="button" onClick={() => setTodasTags(!todasTags)} className="text-xs text-[var(--text-secondary)] underline cursor-pointer bg-transparent border-0">
-                {todasTags ? "menos" : `mais ${tagsFreq.length - 12}`}
+            <span className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--text-muted)] mr-1">Etiquetas</span>
+            {(todasTags ? tagsFreq : tagsFreq.slice(0, TOP_TAGS)).map(([t]) => <Chip key={t} t={t} />)}
+            {tagsFreq.length > TOP_TAGS && (
+              <button type="button" onClick={() => setTodasTags(!todasTags)} className="text-xs font-semibold text-[var(--accent)] cursor-pointer bg-transparent border-0">
+                {todasTags ? "ver menos" : `ver todas (${tagsFreq.length})`}
+              </button>
+            )}
+            {filtrando && (
+              <button type="button" onClick={() => { setBusca(""); setPasta(""); setTag(""); }}
+                className="ml-auto text-xs font-semibold text-[var(--accent)] underline cursor-pointer bg-transparent border-0 p-0">
+                limpar filtros
               </button>
             )}
           </div>
         )}
-        {filtrando && (
-          <button type="button" onClick={() => { setBusca(""); setPasta(""); setTag(""); }}
-            className="text-xs font-semibold text-[var(--accent)] underline cursor-pointer bg-transparent border-0 p-0">
-            limpar filtros
-          </button>
+      </div>
+      <div className="p-4 md:p-6">
+        {filtradas.length === 0 ? <p className="p-6 text-sm text-[var(--text-secondary)] text-center">Nenhuma nota encontrada.</p> : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {filtradas.map((n) => <CartaoNota key={n.id} n={n} onAbrir={() => setAberta(n.id)} />)}
+          </div>
         )}
       </div>
-      <ul className="flex-1 min-h-0 overflow-y-auto list-none m-0 p-0">
-        {filtradas.length === 0 && <li className="p-6 text-sm text-[var(--text-secondary)] text-center">Nenhuma nota encontrada.</li>}
-        {filtradas.map((n) => (
-          <li key={n.id}>
-            <button type="button" onClick={() => setAberta(n.id)}
-              className={`w-full text-left px-4 py-3 border-b border-[var(--border)] cursor-pointer bg-transparent hover:bg-[var(--bg-tertiary)] ${aberta === n.id ? "bg-[var(--bg-tertiary)]" : ""}`}>
-              <div className="flex items-center gap-2"><Pontinho p={n.pasta} /><span className="text-[15px] font-semibold text-[var(--text-primary)] leading-snug">{n.titulo || n.nome}</span></div>
-              {n.descricao && <div className="text-[13px] text-[var(--text-secondary)] mt-0.5 line-clamp-2">{n.descricao}</div>}
-              <div className="text-xs text-[var(--text-muted)] mt-1">{infoPasta(n.pasta).rotulo} · {quando(n.atualizado)}</div>
-            </button>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 
@@ -273,52 +269,57 @@ export default function CerebroPage() {
   })();
 
   // ── nota aberta ──
+  // corpo sem o título e a linha de status (já aparecem no cabeçalho da nota)
+  const corpoLimpo = (t: string) => t.replace(/^\s*# .+\n+/, "").replace(/^\*\*Status:\*\*.*\n+/m, "");
+
   const notaView = (
     <div ref={topoNota} className="flex-1 min-h-0 overflow-y-auto">
-      <div className="p-4 md:p-6 max-w-none">
-        <button type="button" onClick={() => setAberta(null)}
-          className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)] cursor-pointer bg-transparent border-0 p-0">
-          ← Voltar
-        </button>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-tight m-0">{meta?.titulo || meta?.nome || "Nota"}</h1>
-        {meta && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2 text-[13px] text-[var(--text-secondary)]">
-            <span className="inline-flex items-center gap-1.5"><Pontinho p={meta.pasta} />{infoPasta(meta.pasta).rotulo}</span>
-            {meta.status && <span>{rotuloStatus(meta.status)}</span>}
-            {meta.area && <span>Área: {meta.area}</span>}
-            <span>Atualizado {quando(meta.atualizado)}</span>
-          </div>
-        )}
-        {meta && meta.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-3">{meta.tags.map((t) => <Chip key={t} t={t} />)}</div>
-        )}
-        <div className="mt-4 border-t border-[var(--border)] pt-2">
-          {erroNota ? (
-            <p className="text-sm text-[var(--text-secondary)]">Não consegui abrir esta nota agora.</p>
-          ) : !conteudo ? (
-            <p className="text-sm text-[var(--text-secondary)] animate-pulse">Abrindo…</p>
-          ) : (
-            <div className="text-[15px]"><MarkdownLeve texto={comTitulos(conteudo.corpo)} aoLigacao={abrirPorNome} /></div>
+      <div className="px-4 md:px-8 py-4 md:py-6 grid gap-6 xl:gap-10 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <article className="min-w-0">
+          <button type="button" onClick={() => setAberta(null)}
+            className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent)] cursor-pointer bg-transparent border-0 p-0">
+            ← Voltar
+          </button>
+          <h1 className="text-2xl md:text-[28px] font-bold text-[var(--text-primary)] leading-tight m-0">{meta?.titulo || meta?.nome || "Nota"}</h1>
+          {meta && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2 text-[13px] text-[var(--text-secondary)]">
+              <span className="inline-flex items-center gap-1.5"><Pontinho p={meta.pasta} />{infoPasta(meta.pasta).rotulo}</span>
+              {meta.status && <span className="font-semibold text-[var(--text-primary)]">{rotuloStatus(meta.status)}</span>}
+              {meta.area && <span>Área: {meta.area}</span>}
+              <span>Atualizado {quando(meta.atualizado)}</span>
+            </div>
           )}
-        </div>
+          {meta && meta.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">{meta.tags.map((t) => <Chip key={t} t={t} />)}</div>
+          )}
+          <div className="mt-4 border-t border-[var(--border)] pt-2 max-w-[860px]">
+            {erroNota ? (
+              <p className="text-sm text-[var(--text-secondary)]">Não consegui abrir esta nota agora.</p>
+            ) : !conteudo ? (
+              <p className="text-sm text-[var(--text-secondary)] animate-pulse">Abrindo…</p>
+            ) : (
+              <div className="text-[15px] leading-relaxed"><MarkdownLeve texto={comTitulos(corpoLimpo(conteudo.corpo))} aoLigacao={abrirPorNome} /></div>
+            )}
+          </div>
+        </article>
         {conteudo && (
-          <section className="mt-6 border-t border-[var(--border)] pt-4">
-            <h2 className="text-[13px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-secondary)] mb-2">Citada em</h2>
+          <aside className="xl:border-l xl:pl-8 border-t xl:border-t-0 border-[var(--border)] pt-4 xl:pt-12">
+            <h2 className="text-[12px] font-extrabold uppercase tracking-[0.12em] text-[var(--text-secondary)] mb-3">Citada em</h2>
             {citadaEm.length === 0 ? (
               <p className="text-sm text-[var(--text-secondary)]">Nenhuma outra nota cita esta.</p>
             ) : (
-              <ul className="list-none m-0 p-0 flex flex-wrap gap-2">
+              <ul className="list-none m-0 p-0 flex flex-col gap-1.5">
                 {citadaEm.map((n) => (
                   <li key={n.id}>
                     <button type="button" onClick={() => setAberta(n.id)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm cursor-pointer text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]">
-                      <Pontinho p={n.pasta} />{n.titulo || n.nome}
+                      className="w-full text-left inline-flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-2 text-sm cursor-pointer text-[var(--text-primary)] hover:border-[var(--accent)]">
+                      <Pontinho p={n.pasta} /><span className="truncate">{n.titulo || n.nome}</span>
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-          </section>
+          </aside>
         )}
       </div>
     </div>
@@ -344,7 +345,7 @@ export default function CerebroPage() {
         <div className="flex gap-1 ml-auto">
           {abas.map((a) => (
             <button key={a.id} type="button" onClick={() => { setPainel(a.id); setAberta(null); }}
-              className={`px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border ${painel === a.id && !aberta ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)]"} ${a.id === "lista" ? "md:hidden" : ""}`}>
+              className={`px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap cursor-pointer border ${painel === a.id && !aberta ? "bg-[var(--accent)] text-white border-[var(--accent)]" : "bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)]"}`}>
               {a.rotulo}
             </button>
           ))}
@@ -359,15 +360,9 @@ export default function CerebroPage() {
       ) : !notas ? (
         <div className="flex-1 flex items-center justify-center text-sm text-[var(--text-secondary)] animate-pulse">carregando o Cérebro…</div>
       ) : (
-        <div className="flex-1 min-h-0 flex overflow-hidden">
-          {/* lista: sempre no computador; no celular só na aba Notas e sem nota aberta */}
-          <aside className={`${painel === "lista" && !aberta ? "flex" : "hidden"} md:flex w-full md:w-80 xl:w-96 shrink-0 md:border-r border-[var(--border)] bg-[var(--bg-secondary)] min-h-0 flex-col`}>
-            {lateral}
-          </aside>
-          <main className={`${painel === "lista" && !aberta ? "hidden md:flex" : "flex"} flex-1 min-w-0 min-h-0 flex-col`}>
-            {principal}
-          </main>
-        </div>
+        <main className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+          {!aberta && painel === "lista" ? lateral : principal}
+        </main>
       )}
     </div>
   );
@@ -398,6 +393,13 @@ function GrafoNotas({ notas, todas, aoAbrir }: { notas: Nota[]; todas: Nota[]; a
   const arrasto = useRef<{ x: number; y: number; px: number; py: number; moveu: boolean } | null>(null);
   const caixa = useRef<SVGSVGElement>(null);
   const moveuUltimo = useRef(false);
+  const [largura, setLargura] = useState(900);
+  useEffect(() => {
+    const el = caixa.current; if (!el) return;
+    const medir = () => setLargura(el.clientWidth || 900);
+    medir(); const ro = new ResizeObserver(medir); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const { nos, arestas } = useMemo(() => {
     const ids = new Set(notas.map((n) => n.id));
@@ -500,6 +502,9 @@ function GrafoNotas({ notas, todas, aoAbrir }: { notas: Nota[]; todas: Nota[]; a
   const vw = W / zoom, vh = H / zoom;
   const vbx = W / 2 + pan.x - vw / 2, vby = H / 2 + pan.y - vh / 2;
   const mostrarTodosRotulos = zoom >= 1.6;
+  // nomes com ~12 px na tela em qualquer zoom e tamanho de tela
+  const larguraTela = largura;
+  const fonte = (12 * (W / larguraTela)) / zoom;
   const selNo = sel ? posPorId.get(sel) : undefined;
 
   if (nos.length === 0) return <Vazio icone="🕸️" titulo="Nada para mostrar no grafo" descricao="Ajuste a busca ou os filtros." />;
@@ -524,8 +529,8 @@ function GrafoNotas({ notas, todas, aoAbrir }: { notas: Nota[]; todas: Nota[]; a
               <circle cx={p.x} cy={p.y} r={Math.max(p.r, 12 / zoom)} fill="transparent" />
               <circle cx={p.x} cy={p.y} r={p.r} fill={p.cor} stroke={p.id === sel ? "var(--text-primary)" : "var(--bg-primary)"} strokeWidth={p.id === sel ? 2.5 : 1.5} />
               {rotulo && (
-                <text x={p.x} y={p.y + p.r + 11} textAnchor="middle" fontSize={10} fill="var(--text-primary)"
-                  stroke="var(--bg-primary)" strokeWidth={3} paintOrder="stroke" style={{ pointerEvents: "none" }}>
+                <text x={p.x} y={p.y + p.r + fonte * 1.1} textAnchor="middle" fontSize={fonte} fill="var(--text-primary)"
+                  stroke="var(--bg-primary)" strokeWidth={fonte * 0.3} paintOrder="stroke" style={{ pointerEvents: "none" }}>
                   {(() => { const t = p.n.titulo || p.n.nome; return t.length > 24 ? t.slice(0, 23) + "…" : t; })()}
                 </text>
               )}
