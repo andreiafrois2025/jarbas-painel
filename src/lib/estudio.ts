@@ -149,3 +149,16 @@ export function formatarMMSS(segundos: number): string {
   const r = s % 60;
   return `${m}:${String(r).padStart(2, "0")}`;
 }
+
+/** Nome para mostrar: o título dela; sem título, "Reel de 17/10 às 23h40". Nunca o id cru
+ *  (ex.: "1788738874174-AgADMAoAAqj…", que é o nome do arquivo que veio do Telegram). */
+export function nomeLegivel(p: { name: string; titulo?: string | null; criado_em?: string | null }): string {
+  if (p.titulo && p.titulo.trim()) return p.titulo.trim();
+  const quando = p.criado_em ? new Date(p.criado_em) : null;
+  if (quando && !Number.isNaN(quando.getTime())) {
+    const f = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(quando);
+    const g = (t: string) => f.find((x) => x.type === t)?.value || "";
+    return `Reel de ${g("day")}/${g("month")} às ${g("hour")}h${g("minute")}`;
+  }
+  return /^\d{9,}-/.test(p.name) ? "Reel sem nome" : p.name;
+}
