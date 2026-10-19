@@ -537,15 +537,17 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               <textarea {...camposHab} style={{ outline: "none" }} value={texto} rows={1} maxLength={8000}
                 placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… toque no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : habilidadeSel ? "Escreva o pedido…" : `Fale ou escreva para ${agente?.nome ?? "o Jarbas"}… (digite / para habilidades)`}
                 disabled={limiteBatido}
-                className="flex-1 min-w-[10rem] resize-none bg-transparent px-0 py-2.5 text-[15px] leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none max-h-40" aria-label="Mensagem" />
+                className="flex-1 min-w-[6rem] resize-none bg-transparent px-0 py-2.5 text-[15px] leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none max-h-40" aria-label="Mensagem" />
             </div>
-            {(texto.trim() || ocupado) && (ocupado
-              ? <button onClick={parar} className="h-11 px-4 rounded-xl bg-[var(--danger)] text-white text-sm font-bold cursor-pointer">Parar</button>
-              : <button onClick={() => enviar(texto)} disabled={limiteBatido} className="h-11 px-4 rounded-xl bg-[var(--ac)] text-[var(--on-ac)] text-sm font-bold disabled:opacity-40 cursor-pointer">Enviar</button>)}
             <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 3} title="Anexar PDF, imagem, texto ou planilha CSV (até 10 MB)" aria-label="Anexar arquivo"
               className="h-11 w-11 shrink-0 text-xl leading-none rounded-xl bg-[var(--bg-tertiary)] hover:brightness-95 disabled:opacity-40 cursor-pointer">📎</button>
             <button onClick={alternarGravacao} disabled={transcrevendo} title={gravando ? "Parar e transcrever" : "Gravar áudio"} aria-label={gravando ? "Parar gravação" : "Gravar áudio"}
               className={`h-11 w-11 shrink-0 text-xl leading-none rounded-xl cursor-pointer ${gravando ? "bg-[var(--danger)] text-white animate-pulse" : "bg-[var(--ac)] text-[var(--on-ac)]"} disabled:opacity-40`}>{gravando ? "⏹" : "🎙️"}</button>
+            {/* 18/10: botão de enviar SEMPRE visível (no celular o Enter quebra a linha e não dava pra mandar) */}
+            {ocupado
+              ? <button onClick={parar} aria-label="Parar" title="Parar" className="h-11 w-11 shrink-0 rounded-xl bg-[var(--danger)] text-white text-lg font-bold cursor-pointer">■</button>
+              : <button onClick={() => enviar(texto)} disabled={!texto.trim() || limiteBatido} aria-label="Enviar mensagem" title="Enviar"
+                  className="h-11 w-11 shrink-0 rounded-xl bg-[var(--ac)] text-[var(--on-ac)] text-xl font-bold leading-none disabled:opacity-35 cursor-pointer">➤</button>}
           </div>
           </div>
           ) : (
