@@ -270,7 +270,8 @@ export default function CerebroPage() {
 
   // ── nota aberta ──
   // corpo sem o título e a linha de status (já aparecem no cabeçalho da nota)
-  const corpoLimpo = (t: string) => t.replace(/^\s*# .+\n+/, "").replace(/^\*\*Status:\*\*.*\n+/m, "");
+  const corpoLimpo = (t: string) => t.replace(/^\s*# .+\n+/, "").replace(/^\*\*Status:\*\*.*\n+/m, "")
+    .replace(/^## Links\n+- \(nenhum ainda\)\n*/m, "").replace(/^## Ligado a\n+-\s*$/m, "");
 
   const notaView = (
     <div ref={topoNota} className="flex-1 min-h-0 overflow-y-auto">
