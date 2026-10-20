@@ -266,7 +266,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   }, [msgs, fluxo, status, telaCelular]);
 
   const enviar = useCallback(async (conteudo: string, assuntoIdParam?: string) => {
-    const m = conteudo.trim();
+    const m = conteudo.trim() || (anexos.length ? "Veja o anexo." : "");
     if (!m || ocupado) return;
     setErro(""); setOcupado(true); setFluxo(""); setStatus("pensando…");
     const idsAnexos = anexos.map((a) => a.id);
@@ -333,7 +333,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     } catch (e) { marcar({ estado: "erro", resultado: { ok: false, texto: (e as Error).message } }); }
   };
 
-  const anexar = async (arqs: FileList | null) => {
+  const anexar = async (arqs: FileList | File[] | null) => {
     if (!arqs) return;
     for (const f of Array.from(arqs).slice(0, 3 - anexos.length)) {
       if (f.size > 10 * 1024 * 1024) { setErro(`"${f.name}" passa de 10 MB.`); continue; }
@@ -373,6 +373,16 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const aoDigitar = (e: React.ChangeEvent<HTMLTextAreaElement>) => { setTexto(e.target.value); setCursor(e.target.selectionStart); };
   const camposHab = {
     ref: campoRef, onChange: aoDigitar, onKeyDown: teclas,
+    // Ctrl+V de imagem (print recortado) ou arquivo copiado vira anexo; texto colado segue normal
+    onPaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const arqs = Array.from(e.clipboardData.items).filter((i) => i.kind === "file").map((i) => i.getAsFile()).filter((f): f is File => !!f);
+      if (!arqs.length) return;
+      e.preventDefault();
+      const hora = new Date().toTimeString().slice(0, 8).replace(/:/g, "");
+      anexar(arqs.map((f, n) => f.name && f.name !== "image.png" ? f : new File([f], `imagem-colada-${hora}${n ? "-" + n : ""}.${(f.type.split("/")[1] || "png").replace("jpeg", "jpg")}`, { type: f.type })));
+    },
+    onDragOver: (e: React.DragEvent<HTMLTextAreaElement>) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); },
+    onDrop: (e: React.DragEvent<HTMLTextAreaElement>) => { if (e.dataTransfer.files.length) { e.preventDefault(); anexar(e.dataTransfer.files); } },
     onSelect: (e: React.SyntheticEvent<HTMLTextAreaElement>) => setCursor(e.currentTarget.selectionStart),
     role: "combobox" as const, "aria-expanded": menuAberto, "aria-controls": "menu-habilidades", "aria-autocomplete": "list" as const,
     "aria-activedescendant": menuAberto && opcoesMenu.length ? `menu-habilidades-${Math.min(idxMenu, opcoesMenu.length - 1)}` : undefined,
@@ -573,7 +583,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             {/* 18/10: botão de enviar SEMPRE visível (no celular o Enter quebra a linha e não dava pra mandar) */}
             {ocupado
               ? <button onClick={parar} aria-label="Parar" title="Parar" className="h-11 w-11 shrink-0 rounded-xl bg-[var(--danger)] text-white text-lg font-bold cursor-pointer">■</button>
-              : <button onClick={() => enviar(texto)} disabled={!texto.trim() || limiteBatido} aria-label="Enviar mensagem" title="Enviar"
+              : <button onClick={() => enviar(texto)} disabled={(!texto.trim() && !anexos.length) || limiteBatido} aria-label="Enviar mensagem" title="Enviar"
                   className="h-11 w-11 shrink-0 rounded-xl bg-[var(--ac)] text-[var(--on-ac)] text-xl font-bold leading-none disabled:opacity-35 cursor-pointer">➤</button>}
           </div>
           </div>
@@ -595,7 +605,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             </div>
             {ocupado
               ? <button onClick={parar} className="h-12 px-4 rounded-xl bg-[var(--danger)] text-white text-sm font-medium cursor-pointer">Parar</button>
-              : <button onClick={() => enviar(texto)} disabled={!texto.trim() || limiteBatido} className="h-12 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium disabled:opacity-40 cursor-pointer">Enviar</button>}
+              : <button onClick={() => enviar(texto)} disabled={(!texto.trim() && !anexos.length) || limiteBatido} className="h-12 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium disabled:opacity-40 cursor-pointer">Enviar</button>}
           </div>
           </div>
           )}
