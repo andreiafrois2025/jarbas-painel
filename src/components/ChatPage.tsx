@@ -255,7 +255,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     if (!agentes.length) return;
     try { window.localStorage.setItem("chatAgente", agenteId); } catch { /* sem storage */ }
     pedidoConversa.current++; setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null); setHabSel(null);
-    setModeloSel(agenteId === "jarbas" ? "sonnet" : "haiku");
+    setModeloSel(agenteId === "jarbas" ? "opus" : "haiku");
     // 20/10: às vezes a conversa voltava vazia ao navegar pelo painel e só aparecia reabrindo a aba (pedido falho
     // em silêncio ou resposta de um agente anterior chegando atrasada). Agora: ignora resposta velha, tenta de novo
     // e, se a aba voltar a ficar visível com a conversa vazia, carrega outra vez.
@@ -499,7 +499,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado} aria-label="Modelo que responde nesta conversa"
               className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1.5 text-xs text-[var(--text-primary)] cursor-pointer disabled:opacity-50">
               <optgroup label="Claude">
-                {modelos.filter((m) => m.motor === "claude").map((m) => <option key={m.chave} value={m.chave}>{m.rotulo.replace(/^Claude /, "")}{m.chave === (agenteId === "jarbas" ? "sonnet" : "haiku") ? " (padrão)" : ""}</option>)}
+                {modelos.filter((m) => m.motor === "claude").map((m) => <option key={m.chave} value={m.chave}>{m.rotulo.replace(/^Claude /, "")}{m.chave === (agenteId === "jarbas" ? "opus" : "haiku") ? " (padrão)" : ""}</option>)}
               </optgroup>
               {modelos.some((m) => m.motor === "codex") && (
                 <optgroup label="GPT (Codex)">
