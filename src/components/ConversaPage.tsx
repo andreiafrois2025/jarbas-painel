@@ -192,13 +192,13 @@ function OlhoBotao({ aberto, onClick, rotulo }: { aberto: boolean; onClick: () =
 }
 
 // Atividades (20/10): as tarefas do Notion voltaram para a tela Conversa, recolhidas por padrão
-// (sempre começam fechadas, pra aula). Só são pedidas ao servidor quando ela abre.
-function BlocoAtividades() {
+// (sempre começam fechadas, pra aula). Só são pedidas ao servidor quando ela abre. No Só Igam: só as de Trabalho.
+function BlocoAtividades({ servidora }: { servidora: boolean }) {
   const [aberto, setAberto] = useState(false);
   return (
     <section>
       <Titulo extra={<OlhoBotao aberto={aberto} onClick={() => setAberto((v) => !v)} rotulo="atividades" />}>Atividades</Titulo>
-      {aberto ? <ListaTarefas />
+      {aberto ? <ListaTarefas modo={servidora ? "servidora" : undefined} />
         : <button type="button" onClick={() => setAberto(true)} className="text-[13px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--ac)]">Escondidas · toque para ver ▾</button>}
     </section>
   );
@@ -281,7 +281,7 @@ export default function ConversaPage() {
       {/* ===== COLUNA DIREITA: o dia dela ===== */}
       <aside aria-label="O dia" className="lg:w-[300px] 2xl:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] bg-[var(--bg-secondary)] px-[18px] py-5 flex flex-col gap-5 lg:overflow-y-auto">
         <BlocoHoje dados={dados} erro={erro} />
-        {!servidora && <BlocoAtividades />}
+        <BlocoAtividades servidora={servidora} />
         <BlocoEsperando esperando={esperando} erro={erroEsperando} />
         <BlocoNoticias dados={dados} caixa={caixa} erro={erro} />
       </aside>

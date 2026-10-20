@@ -102,7 +102,7 @@ export interface EventosEnvio {
 }
 
 export async function enviarMensagem(
-  corpo: { agente: string; conversaId?: string; mensagem: string; anexos?: string[]; modelo?: string; assuntoId?: string; habilidade?: string },
+  corpo: { agente: string; conversaId?: string; mensagem: string; anexos?: string[]; modelo?: string; assuntoId?: string; habilidade?: string; modo?: string },
   ev: EventosEnvio, sinal: AbortSignal,
 ) {
   let r: Response;

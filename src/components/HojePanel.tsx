@@ -485,8 +485,8 @@ function EsqueletoHoje({ lateral }: { lateral?: React.ReactNode }) {
 //
 // E se a leitura com id falhar (VPS fora, Notion fora), a tela cai no texto de
 // sempre em vez de mostrar lista vazia.
-export function ListaTarefas({ textoCru }: { textoCru?: string }) {
-  const { tarefas, atrasadas, atrasadasTotal, marcarFeita } = useTarefas();
+export function ListaTarefas({ textoCru, modo }: { textoCru?: string; modo?: "servidora" }) {
+  const { tarefas, atrasadas, atrasadasTotal, marcarFeita } = useTarefas(true, modo);
   const { avisar } = useUI();
   const [emCurso, setEmCurso] = useState<string | null>(null);
 

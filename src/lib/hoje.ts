@@ -49,7 +49,7 @@ export interface TarefaNotion {
 }
 
 /** Tarefas com id, pra poder marcar como feita direto no Notion (F6.3). */
-export function useTarefas(ativo = true) {
+export function useTarefas(ativo = true, modo?: "servidora") {
   const [tarefas, setTarefas] = useState<TarefaNotion[] | null>(null);
   // atrasadas ficam à parte: o servidor só manda hoje + 2 dias em "tarefas"
   const [atrasadas, setAtrasadas] = useState<TarefaNotion[]>([]);
@@ -59,7 +59,7 @@ export function useTarefas(ativo = true) {
     // Modo Servidora: nem pergunta ao servidor (Fase 5-A)
     if (!ativo) return;
     try {
-      const r = await comToken("/api/hoje/tarefas");
+      const r = await comToken("/api/hoje/tarefas" + (modo ? `?modo=${modo}` : "")); // servidora: só Área da vida = Trabalho
       if (!r.ok) throw new Error(String(r.status));
       const d = await r.json();
       const lista: TarefaNotion[] = d.atrasadas || [];
@@ -69,7 +69,7 @@ export function useTarefas(ativo = true) {
     } catch {
       setTarefas(null); // deixa a tela cair no texto de sempre
     }
-  }, [ativo]);
+  }, [ativo, modo]);
 
   useEffect(() => { carregar(); }, [carregar]);
 

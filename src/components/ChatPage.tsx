@@ -301,7 +301,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     setTexto(""); setAnexos([]); setFixarAssunto(null); setHabSel(null);
     ctl.current = new AbortController();
     let acumulado = ""; let idConv = conversaId;
-    await enviarMensagem({ agente: agenteId, conversaId: conversaId ?? undefined, mensagem: m, anexos: idsAnexos, modelo: modeloSel, assuntoId: assuntoEnvio, habilidade: habEnvio }, {
+    await enviarMensagem({ agente: agenteId, conversaId: conversaId ?? undefined, mensagem: m, anexos: idsAnexos, modelo: modeloSel, assuntoId: assuntoEnvio, habilidade: habEnvio, modo: servidora ? "servidora" : undefined }, {
       onMeta: (meta) => { idConv = meta.conversaId; setConversaId(meta.conversaId); },
       onAssunto: (a) => { if (a.novo) setStatus("novo assunto: " + a.titulo); },
       onModelo: (mm) => { setModeloSel(mm.chave); setMsgs((x) => [...x, mm.mensagem]); },
@@ -317,7 +317,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     chatApi.conversas(agenteId).then(setConversas).catch(() => {});
     chatApi.uso().then(setUso).catch(() => {});
     if (obraDisponivel) obraApi.estado().then(setObra).catch(() => {});
-  }, [obraDisponivel, ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel]);
+  }, [obraDisponivel, ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel, servidora]);
 
   // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
   const escolherModelo = async (chave: string) => {
