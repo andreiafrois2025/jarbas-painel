@@ -25,7 +25,7 @@ import { usePainel } from "@/lib/painel-context";
 import { useHoje, type DadosHoje, type CardCaixa } from "@/lib/hoje";
 import { tempoRelativo } from "@/lib/metrics";
 import { type DadosEsperando, type ItemEsperando } from "@/lib/esperando";
-import { COLUNAS_CAIXA, ehUau } from "./HojePanel";
+import { COLUNAS_CAIXA, ehUau, ListaTarefas } from "./HojePanel";
 
 const TZ = "America/Sao_Paulo";
 
@@ -110,10 +110,12 @@ function BlocoHoje({ dados, erro }: { dados: DadosHoje | null; erro: boolean }) 
 // vencem hoje/amanhã · 4 dicas e textos · 5 notícias. Prioridade alta = borda dourada.
 const MOSTRAR_ESPERANDO = 4;
 
-function ItemEsperandoLinha({ it, onIr }: { it: ItemEsperando; onIr: (it: ItemEsperando) => void }) {
+function ItemEsperandoLinha({ it, onIr, verValores }: { it: ItemEsperando; onIr: (it: ItemEsperando) => void; verValores: boolean }) {
   const alta = it.prioridade === "alta";
   const noticia = it.grupo === 5;
-  const sub = [it.selo === "UAU" ? "UAU" : "", it.origem, it.detalhe].filter(Boolean).join(" · ");
+  // valor de finanças escondido por padrão (troca o texto, não só embaça: nem selecionando aparece)
+  const detalhe = it.tipo === "financa" && !verValores ? (it.detalhe || "").replace(/R\$\s*[\d.,]+/g, "R$ ••••") : it.detalhe;
+  const sub = [it.selo === "UAU" ? "UAU" : "", it.origem, detalhe].filter(Boolean).join(" · ");
   return (
     <div
       className={`rounded-[10px] px-2.5 mb-[7px] text-[13px] text-[var(--text-primary)] ${
@@ -143,7 +145,10 @@ function ItemEsperandoLinha({ it, onIr }: { it: ItemEsperando; onIr: (it: ItemEs
 function BlocoEsperando({ esperando, erro }: { esperando: DadosEsperando | null; erro: boolean }) {
   const router = useRouter();
   const [todos, setTodos] = useState(false);
+  // 20/10: olhinho dos valores. Sempre começa fechado (não guarda a escolha), pra aula/tela compartilhada.
+  const [verValores, setVerValores] = useState(false);
   const itens = esperando?.itens || [];
+  const temValor = itens.some((it) => it.tipo === "financa");
   const mostrar = todos ? itens : itens.slice(0, MOSTRAR_ESPERANDO);
 
   const ir = (it: ItemEsperando) => {
@@ -156,17 +161,45 @@ function BlocoEsperando({ esperando, erro }: { esperando: DadosEsperando | null;
 
   return (
     <section>
-      <Titulo extra={esperando ? <span className="normal-case tracking-normal font-bold text-[var(--ac)]">{esperando.total}</span> : null}>Esperando você</Titulo>
+      <Titulo extra={esperando ? <span className="normal-case tracking-normal font-bold text-[var(--ac)] inline-flex items-center gap-2">
+        {temValor && <OlhoBotao aberto={verValores} onClick={() => setVerValores((v) => !v)} rotulo="valores" />}
+        {esperando.total}
+      </span> : null}>Esperando você</Titulo>
       {!esperando ? <Vazio>{erro ? "Não consegui ler o que espera você agora." : "carregando…"}</Vazio>
         : itens.length === 0 ? <Vazio>Nada esperando você agora.</Vazio>
         : <>
-          {mostrar.map((it) => <ItemEsperandoLinha key={it.id} it={it} onIr={ir} />)}
+          {mostrar.map((it) => <ItemEsperandoLinha key={it.id} it={it} onIr={ir} verValores={verValores} />)}
           {itens.length > MOSTRAR_ESPERANDO && (
             <button onClick={() => setTodos((v) => !v)} className="text-xs font-bold text-[var(--ac)] cursor-pointer">
               {todos ? "mostrar menos ▴" : `+ ${itens.length - MOSTRAR_ESPERANDO} ▾`}
             </button>
           )}
         </>}
+    </section>
+  );
+}
+
+function OlhoBotao({ aberto, onClick, rotulo }: { aberto: boolean; onClick: () => void; rotulo: string }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={aberto} aria-label={aberto ? `Esconder ${rotulo}` : `Mostrar ${rotulo}`} title={aberto ? `Esconder ${rotulo}` : `Mostrar ${rotulo}`}
+      className="h-6 w-6 inline-flex items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" />
+        {!aberto && <path d="M3 3l18 18" />}
+      </svg>
+    </button>
+  );
+}
+
+// Atividades (20/10): as tarefas do Notion voltaram para a tela Conversa, recolhidas por padrão
+// (sempre começam fechadas, pra aula). Só são pedidas ao servidor quando ela abre.
+function BlocoAtividades() {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <section>
+      <Titulo extra={<OlhoBotao aberto={aberto} onClick={() => setAberto((v) => !v)} rotulo="atividades" />}>Atividades</Titulo>
+      {aberto ? <ListaTarefas />
+        : <button type="button" onClick={() => setAberto(true)} className="text-[13px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--ac)]">Escondidas · toque para ver ▾</button>}
     </section>
   );
 }
@@ -248,6 +281,7 @@ export default function ConversaPage() {
       {/* ===== COLUNA DIREITA: o dia dela ===== */}
       <aside aria-label="O dia" className="lg:w-[300px] 2xl:w-[360px] shrink-0 border-t lg:border-t-0 lg:border-l border-[var(--border)] bg-[var(--bg-secondary)] px-[18px] py-5 flex flex-col gap-5 lg:overflow-y-auto">
         <BlocoHoje dados={dados} erro={erro} />
+        {!servidora && <BlocoAtividades />}
         <BlocoEsperando esperando={esperando} erro={erroEsperando} />
         <BlocoNoticias dados={dados} caixa={caixa} erro={erro} />
       </aside>
