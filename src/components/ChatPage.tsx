@@ -77,7 +77,7 @@ function ListaAgentes({ agentes, ativo, previas, recolhida, onAlternar, aoEscolh
                     <span className="flex-1 min-w-0 truncate text-sm font-bold text-[var(--text-primary)]">{a.nome}</span>
                     {pv && <span className="shrink-0 text-[11px] text-[var(--text-secondary)] tabular-nums">{horaLista(pv.ts)}</span>}
                   </span>
-                  <span className="block truncate text-[12.5px] text-[var(--text-secondary)]">{pv ? <>{pv.minha && <span className="text-[var(--ac)]">Você: </span>}{pv.texto}</> : a.cargo}</span>
+                  <span className="block truncate text-[12.5px] text-[var(--text-secondary)]">{a.cargo}</span>
                 </span>
               </button>
             </li>
@@ -195,7 +195,16 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     if (resto.length) gs.splice(gs.length - 1, 0, { rotulo: "Outros", itens: resto }); // antes do último grupo
     return gs.filter((g) => g.itens.length);
   }, [agentes]);
-  const ordem = useMemo(() => grupos.flatMap((g) => g.itens), [grupos]); // Jarbas primeiro, depois por afinidade
+  // Lista lateral (pedido de 20/10): Jarbas fixo no topo, Nara e Lara sempre no fim; os demais pela conversa mais
+  // recente (quem ela falou por último sobe). Quem nunca conversou fica na ordem por afinidade dos GRUPOS.
+  const ordem = useMemo(() => {
+    const base = grupos.flatMap((g) => g.itens);
+    const fixosFim = ["nara", "lara"];
+    const meio = base.filter((a) => a.id !== "jarbas" && !fixosFim.includes(a.id));
+    const ts = (id: string) => (previas[id] ? new Date(previas[id].ts).getTime() || 0 : 0);
+    meio.sort((a, b) => ts(b.id) - ts(a.id) || base.indexOf(a) - base.indexOf(b));
+    return [...base.filter((a) => a.id === "jarbas"), ...meio, ...fixosFim.map((id) => base.find((a) => a.id === id)).filter((a): a is Agente => !!a)];
+  }, [grupos, previas]);
   useEffect(() => { try { setRecolhida(window.localStorage.getItem("chatListaRecolhida") === "1"); } catch { /* sem storage */ } }, []);
   const alternarLista = () => setRecolhida((v) => { try { window.localStorage.setItem("chatListaRecolhida", v ? "0" : "1"); } catch { /* sem storage */ } return !v; });
   // Prévia = última mensagem e hora da conversa mais recente de cada agente (como no WhatsApp). No modo Só Igam não
@@ -233,17 +242,32 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     chatApi.modelos().then(setModelos).catch(() => {});
   }, []);
 
+  const conversaIdRef = useRef<string | null>(null);
+  useEffect(() => { conversaIdRef.current = conversaId; }, [conversaId]);
+  const pedidoConversa = useRef(0); // só a última conversa pedida vale (troca rápida de agente não mistura)
   const abrirConversa = useCallback(async (id: string) => {
-    try { const c = await chatApi.conversa(id); setConversaId(id); setMsgs(c.mensagens); setAssuntos(c.assuntos || []); setModeloSel(c.modelo); setErro(""); } catch (e) { setErro((e as Error).message); }
+    const n = ++pedidoConversa.current;
+    try { const c = await chatApi.conversa(id); if (n !== pedidoConversa.current) return; setConversaId(id); setMsgs(c.mensagens); setAssuntos(c.assuntos || []); setModeloSel(c.modelo); setErro(""); } catch (e) { setErro((e as Error).message); }
   }, []);
 
   // ao trocar de pessoa: abre a conversa mais recente dela (ou uma em branco)
   useEffect(() => {
     if (!agentes.length) return;
     try { window.localStorage.setItem("chatAgente", agenteId); } catch { /* sem storage */ }
-    setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null); setHabSel(null);
+    pedidoConversa.current++; setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null); setHabSel(null);
     setModeloSel(agenteId === "jarbas" ? "sonnet" : "haiku");
-    chatApi.conversas(agenteId).then((cs) => { setConversas(cs); if (cs[0] && !servidora) abrirConversa(cs[0].id); }).catch((e) => setErro(e.message));
+    // 20/10: às vezes a conversa voltava vazia ao navegar pelo painel e só aparecia reabrindo a aba (pedido falho
+    // em silêncio ou resposta de um agente anterior chegando atrasada). Agora: ignora resposta velha, tenta de novo
+    // e, se a aba voltar a ficar visível com a conversa vazia, carrega outra vez.
+    let vivo = true;
+    const carregar = (tentativa = 0) => chatApi.conversas(agenteId).then((cs) => {
+      if (!vivo) return;
+      setConversas(cs); if (cs[0] && !servidora) abrirConversa(cs[0].id);
+    }).catch((e) => { if (!vivo) return; if (tentativa < 2) setTimeout(() => vivo && carregar(tentativa + 1), 1500 * (tentativa + 1)); else setErro(e.message); });
+    carregar();
+    const aoVoltar = () => { if (document.visibilityState === "visible" && !conversaIdRef.current && !servidora) carregar(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => { vivo = false; document.removeEventListener("visibilitychange", aoVoltar); };
   }, [agenteId, agentes.length, abrirConversa, servidora]);
 
   useEffect(() => {
@@ -270,6 +294,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     if (!m || ocupado) return;
     setErro(""); setOcupado(true); setFluxo(""); setStatus("pensando…");
     const idsAnexos = anexos.map((a) => a.id);
+    setPrevias((p) => ({ ...p, [agenteId]: { texto: m, ts: new Date().toISOString(), minha: true } })); // sobe na lista
     const assuntoEnvio = assuntoIdParam ?? fixarAssunto ?? undefined;
     const habEnvio = habSel ?? undefined;
     setMsgs((x) => [...x, { id: "tmp-" + Date.now(), papel: "user", texto: m, ts: new Date().toISOString(), anexos, habilidade: habEnvio }]);
