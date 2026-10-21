@@ -296,6 +296,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       setOcupado(!!h.motor?.ocupado); if (!h.motor?.ocupado) { setStatus(""); setFluxo(""); acumulado = ""; }
       if (h.motor?.modelo) setModeloSel(h.motor.modelo);
     }).catch(() => {});
+    let falhas = 0;
     const checar = async () => {
       try {
         const e = await vivoApi.estado(); if (!aberto) return;
@@ -321,7 +322,13 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           else if (ev.tipo === "fim" || ev.tipo === "nova-conversa") { acumulado = ""; setFluxo(""); setStatus(""); carregarHist(); }
           else if (ev.tipo === "erro") setErro(ev.texto);
         };
-      } catch { if (aberto) setVivo("fora"); } // VPS fora do ar: oferece o chat antigo
+        falhas = 0;
+      } catch {
+        // o celular acabou de acordar e a internet ainda não voltou: tenta de novo antes de desistir
+        if (!aberto) return;
+        if (++falhas <= 3) { setTimeout(() => aberto && checar(), 1500 * falhas); return; }
+        setVivo("fora"); // VPS fora do ar: oferece o chat antigo
+      }
     };
     checar();
     const aoVoltar = () => { if (document.visibilityState === "visible") checar(); };
