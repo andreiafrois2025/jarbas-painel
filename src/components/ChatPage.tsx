@@ -294,6 +294,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       if (!aberto) return;
       setMsgs(paraMensagens(h.itens, aulaRef.current)); setLicencas(h.motor?.permissoes || []);
       setOcupado(!!h.motor?.ocupado); if (!h.motor?.ocupado) { setStatus(""); setFluxo(""); acumulado = ""; }
+      if (h.motor?.modelo) setModeloSel(h.motor.modelo);
     }).catch(() => {});
     const checar = async () => {
       try {
@@ -307,7 +308,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
         fonte.onerror = () => { if (fonte?.readyState === 2) { fonte = null; checar(); } };
         fonte.onmessage = (m) => {
           let ev: any; try { ev = JSON.parse(m.data); } catch { return; }
-          if (ev.tipo === "estado") { setOcupado(!!ev.ocupado); if (!ev.ocupado) setStatus(""); }
+          if (ev.tipo === "estado") { setOcupado(!!ev.ocupado); if (!ev.ocupado) setStatus(""); if (ev.modelo) setModeloSel(ev.modelo); }
           else if (ev.tipo === "ela") setMsgs((x) => {
             const ult = x[x.length - 1];
             if (ult && ult.papel === "user" && ult.id.startsWith("tmp-") && ult.texto === ev.texto) return x; // fui eu que mandei daqui
@@ -392,6 +393,14 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const escolherModelo = async (chave: string) => {
     const op = modelos.find((x) => x.chave === chave); if (!op) return;
     const aviso = `Trocando para ${op.rotulo.replace(/^Claude /, "")} nesta conversa.` + (op.aviso ? " " + op.aviso : "");
+    if (usaVivo) {
+      if (op.motor !== "claude") return;
+      const r = await vivoApi.modelo(chave).catch(() => ({ ok: false, erro: "Não consegui falar com o Jarbas." }));
+      if (!r.ok) { setErro(r.erro || "Não consegui trocar o modelo."); return; }
+      setModeloSel(chave);
+      setMsgs((x) => [...x, { id: "sis-" + Date.now(), papel: "sistema", texto: `Trocando para ${op.rotulo.replace(/^Claude /, "")}. Vale a partir da próxima mensagem.`, ts: new Date().toISOString() }]);
+      return;
+    }
     setModeloSel(chave);
     const sis: Mensagem = { id: "sis-" + Date.now(), papel: "sistema", texto: aviso, ts: new Date().toISOString() };
     if (conversaId) { try { await chatApi.trocarModelo(conversaId, chave); } catch (e) { setErro((e as Error).message); return; } }
@@ -589,14 +598,14 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           </div>
           {agente && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher descrição" : "ver descrição"}</button>}
           </>}
-          {!usaVivo && <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+          {<label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
             <span className="sr-only md:not-sr-only">Modelo</span>
             <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado} aria-label="Modelo que responde nesta conversa"
               className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1.5 text-xs text-[var(--text-primary)] cursor-pointer disabled:opacity-50">
               <optgroup label="Claude">
                 {modelos.filter((m) => m.motor === "claude").map((m) => <option key={m.chave} value={m.chave}>{m.rotulo.replace(/^Claude /, "")}{m.chave === (agenteId === "jarbas" ? "opus" : "haiku") ? " (padrão)" : ""}</option>)}
               </optgroup>
-              {modelos.some((m) => m.motor === "codex") && (
+              {!usaVivo && modelos.some((m) => m.motor === "codex") && (
                 <optgroup label="GPT (Codex)">
                   {modelos.filter((m) => m.motor === "codex").map((m) => <option key={m.chave} value={m.chave} disabled={!!m.indisponivel} title={m.indisponivel || undefined}>{m.rotulo}{m.indisponivel ? " (indisponível)" : ""}</option>)}
                 </optgroup>

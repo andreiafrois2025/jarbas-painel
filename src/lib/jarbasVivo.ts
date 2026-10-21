@@ -8,7 +8,7 @@ export const JARBAS_VIVO = "https://jarbas.andreiafrois.tech";
 
 export interface EstadoVivo { temSenha: boolean; entrou: boolean; aparelho?: string; principal?: boolean; temPrincipal?: boolean }
 export interface LicencaVivo { id: string; ferramenta: string; resumo: string; aparelho?: string }
-export interface MotorVivo { ligado: boolean; ocupado: boolean; fila: number; permissoes?: LicencaVivo[] }
+export interface MotorVivo { ligado: boolean; ocupado: boolean; fila: number; modelo?: string; permissoes?: LicencaVivo[] }
 interface ItemVivo { quando: number; quem: "ela" | "jarbas" | "acao" | "sistema"; texto: string; aparelho?: string; segundos?: number }
 
 const ir = (p: string, init?: RequestInit) => fetch(JARBAS_VIVO + p, { credentials: "include", ...init });
@@ -20,6 +20,7 @@ export const vivoApi = {
   historico: async (): Promise<{ itens: ItemVivo[]; motor: MotorVivo }> => (await ir("/api/historico")).json(),
   enviar: (texto: string) => postar("/api/mensagem", { texto }) as Promise<{ ok?: boolean; erro?: string }>,
   interromper: () => postar("/api/interromper"),
+  modelo: (modelo: string) => postar("/api/modelo", { modelo }) as Promise<{ ok?: boolean; erro?: string }>,
   permissao: (id: string, permitir: boolean) => postar("/api/permissao", { id, permitir }) as Promise<{ ok?: boolean; erro?: string }>,
   nova: () => postar("/api/nova-conversa"),
   anexo: async (f: File): Promise<string> => {
