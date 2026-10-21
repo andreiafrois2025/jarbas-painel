@@ -138,6 +138,7 @@ export const QUEM_USA: Record<string, string[]> = {
   "resend": ["donna"],
   "himalaya": ["donna"],
   "apify": ["mike"],
+  "acontece-no-igam": ["izzy"],
   "mapa-institucional": ["eric"],
   "gerador-mapas": ["eric"],
   "reels-studio": ["theo"],
