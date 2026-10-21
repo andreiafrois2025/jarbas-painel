@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import Dashboard from "@/components/Dashboard";
 import LoginScreen from "@/components/LoginScreen";
 import type { Session } from "@supabase/supabase-js";
+import { VIVO_DISPONIVEL, vivoApi } from "@/lib/jarbasVivo";
+import AvisosPorta from "@/components/AvisosPorta";
 
 // Layout compartilhado de todas as páginas do painel.
 // Persiste entre navegações: o Dashboard (sidebar + dados) não remonta a cada rota.
@@ -13,7 +15,15 @@ export default function PainelLayout({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // 21/10: no painel da VPS quem passou pela porta forte já entra, sem o e-mail e senha antigos
+      if (!session && VIVO_DISPONIVEL) {
+        const t = await vivoApi.sessaoPainel().catch(() => null);
+        if (t) {
+          const { data } = await supabase.auth.setSession(t);
+          session = data.session;
+        }
+      }
       setSession(session);
       setLoading(false);
     });
@@ -42,5 +52,5 @@ export default function PainelLayout({ children }: { children: ReactNode }) {
     return <LoginScreen />;
   }
 
-  return <Dashboard session={session}>{children}</Dashboard>;
+  return <Dashboard session={session}>{children}{VIVO_DISPONIVEL && <AvisosPorta />}</Dashboard>;
 }

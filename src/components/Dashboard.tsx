@@ -26,6 +26,7 @@ import {
   ehColaboradorOculto, ehContextoPessoal, ehPessoal, limpaColaborador,
 } from "@/lib/modo";
 import type { Session } from "@supabase/supabase-js";
+import { VIVO_DISPONIVEL, vivoApi } from "@/lib/jarbasVivo";
 
 interface DashboardProps {
   session: Session;
@@ -120,6 +121,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
 
   const handleLogout = async () => {
     await signOut();
+    if (VIVO_DISPONIVEL) { await vivoApi.sair().catch(() => {}); window.location.href = "/porta/"; return; }
     window.location.href = "/";
   };
 

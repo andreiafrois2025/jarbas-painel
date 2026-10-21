@@ -11,6 +11,7 @@ import { CartaoSecao, LinhaItem, Pilula, useUI } from "../ui";
 import { Interruptor, Opcoes, BotaoPilula, Etiqueta } from "./pecas";
 import { liberaSom, somPlim } from "@/lib/escritorio";
 import { CHAVE_ANIM, CHAVE_SOM, CHAVE_INICIO, lerChave, gravaChave, lerInicio, type Inicio } from "@/lib/preferencias";
+import { VIVO_DISPONIVEL, vivoApi } from "@/lib/jarbasVivo";
 
 // Cartões de Ajustes (19/10/2026, mock aprovado "ajustes-novo").
 // Conta e Aparência mexem em coisas dela; Avisos e Modo obra mostram o que a VPS faz.
@@ -82,7 +83,11 @@ export function CartaoConta({ id }: { id?: string }) {
     setSenha(""); setSenha2(""); setEditaSenha(false);
     aviso(true, "Senha alterada com sucesso!");
   };
-  const sair = async () => { await supabase.auth.signOut(); window.location.href = "/"; };
+  const sair = async () => {
+    await supabase.auth.signOut();
+    if (VIVO_DISPONIVEL) { await vivoApi.sair().catch(() => {}); window.location.href = "/porta/"; return; }
+    window.location.href = "/";
+  };
 
   return (
     <CartaoSecao titulo="Conta" id={id}>
@@ -111,8 +116,11 @@ export function CartaoConta({ id }: { id?: string }) {
               <BotaoPilula onClick={salvarNome}>salvar</BotaoPilula>
             </span>
           } />
-        <LinhaItem titulo="Senha" direita={<BotaoPilula onClick={() => setEditaSenha((v) => !v)}>{editaSenha ? "cancelar" : "alterar"}</BotaoPilula>} />
-        {editaSenha && (
+        {/* 21/10: no painel da VPS a entrada é a porta forte; senha e aparelhos se cuidam lá */}
+        {VIVO_DISPONIVEL ? (
+          <LinhaItem titulo="Senha e aparelhos (senha forte, Permitir no celular)" direita={<BotaoPilula onClick={() => { window.location.href = "/porta/#aparelhos"; }}>📱 abrir</BotaoPilula>} />
+        ) : <LinhaItem titulo="Senha" direita={<BotaoPilula onClick={() => setEditaSenha((v) => !v)}>{editaSenha ? "cancelar" : "alterar"}</BotaoPilula>} />}
+        {editaSenha && !VIVO_DISPONIVEL && (
           <li className="py-3 space-y-2 border-b border-dashed border-[var(--border)]">
             <input className={campo} type="password" placeholder="Nova senha (mín. 8 caracteres)" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="new-password" />
             <input className={campo} type="password" placeholder="Confirmar nova senha" value={senha2} onChange={(e) => setSenha2(e.target.value)} autoComplete="new-password" />

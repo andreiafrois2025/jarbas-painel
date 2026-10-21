@@ -14,7 +14,7 @@ import Visuais from "./chat/Visuais";
 import { MenuHabilidades, ChipHabilidade } from "./chat/MenuHabilidades";
 import { Bastidores, BotaoDesfazer, CartaoArquivoObra, CartoesPosso } from "./chat/ModoObra";
 import { AVISO_OBRA, detectarHabilidadeFalada, filtrarHabilidades, gatilhoBarra, useHabilidadesChat, type HabChat } from "@/lib/habilidadesChat";
-import { JARBAS_VIVO, paraMensagens, vivoApi, type EstadoVivo, type LicencaVivo } from "@/lib/jarbasVivo";
+import { JARBAS_VIVO, VIVO_DISPONIVEL, paraMensagens, vivoApi, type EstadoVivo, type LicencaVivo } from "@/lib/jarbasVivo";
 import { temDitado, useDitado } from "@/lib/ditado";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -138,7 +138,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   // ── Jarbas sempre ligado (21/10): o chat do Jarbas fala com a sessão viva da VPS ──
   // "checando" no começo; "ok" = aparelho conectado; "fora" = falta conectar este aparelho;
   // "antigo" = ela escolheu usar o chat antigo (reserva, só leitura).
-  const querVivo = agenteId === "jarbas" && !servidora;
+  const querVivo = agenteId === "jarbas" && !servidora && VIVO_DISPONIVEL;
   const [vivo, setVivo] = useState<"checando" | "ok" | "fora" | "antigo">("checando");
   const [vivoInfo, setVivoInfo] = useState<EstadoVivo | null>(null);
   const [licencas, setLicencas] = useState<LicencaVivo[]>([]);
@@ -625,7 +625,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               <button onClick={nova} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer" title="Começa um assunto do zero">✨ Nova</button>
               <button onClick={alternarAula} aria-pressed={!!aulaDesde} title="Esconde a conversa anterior para projetar no curso"
                 className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${aulaDesde ? "border-[var(--ac)] bg-[var(--accent-soft)] font-bold" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"}`}>🎓 {aulaDesde ? "Sair do modo aula" : "Modo aula"}</button>
-              <a href={JARBAS_VIVO} target="_blank" rel="noreferrer" title="Aparelhos conectados, trocar a senha" className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] no-underline text-[var(--text-primary)]">📱 Aparelhos</a>
+              <a href={JARBAS_VIVO + "/#aparelhos"} title="Aparelhos conectados, trocar a senha" className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] no-underline text-[var(--text-primary)]">📱 Aparelhos</a>
             </div>
           ) : querVivo && modoAntigo ? (
             <button onClick={() => setVivo("checando")} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--ac)] bg-[var(--accent-soft)] font-bold cursor-pointer">⚡ Voltar ao Jarbas sempre ligado</button>
@@ -662,10 +662,10 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
         <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-6 2xl:px-10" : "px-4"}`} aria-live="polite">
           {querVivo && vivo === "fora" && (
             <div className="rounded-xl border-[1.5px] border-[var(--ac)] bg-[var(--accent-soft)] p-4 space-y-2 max-w-2xl">
-              <p className="m-0 font-bold text-[var(--text-primary)]">⚡ Conecte este aparelho ao Jarbas sempre ligado</p>
-              <p className="m-0 text-sm text-[var(--text-secondary)]">Uma vez por aparelho: digite a senha do Jarbas e, se o aparelho for novo, toque em <b>Permitir</b> no celular. Depois ele conversa aqui, rápido e fazendo de verdade.</p>
+              <p className="m-0 font-bold text-[var(--text-primary)]">⚡ O Jarbas sempre ligado não respondeu</p>
+              <p className="m-0 text-sm text-[var(--text-secondary)]">Pode ser que a entrada deste aparelho tenha vencido, ou que a VPS esteja fora do ar. Tente entrar de novo; se não der, use o chat antigo.</p>
               <div className="flex gap-2 flex-wrap">
-                <button onClick={() => vivoApi.conectar()} className="px-3 py-2 rounded-lg bg-[var(--ac)] text-[var(--on-ac)] text-sm font-bold cursor-pointer">Conectar este aparelho</button>
+                <button onClick={() => vivoApi.conectar()} className="px-3 py-2 rounded-lg bg-[var(--ac)] text-[var(--on-ac)] text-sm font-bold cursor-pointer">Entrar de novo</button>
                 <button onClick={() => setVivo("antigo")} className="px-3 py-2 rounded-lg border border-[var(--border)] text-sm cursor-pointer">Usar o chat antigo (só consulta)</button>
               </div>
             </div>

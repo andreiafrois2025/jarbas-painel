@@ -1,17 +1,19 @@
-// Jarbas sempre ligado (21/10/2026): o chat do Jarbas no painel fala direto com a
-// sessão viva em jarbas.andreiafrois.tech (VPS), em vez do chat antigo da squad-api.
-// O navegador manda os cookies do "aparelho de confiança" (mesmo site andreiafrois.tech),
-// então a senha forte e o "Permitir" no celular continuam valendo aqui dentro.
+// Jarbas sempre ligado (21/10/2026): o chat do Jarbas no painel fala com a sessão viva da VPS,
+// em vez do chat antigo da squad-api. Desde 12h23 tudo mora no painel: a porta forte (senha +
+// aparelhos de confiança + Permitir no celular) fica na frente do painel inteiro, em /porta.
+// Na reserva da Vercel não existe porta nem sessão viva: o Jarbas volta ao chat antigo.
 import type { Mensagem } from "./chat";
 
-export const JARBAS_VIVO = "https://jarbas.andreiafrois.tech";
+export const JARBAS_VIVO = "/porta";
+export const VIVO_DISPONIVEL = typeof window !== "undefined" && /^(painel\.andreiafrois\.tech|painel\.srv1536795\.hstgr\.cloud|localhost)$/.test(window.location.hostname);
 
-export interface EstadoVivo { temSenha: boolean; entrou: boolean; aparelho?: string; principal?: boolean; temPrincipal?: boolean }
+export interface PedidoAparelho { id: string; aparelho: string; ip: string; criado: number; expira: number }
+export interface EstadoVivo { temSenha: boolean; entrou: boolean; aparelho?: string; principal?: boolean; temPrincipal?: boolean; pedidos?: PedidoAparelho[]; licencas?: LicencaVivo[] }
 export interface LicencaVivo { id: string; ferramenta: string; resumo: string; aparelho?: string }
 export interface MotorVivo { ligado: boolean; ocupado: boolean; fila: number; modelo?: string; permissoes?: LicencaVivo[] }
 interface ItemVivo { quando: number; quem: "ela" | "jarbas" | "acao" | "sistema"; texto: string; aparelho?: string; segundos?: number }
 
-const ir = (p: string, init?: RequestInit) => fetch(JARBAS_VIVO + p, { credentials: "include", ...init });
+const ir = (p: string, init?: RequestInit) => fetch(JARBAS_VIVO + p, { credentials: "same-origin", ...init });
 const postar = (p: string, corpo?: unknown) =>
   ir(p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo ?? {}) }).then((r) => r.json());
 
@@ -33,9 +35,14 @@ export const vivoApi = {
     if (r.texto === undefined) throw new Error(r.erro || "Não consegui transcrever.");
     return r.texto;
   },
-  eventos: () => new EventSource(JARBAS_VIVO + "/api/eventos", { withCredentials: true }),
-  // abre a tela do Jarbas só para conectar este aparelho (senha + Permitir no celular) e volta
-  conectar: () => window.open(JARBAS_VIVO + "/?voltar=painel", "jarbas-conectar", "width=480,height=720"),
+  eventos: () => new EventSource(JARBAS_VIVO + "/api/eventos"),
+  conectar: () => { window.location.href = JARBAS_VIVO + "/?volta=" + encodeURIComponent(window.location.pathname); },
+  responderAparelho: (pedido: string, permitir: boolean, nome?: string) => postar("/api/responder-pedido", { pedido, permitir, nome }) as Promise<{ ok?: boolean; erro?: string }>,
+  sessaoPainel: async (): Promise<{ access_token: string; refresh_token: string } | null> => {
+    const r = await ir("/api/sessao-painel");
+    return r.ok ? r.json() : null;
+  },
+  sair: () => postar("/api/sair"),
 };
 
 // histórico da sessão viva no formato das mensagens do painel; ações seguidas viram uma linha só
