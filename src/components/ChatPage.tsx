@@ -105,6 +105,24 @@ function DescricaoRH({ c, fallback }: { c?: Collaborator; fallback: string }) {
   return <div className="space-y-1.5">{bloco("🎓 Especialização", c.specialization)}{bloco("🛠️ Habilidades", c.skills)}{bloco("🧠 Personalidade", c.personality)}{bloco("📋 Bio", c.bio)}</div>;
 }
 
+// 21/10/2026: a tela abre já montada como da última vez (equipe, modelos e descrição guardados no
+// aparelho) e já no agente pedido, em vez de passar pela lista, pelo chat antigo e só depois chegar ao Jarbas.
+function lerGuardado<T>(chave: string, padrao: T): T {
+  try { const v = window.localStorage.getItem(chave); return v ? (JSON.parse(v) as T) : padrao; } catch { return padrao; }
+}
+function guardar(chave: string, v: unknown) {
+  try { window.localStorage.setItem(chave, JSON.stringify(v)); } catch { /* sem storage */ }
+}
+function pedidoDaUrl(): string | null {
+  try { return new URLSearchParams(window.location.search).get("agente") || (window.location.pathname === "/jarbas" ? "jarbas" : null); } catch { return null; }
+}
+function agenteInicial(agenteFixo?: string): string {
+  if (agenteFixo) return agenteFixo;
+  const pedido = pedidoDaUrl();
+  if (pedido && /^[a-z]{3,10}$/.test(pedido)) return pedido;
+  try { return window.localStorage.getItem("chatAgente") || "jarbas"; } catch { return "jarbas"; }
+}
+
 // `compacto`: usado na tela Conversa (painel v2). Sem a lista lateral de pessoas
 // (a escolha vira um seletor no topo), caixa de texto grande embaixo.
 // `servidora` (modo Só Igam): sem agentes pessoais e sem abrir conversa antiga,
@@ -116,13 +134,17 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const perfilDe = useCallback((a?: Agente) => (a ? collaborators.find((c) => c.name.trim().toLowerCase() === a.nome.toLowerCase()) : undefined), [collaborators]);
   const [abertos, setAbertos] = useState<Set<string>>(new Set()); // itens da lista com a descrição aberta
   const alternarItem = (id: string) => setAbertos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  const [modelos, setModelos] = useState<ModeloOpcao[]>([]);
+  const [modelos, setModelos] = useState<ModeloOpcao[]>(() => lerGuardado("chatModelosGuardados", []));
   const [modeloSel, setModeloSel] = useState("haiku");
   const [assuntos, setAssuntos] = useState<Assunto[]>([]);
   const [painelAssuntos, setPainelAssuntos] = useState(false);
   const [fixarAssunto, setFixarAssunto] = useState<string | null>(null);
-  const [agentes, setAgentes] = useState<Agente[]>([]);
-  const [agenteId, setAgenteId] = useState("jarbas");
+  const [agentes, setAgentes] = useState<Agente[]>(() => {
+    const as = lerGuardado<Agente[]>("chatAgentesGuardados", []);
+    return servidora ? as.filter((a) => !ehColaboradorOculto(a.nome) && a.id !== "louis") : as;
+  });
+  const [agenteId, setAgenteId] = useState(() => agenteInicial(agenteFixo));
+  const agenteCarregado = useRef<string | null>(null); // último agente cuja conversa já foi aberta
   const [conversas, setConversas] = useState<ConversaResumo[]>([]);
   const [conversaId, setConversaId] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Mensagem[]>([]);
@@ -142,6 +164,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const [vivo, setVivo] = useState<"checando" | "ok" | "fora" | "antigo">("checando");
   const [vivoInfo, setVivoInfo] = useState<EstadoVivo | null>(null);
   const [licencas, setLicencas] = useState<LicencaVivo[]>([]);
+  const [histVivo, setHistVivo] = useState(false); // o histórico da sessão viva já chegou (antes disso, nem a dica de "conversa vazia")
   const [aulaDesde, setAulaDesde] = useState(0);
   const [privado, setPrivado] = useState(false);
   const usaVivo = querVivo && vivo === "ok";
@@ -163,7 +186,9 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   // Lista lateral de agentes (modo compacto): recolhida mostra só as fotos; no celular
   // a lista é a primeira tela e o chat abre ao tocar num agente.
   const [recolhida, setRecolhida] = useState(false);
-  const [telaCelular, setTelaCelular] = useState<"lista" | "chat">(agenteFixo ? "chat" : "lista");
+  const [telaCelular, setTelaCelular] = useState<"lista" | "chat">(() => {
+    try { return agenteFixo || pedidoDaUrl() || new URLSearchParams(window.location.search).get("texto") ? "chat" : "lista"; } catch { return "lista"; }
+  });
   useEffect(() => { if (agenteFixo) { setAgenteId(agenteFixo); setTelaCelular("chat"); } }, [agenteFixo]);
   // Celular: placeholder curto, cabe em uma linha
   const [celular, setCelular] = useState(false);
@@ -206,6 +231,12 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const tirarHabilidade = () => { setHabSel(null); requestAnimationFrame(() => campoRef.current?.focus()); };
 
   const agente = useMemo(() => agentes.find((a) => a.id === agenteId), [agentes, agenteId]);
+  const [descGuardada, setDescGuardada] = useState<Record<string, string>>(() => lerGuardado("chatDescricoes", {}));
+  const descricao = perfilDe(agente)?.specialization || descGuardada[agenteId] || agente?.cargo;
+  useEffect(() => {
+    const d = perfilDe(agente)?.specialization;
+    if (d && descGuardada[agenteId] !== d) { const n = { ...descGuardada, [agenteId]: d }; guardar("chatDescricoes", n); setDescGuardada(n); }
+  }, [agente, agenteId, perfilDe, descGuardada]);
   const grupos = useMemo(() => {
     const usados = new Set<string>();
     const gs = GRUPOS.map((g) => ({ rotulo: g.rotulo, itens: g.ids.map((id) => agentes.find((a) => a.id === id)).filter((a): a is Agente => !!a) }));
@@ -256,9 +287,9 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       if (rascunho) setTexto(rascunho.slice(0, 8000));
       if (pedido || rascunho) setTelaCelular("chat");
     } catch { /* sem storage */ }
-    chatApi.agentes().then((as) => setAgentes(servidora ? as.filter((a) => !ehColaboradorOculto(a.nome) && a.id !== "louis") : as)).catch((e) => setErro(e.message));
+    chatApi.agentes().then((as) => { guardar("chatAgentesGuardados", as); setAgentes(servidora ? as.filter((a) => !ehColaboradorOculto(a.nome) && a.id !== "louis") : as); }).catch((e) => setErro(e.message));
     chatApi.uso().then(setUso).catch(() => {});
-    chatApi.modelos().then(setModelos).catch(() => {});
+    chatApi.modelos().then((ms) => { guardar("chatModelosGuardados", ms); setModelos(ms); }).catch(() => {});
   }, []);
 
   const conversaIdRef = useRef<string | null>(null);
@@ -273,9 +304,13 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   useEffect(() => {
     if (!agentes.length) return;
     try { window.localStorage.setItem("chatAgente", agenteId); } catch { /* sem storage */ }
+    const mesmoAgente = agenteCarregado.current === agenteId || agenteCarregado.current === null; // null = primeira abertura
+    agenteCarregado.current = agenteId;
+    const vivoJarbas = agenteId === "jarbas" && !servidora && !modoAntigo;
+    if (vivoJarbas && mesmoAgente) return; // só chegou a lista da equipe: a sessão viva já cuida da conversa
     pedidoConversa.current++; setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null); setHabSel(null);
     setModeloSel(agenteId === "jarbas" ? "opus" : "haiku");
-    if (agenteId === "jarbas" && !servidora && !modoAntigo) return; // a sessão viva carrega o próprio histórico
+    if (vivoJarbas) return; // a sessão viva carrega o próprio histórico
     // 20/10: às vezes a conversa voltava vazia ao navegar pelo painel e só aparecia reabrindo a aba (pedido falho
     // em silêncio ou resposta de um agente anterior chegando atrasada). Agora: ignora resposta velha, tenta de novo
     // e, se a aba voltar a ficar visível com a conversa vazia, carrega outra vez.
@@ -296,7 +331,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     let aberto = true; let fonte: EventSource | null = null; let acumulado = "";
     const carregarHist = () => (provRef.current ? vivoApi.prov.historico() : vivoApi.historico()).then((h) => {
       if (!aberto) return;
-      setMsgs(paraMensagens(h.itens, provRef.current ? 0 : aulaRef.current)); setLicencas(provRef.current ? [] : h.motor?.permissoes || []);
+      setMsgs(paraMensagens(h.itens, provRef.current ? 0 : aulaRef.current)); setHistVivo(true); setLicencas(provRef.current ? [] : h.motor?.permissoes || []);
       setOcupado(!!h.motor?.ocupado); if (!h.motor?.ocupado) { setStatus(""); setFluxo(""); acumulado = ""; }
       if (h.motor?.modelo) setModeloSel(h.motor.modelo);
     }).catch(() => {});
@@ -610,14 +645,14 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               <span className={aoFechar ? "" : "md:hidden"}><Avatar a={agente} tamanho={32} /></span>
               <div className="min-w-0">
                 <p className="m-0 text-sm font-bold text-[var(--text-primary)] leading-tight truncate">{agente?.nome ?? "Chat"}</p>
-                <p className="m-0 text-xs text-[var(--text-secondary)] truncate">{perfilDe(agente)?.specialization || agente?.cargo}</p>
+                <p className="m-0 text-xs text-[var(--text-secondary)] truncate">{descricao}</p>
               </div>
             </div>
           ) : <>
           <Avatar a={agente} tamanho={40} />
           <div className="min-w-0 flex-1 basis-48">
             <h1 className="text-base font-semibold text-[var(--text-primary)] leading-tight">{agente?.nome ?? "Chat"}</h1>
-            <p className="text-xs text-[var(--text-secondary)] truncate">{perfilDe(agente)?.specialization || agente?.cargo}</p>
+            <p className="text-xs text-[var(--text-secondary)] truncate">{descricao}</p>
             {agente && dicaAberta && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <p className="text-[11px] text-[var(--text-muted)] leading-snug mt-0.5">{perfilDe(agente)?.bio || perfilDe(agente)?.skills}</p>}
           </div>
           {agente && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher descrição" : "ver descrição"}</button>}
@@ -643,7 +678,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               Hora {uso.hora.usadas}/{uso.hora.limite} · Hoje {uso.dia.usadas}/{uso.dia.limite}
             </span>
           )}
-          {servidora ? null : usaVivo ? (
+          {servidora ? null : usaVivo || (querVivo && vivo === "checando") ? (
             <div className="flex items-center gap-1.5 flex-wrap">
               {prov ? <>
                 <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--warning)]/25 text-[var(--text-primary)] font-bold" title="Conversa avulsa: só conversa e lê anexos, não mexe em nada e não fica salva">🫥 provisório</span>
@@ -705,7 +740,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               </div>
             </div>
           )}
-          {!msgs.length && !ocupado && agente && !(querVivo && vivo === "fora") && (
+          {!msgs.length && !ocupado && agente && !(querVivo && vivo === "fora") && !(querVivo && !modoAntigo && !histVivo) && (
             compacto ? (
               <p className="text-sm text-[var(--text-secondary)] mt-2">Fale ou escreva abaixo. {agente.nome} responde aqui, e o que precisar da sua aprovação aparece como cartão.</p>
             ) : (
@@ -799,7 +834,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           {avisosHab}
           <div className={`flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 ${compacto ? "px-2" : ""}`}>
             <label className="inline-flex items-center gap-1.5 text-[11.5px] text-[var(--text-secondary)] cursor-pointer" title={usaVivo ? "Grava e transcreve na própria VPS: não aparece ao vivo, mas a voz não sai daqui" : "Grava e transcreve no servidor, sem o ditado ao vivo do navegador"}>
-              <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} /> 🔒 {usaVivo ? "voz aqui dentro (assunto sigiloso)" : "gravar sem ditado ao vivo"}
+              <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} /> 🔒 {usaVivo || (querVivo && vivo === "checando") ? "voz aqui dentro (assunto sigiloso)" : "gravar sem ditado ao vivo"}
             </label>
             <p className={`m-0 text-[11px] text-[var(--text-muted)] ${compacto ? "hidden md:block" : ""}`}>{usaVivo
               ? "⚡ Jarbas sempre ligado: faz de verdade e pede licença no celular para o que for sensível · 🎙️ o texto aparece enquanto você fala."
