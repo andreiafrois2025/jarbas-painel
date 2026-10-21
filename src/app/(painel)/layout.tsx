@@ -37,10 +37,16 @@ export default function PainelLayout({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // 21/10: na VPS quem chegou aqui já passou pela porta forte, então o painel aparece na hora
+  // e o login dele chega por trás (o chat do Jarbas não depende dele). Na Vercel, espera como antes.
+  if (loading && VIVO_DISPONIVEL) {
+    return <Dashboard session={null}>{children}<AvisosPorta /></Dashboard>;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-        <div className="flex flex-col items-center gap-3">
+        <div className="espera-demorada flex flex-col items-center gap-3">
           <span className="text-4xl animate-pulse">⚡</span>
           <span className="text-[var(--text-secondary)]">Carregando...</span>
         </div>

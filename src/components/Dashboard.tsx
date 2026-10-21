@@ -29,7 +29,8 @@ import type { Session } from "@supabase/supabase-js";
 import { VIVO_DISPONIVEL, vivoApi } from "@/lib/jarbasVivo";
 
 interface DashboardProps {
-  session: Session;
+  /** null enquanto o login do painel ainda chega (21/10: o chat do Jarbas abre antes dele). */
+  session: Session | null;
   children: ReactNode;
 }
 
@@ -56,7 +57,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
   }, []);
 
   const [menuAvatar, setMenuAvatar] = useState(false);
-  const { dados: esperando, erro: erroEsperando, recarregar: recarregarEsperando } = useEsperando(servidora);
+  const { dados: esperando, erro: erroEsperando, recarregar: recarregarEsperando } = useEsperando(servidora, !!session);
 
   const loadData = useCallback(async () => {
     try {
@@ -90,11 +91,12 @@ export default function Dashboard({ session, children }: DashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [session.user?.id]);
+  }, [session?.user?.id]);
 
+  const logado = !!session;
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (logado) loadData();
+  }, [loadData, logado]);
 
   // Celular: busca vira ícone que abre uma linha extra; teclado aberto esconde o menu inferior
   // e a altura do painel segue a área realmente visível (visualViewport), pra caixa de mensagem não sumir.
@@ -142,11 +144,11 @@ export default function Dashboard({ session, children }: DashboardProps) {
     };
   }, [servidora, collaborators, assignments, categories, quickLinks]);
 
-  // A Conversa abre na hora (o chat não depende desses dados); as outras páginas esperam
-  if (loading && pathname !== "/conversa") {
+  // A Conversa e o atalho /jarbas abrem na hora (o chat não depende desses dados); as outras páginas esperam
+  if (loading && pathname !== "/conversa" && pathname !== "/jarbas") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-        <div className="flex flex-col items-center gap-3">
+        <div className="espera-demorada flex flex-col items-center gap-3">
           <Mascote nome="jarbas" emoji="⚡" tamanho={56} className="animate-pulse" />
           <span className="text-[var(--text-secondary)]">Carregando…</span>
         </div>

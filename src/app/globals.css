@@ -525,3 +525,8 @@ body {
   .esc-tela-g b { transform: scaleY(1) !important; }
   .esc-tela-g { opacity: 1 !important; } .esc-tela-c.esc-tela-g { opacity: 1 !important; }
 }
+
+/* 21/10/2026: a tela "Carregando" só aparece se a espera passar de meio segundo.
+   Abaixo disso o chat do Jarbas já está na tela e o aviso só piscaria. */
+@keyframes espera-aparece { to { opacity: 1; } }
+.espera-demorada { opacity: 0; animation: espera-aparece .2s ease .6s forwards; }

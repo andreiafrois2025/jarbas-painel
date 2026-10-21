@@ -49,8 +49,9 @@ async function buscar(servidora: boolean): Promise<DadosEsperando> {
   return r.json();
 }
 
-/** Uma consulta só para o painel inteiro (o shell chama; as telas leem do contexto). */
-export function useEsperando(servidora: boolean) {
+/** Uma consulta só para o painel inteiro (o shell chama; as telas leem do contexto).
+ *  `logado` falso = o login do painel ainda está chegando: espera, sem acusar erro. */
+export function useEsperando(servidora: boolean, logado = true) {
   const [dados, setDados] = useState<DadosEsperando | null>(null);
   const [erro, setErro] = useState(false);
 
@@ -65,6 +66,7 @@ export function useEsperando(servidora: boolean) {
 
   useEffect(() => {
     setDados(null);
+    if (!logado) return;
     carregar();
     // parada nova de squad aparece em até 30 s; ao voltar pra aba, na hora
     const id = setInterval(carregar, 30 * 1000);
@@ -76,7 +78,7 @@ export function useEsperando(servidora: boolean) {
       document.removeEventListener("visibilitychange", visivel);
       window.removeEventListener("focus", carregar);
     };
-  }, [carregar]);
+  }, [carregar, logado]);
 
   return { dados, erro, recarregar: carregar };
 }
