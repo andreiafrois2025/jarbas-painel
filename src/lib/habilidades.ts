@@ -1,26 +1,48 @@
 // Apoio da página Equipe › Habilidades: categoria simples, "como pedir" e
 // "quem usa" de cada habilidade.
 //
-// - categoria: vem do catálogo (/api/catalogo) e é agrupada em 4 chips.
+// - grupo: tabela GRUPO abaixo (pelo uso dela); fora da tabela, pela categoria do catálogo.
 // - "como pedir": primeira frase entre aspas da descrição do SKILL.md
 //   ("Use quando ela disser ..."). Sem aspas na descrição, não mostra nada.
 // - "quem usa": mapeamento óbvio habilidade -> agente da equipe (abaixo).
 //   Habilidade fora da tabela não mostra "quem usa" (nada inventado).
 
-export type CategoriaChip = "design" | "video" | "docs" | "sistema";
+export type CategoriaChip = "igam" | "design" | "video" | "memoria" | "agentes" | "sistema";
 
-export const CATEGORIAS: { id: CategoriaChip; rotulo: string; emoji: string }[] = [
-  { id: "design", rotulo: "Design", emoji: "🎨" },
-  { id: "video", rotulo: "Vídeo e conteúdo", emoji: "🎬" },
-  { id: "docs", rotulo: "Documentos", emoji: "📄" },
-  { id: "sistema", rotulo: "Sistema", emoji: "⚙️" },
+// 21/10: grupos pensados pelo uso dela (antes eram 4 chips pela categoria técnica).
+// A ordem aqui é a ordem das seções em "Todas": o que ela procura rápido primeiro,
+// o que os agentes usam sozinhos e a manutenção no fim.
+export const CATEGORIAS: { id: CategoriaChip; rotulo: string; emoji: string; explica: string }[] = [
+  { id: "igam", rotulo: "Igam", emoji: "🏛️", explica: "Trabalho no Igam: avisos do grupo, mapas e documentos." },
+  { id: "design", rotulo: "Design, sites e imagens", emoji: "🎨", explica: "Apresentações, sites, propostas e imagens." },
+  { id: "video", rotulo: "Vídeo e posts", emoji: "🎬", explica: "Reels, vídeos animados e textos para as redes." },
+  { id: "memoria", rotulo: "Memória e organização", emoji: "🧠", explica: "Lembrar, lembretes e guardar jeitos de fazer." },
+  { id: "agentes", rotulo: "Os agentes usam sozinhos", emoji: "🤖", explica: "Você não precisa chamar: o Jarbas, a Donna ou as squads usam por trás quando a tarefa pede." },
+  { id: "sistema", rotulo: "Sistema e manutenção", emoji: "⚙️", explica: "Para consertar, entender ou montar o próprio sistema." },
 ];
 
-export function categoriaChip(categoria?: string): CategoriaChip {
+// Grupo de cada habilidade pelo nome do catálogo. Fora da tabela: cai pela categoria técnica.
+export const GRUPO: Record<string, CategoriaChip> = {
+  "acontece-no-igam": "igam", "mapa-por-audio": "igam", "mapa-institucional": "igam", "documento-confirmar": "igam",
+  "slide-animado": "design", "site-animado": "design", "site-animado-cinema": "design", "gerador-proposta": "design",
+  "mascote-agente": "design", "criacao-edicao-imagem-gpt-image": "design", "pedir-ao-codex": "design", "frontend-design": "design",
+  "gerador-post": "video", "gerar-prompt-seedance": "video", "assistir-video": "video", "dg-editar-gravacao-bruta": "video",
+  "motion-design": "video", "video-animado": "video",
+  lembrar: "memoria", lembretes: "memoria", aprender: "memoria", "especificacao-curta": "memoria",
+  "telegram-audio": "agentes", "reels-studio": "agentes", "gerador-mapas": "agentes", apify: "agentes", blotato: "agentes",
+  canva: "agentes", "instagram-publisher": "agentes", resend: "agentes", "image-ai-generator": "agentes", "image-creator": "agentes",
+  "image-fetcher": "agentes", "template-designer": "agentes", "gcp-image-gen": "agentes", "image-to-prompt": "agentes",
+  weather: "agentes", himalaya: "agentes", healthcheck: "agentes", "opensquad-skill-creator": "agentes", "Best-Practice Creator": "agentes",
+  socorro: "sistema", radiografar: "sistema", "fabrica-de-squads": "sistema", opensquad: "sistema", "opensquad-dev": "sistema",
+  "opensquad-dashboard-design": "sistema", salvatelegram: "sistema",
+};
+
+export function categoriaChip(categoria?: string, nome?: string): CategoriaChip {
+  if (nome && GRUPO[nome]) return GRUPO[nome];
   const c = (categoria || "").toLowerCase();
   if (/design|imagem/.test(c)) return "design";
   if (/v[ií]deo/.test(c)) return "video";
-  if (/document|mem[oó]ria/.test(c)) return "docs";
+  if (/document|mem[oó]ria/.test(c)) return "memoria";
   return "sistema";
 }
 
@@ -64,6 +86,13 @@ export const NOME_BONITO: Record<string, string> = {
   "documento-confirmar": "Documento sem inventar",
   "especificacao-curta": "Especificação curta",
   "fabrica-de-squads": "Fábrica de squads",
+  "mapa-institucional": "Mapa institucional", "gerador-mapas": "Motor dos mapas", "reels-studio": "Estúdio de reels",
+  "telegram-audio": "Áudio do Telegram", salvatelegram: "Levar a conversa pro Telegram", "Best-Practice Creator": "Manual de boas práticas",
+  "opensquad-skill-creator": "Criar habilidade (OpenSquad)", "opensquad-dev": "Checklist do OpenSquad", "opensquad-dashboard-design": "Visual do escritório virtual",
+  apify: "Coletar dados de sites", blotato: "Publicar nas redes", canva: "Canva", "instagram-publisher": "Publicar no Instagram",
+  resend: "Enviar e-mails", "image-ai-generator": "Gerar imagem com IA", "image-creator": "Finalizar imagem", "image-fetcher": "Buscar imagens",
+  "template-designer": "Escolher modelo visual", "gcp-image-gen": "Imagem pelo Google", "image-to-prompt": "Descrever imagem",
+  weather: "Previsão do tempo", himalaya: "E-mail (Donna)", healthcheck: "Hábitos de saúde",
   lembrar: "Lembrar", lembretes: "Lembretes", aprender: "Aprender", socorro: "Socorro", radiografar: "Radiografar",
 };
 export function nomeBonito(nome: string): string {
@@ -109,6 +138,11 @@ export const QUEM_USA: Record<string, string[]> = {
   "resend": ["donna"],
   "himalaya": ["donna"],
   "apify": ["mike"],
+  "mapa-institucional": ["eric"],
+  "gerador-mapas": ["eric"],
+  "reels-studio": ["theo"],
+  "telegram-audio": ["jarbas"],
+  "salvatelegram": ["jarbas"],
 };
 
 export const NOME_AGENTE: Record<string, string> = {

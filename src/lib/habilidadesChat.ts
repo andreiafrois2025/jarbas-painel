@@ -63,7 +63,7 @@ export function useHabilidadesChat(servidora: boolean): { lista: HabChat[]; pron
         const desc = s.descricao_simples || s.descricao;
         if (servidora && ehPessoal(s.nome, desc)) continue;
         const rotulo = nomeBonito(s.nome);
-        const chip = categoriaChip(s.categoria);
+        const chip = categoriaChip(s.categoria, s.nome);
         itens.push({
           id: s.nome, rotulo, descricao: primeiraFrase(desc),
           icone: ICONES[s.nome] ?? CATEGORIAS.find((c) => c.id === chip)?.emoji ?? "🧩",
