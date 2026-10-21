@@ -43,6 +43,13 @@ export const vivoApi = {
     return r.ok ? r.json() : null;
   },
   sair: () => postar("/api/sair"),
+  // chat provisório (21/10): conversa avulsa, só leitura e conversa, não fica salva
+  prov: {
+    historico: async (): Promise<{ itens: ItemVivo[]; motor: MotorVivo; ativo: boolean }> => (await ir("/api/provisorio/historico")).json(),
+    enviar: (texto: string) => postar("/api/provisorio/mensagem", { texto }) as Promise<{ ok?: boolean; erro?: string }>,
+    interromper: () => postar("/api/provisorio/interromper"),
+    sair: () => postar("/api/provisorio/sair"),
+  },
 };
 
 // histórico da sessão viva no formato das mensagens do painel; ações seguidas viram uma linha só

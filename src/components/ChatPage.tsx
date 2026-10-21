@@ -145,12 +145,16 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const [aulaDesde, setAulaDesde] = useState(0);
   const [privado, setPrivado] = useState(false);
   const usaVivo = querVivo && vivo === "ok";
+  // chat provisório: conversa avulsa, só leitura e conversa, some ao sair
+  const [prov, setProv] = useState(false);
+  const provRef = useRef(false);
   const modoAntigo = vivo === "antigo";
   const obraDisponivel = agenteId === "jarbas" && !servidora && !usaVivo && vivo !== "checando";
   const obraLigada = obraDisponivel && !!obra?.ligado;
   const [texto, setTexto] = useState("");
   const ditado = useDitado(setTexto, setErro);
   const aulaRef = useRef(0);
+  const recarregarVivo = useRef<(() => void) | null>(null);
   const [anexos, setAnexos] = useState<{ id: string; nome: string }[]>([]);
   const [gravando, setGravando] = useState(false);
   const [transcrevendo, setTranscrevendo] = useState(false);
@@ -290,9 +294,9 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   useEffect(() => {
     if (!querVivo || modoAntigo) return;
     let aberto = true; let fonte: EventSource | null = null; let acumulado = "";
-    const carregarHist = () => vivoApi.historico().then((h) => {
+    const carregarHist = () => (provRef.current ? vivoApi.prov.historico() : vivoApi.historico()).then((h) => {
       if (!aberto) return;
-      setMsgs(paraMensagens(h.itens, aulaRef.current)); setLicencas(h.motor?.permissoes || []);
+      setMsgs(paraMensagens(h.itens, provRef.current ? 0 : aulaRef.current)); setLicencas(provRef.current ? [] : h.motor?.permissoes || []);
       setOcupado(!!h.motor?.ocupado); if (!h.motor?.ocupado) { setStatus(""); setFluxo(""); acumulado = ""; }
       if (h.motor?.modelo) setModeloSel(h.motor.modelo);
     }).catch(() => {});
@@ -306,10 +310,13 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
         if (fonte) return;
         fonte = vivoApi.eventos();
         fonte.onopen = () => { setErro(""); carregarHist(); };
+        recarregarVivo.current = () => { acumulado = ""; setFluxo(""); setStatus(""); carregarHist(); };
         fonte.onerror = () => { if (fonte?.readyState === 2) { fonte = null; checar(); } };
         fonte.onmessage = (m) => {
           let ev: any; try { ev = JSON.parse(m.data); } catch { return; }
-          if (ev.tipo === "estado") { setOcupado(!!ev.ocupado); if (!ev.ocupado) setStatus(""); if (ev.modelo) setModeloSel(ev.modelo); }
+          if (ev.tipo === "prov-fim") { if (provRef.current) { provRef.current = false; setProv(false); acumulado = ""; setFluxo(""); setStatus(""); carregarHist(); } return; }
+          if (!!ev.prov !== provRef.current) return; // evento da outra conversa (normal x provisória)
+          if (ev.tipo === "estado") { setOcupado(!!ev.ocupado); if (!ev.ocupado) setStatus(""); if (ev.modelo && !ev.prov) setModeloSel(ev.modelo); }
           else if (ev.tipo === "ela") setMsgs((x) => {
             const ult = x[x.length - 1];
             if (ult && ult.papel === "user" && ult.id.startsWith("tmp-") && ult.texto === ev.texto) return x; // fui eu que mandei daqui
@@ -365,7 +372,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       setErro(""); setOcupado(true); setStatus("pensando…");
       setMsgs((x) => [...x, { id: "tmp-" + Date.now(), papel: "user", texto: comHab, ts: new Date().toISOString(), anexos, habilidade: habSel ?? undefined }]);
       setTexto(""); setAnexos([]); setHabSel(null);
-      const r = await vivoApi.enviar(comHab).catch(() => ({ ok: false, erro: "Não consegui falar com o Jarbas. Confira a internet." }));
+      const r = await (prov ? vivoApi.prov.enviar(comHab) : vivoApi.enviar(comHab)).catch(() => ({ ok: false, erro: "Não consegui falar com o Jarbas. Confira a internet." }));
       if (!r.ok) { setErro(r.erro || "Não consegui mandar."); setOcupado(false); setStatus(""); }
       return;
     }
@@ -394,7 +401,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     chatApi.conversas(agenteId).then(setConversas).catch(() => {});
     chatApi.uso().then(setUso).catch(() => {});
     if (obraDisponivel) obraApi.estado().then(setObra).catch(() => {});
-  }, [obraDisponivel, ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel, servidora, usaVivo, ditado]);
+  }, [obraDisponivel, ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel, servidora, usaVivo, ditado, prov]);
 
   // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
   const escolherModelo = async (chave: string) => {
@@ -423,7 +430,17 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     try { setAssuntos(await chatApi.assunto(conversaId, id, { arquivado })); if (arquivado && fixarAssunto === id) setFixarAssunto(null); } catch (e) { setErro((e as Error).message); }
   };
 
-  const parar = () => { if (usaVivo) vivoApi.interromper().catch(() => {}); else ctl.current?.abort(); };
+  const parar = () => { if (usaVivo) (prov ? vivoApi.prov.interromper() : vivoApi.interromper()).catch(() => {}); else ctl.current?.abort(); };
+
+  const alternarProv = async () => {
+    if (prov) {
+      if (!window.confirm("Sair do provisório? Esta conversa será apagada.")) return;
+      await vivoApi.prov.sair().catch(() => {});
+    }
+    provRef.current = !prov; setProv(!prov);
+    setErro(""); setAnexos([]); setHabSel(null);
+    recarregarVivo.current?.();
+  };
 
   const alternarAula = () => {
     const d = aulaDesde ? 0 : Date.now();
@@ -607,7 +624,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           </>}
           {<label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
             <span className="sr-only md:not-sr-only">Modelo</span>
-            <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado} aria-label="Modelo que responde nesta conversa"
+            <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado || prov} aria-label="Modelo que responde nesta conversa"
               className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1.5 text-xs text-[var(--text-primary)] cursor-pointer disabled:opacity-50">
               <optgroup label="Claude">
                 {modelos.filter((m) => m.motor === "claude").map((m) => <option key={m.chave} value={m.chave}>{m.rotulo.replace(/^Claude /, "")}{m.chave === (agenteId === "jarbas" ? "opus" : "haiku") ? " (padrão)" : ""}</option>)}
@@ -628,11 +645,17 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           )}
           {servidora ? null : usaVivo ? (
             <div className="flex items-center gap-1.5 flex-wrap">
+              {prov ? <>
+                <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--warning)]/25 text-[var(--text-primary)] font-bold" title="Conversa avulsa: só conversa e lê anexos, não mexe em nada e não fica salva">🫥 provisório</span>
+                <button onClick={alternarProv} disabled={ocupado} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--warning)] font-bold hover:bg-[var(--bg-tertiary)] cursor-pointer disabled:opacity-50">✖ Sair do provisório</button>
+              </> : <>
               <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--text-primary)] font-bold" title="O Jarbas fica ligado na VPS e faz de verdade. O que for sensível pede licença no celular.">⚡ sempre ligado</span>
+              <button onClick={alternarProv} disabled={ocupado} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer disabled:opacity-50" title="Conversa avulsa para corrigir e revisar texto: não mexe em nada e não fica salva">🫥 Provisório</button>
               <button onClick={nova} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer" title="Começa um assunto do zero">✨ Nova</button>
               <button onClick={alternarAula} aria-pressed={!!aulaDesde} title="Esconde a conversa anterior para projetar no curso"
                 className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${aulaDesde ? "border-[var(--ac)] bg-[var(--accent-soft)] font-bold" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"}`}>🎓 {aulaDesde ? "Sair do modo aula" : "Modo aula"}</button>
               <a href={JARBAS_VIVO + "/#aparelhos"} title="Aparelhos conectados, trocar a senha" className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] no-underline text-[var(--text-primary)]">📱 Aparelhos</a>
+              </>}
             </div>
           ) : querVivo && modoAntigo ? (
             <button onClick={() => setVivo("checando")} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--ac)] bg-[var(--accent-soft)] font-bold cursor-pointer">⚡ Voltar ao Jarbas sempre ligado</button>
@@ -667,6 +690,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           <PainelAssuntos assuntos={assuntos} msgs={msgs} fixado={fixarAssunto} onFixar={setFixarAssunto} onArquivar={arquivarAssunto} />
         )}
         <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-6 2xl:px-10" : "px-4"}`} aria-live="polite">
+          {usaVivo && prov && (
+            <div role="status" className="rounded-xl border-2 border-[var(--warning)] bg-[var(--warning)]/15 px-3 py-2 text-sm text-[var(--text-primary)]">
+              🫥 <b>Chat provisório.</b> Aqui eu só converso, corrijo e reviso texto e leio anexos. Não mexo em código, arquivos, Notion, Drive nem agenda. Nada fica salvo: some ao tocar em “Sair do provisório” ou depois de 1 hora parado.
+            </div>
+          )}
           {querVivo && vivo === "fora" && (
             <div className="rounded-xl border-[1.5px] border-[var(--ac)] bg-[var(--accent-soft)] p-4 space-y-2 max-w-2xl">
               <p className="m-0 font-bold text-[var(--text-primary)]">⚡ O Jarbas sempre ligado não respondeu</p>
