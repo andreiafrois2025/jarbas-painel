@@ -14,6 +14,8 @@ import Visuais from "./chat/Visuais";
 import { MenuHabilidades, ChipHabilidade } from "./chat/MenuHabilidades";
 import { Bastidores, BotaoDesfazer, CartaoArquivoObra, CartoesPosso } from "./chat/ModoObra";
 import { AVISO_OBRA, detectarHabilidadeFalada, filtrarHabilidades, gatilhoBarra, useHabilidadesChat, type HabChat } from "@/lib/habilidadesChat";
+import { JARBAS_VIVO, paraMensagens, vivoApi, type EstadoVivo, type LicencaVivo } from "@/lib/jarbasVivo";
+import { temDitado, useDitado } from "@/lib/ditado";
 
 const hora = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -133,9 +135,22 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   // ── Modo obra (só o Jarbas): estado vem do servidor; o relógio só atualiza o "1h52" na tela ──
   const [obra, setObra] = useState<EstadoObra | null>(null);
   const [agoraMs, setAgoraMs] = useState(() => Date.now());
-  const obraDisponivel = agenteId === "jarbas" && !servidora;
+  // ── Jarbas sempre ligado (21/10): o chat do Jarbas fala com a sessão viva da VPS ──
+  // "checando" no começo; "ok" = aparelho conectado; "fora" = falta conectar este aparelho;
+  // "antigo" = ela escolheu usar o chat antigo (reserva, só leitura).
+  const querVivo = agenteId === "jarbas" && !servidora;
+  const [vivo, setVivo] = useState<"checando" | "ok" | "fora" | "antigo">("checando");
+  const [vivoInfo, setVivoInfo] = useState<EstadoVivo | null>(null);
+  const [licencas, setLicencas] = useState<LicencaVivo[]>([]);
+  const [aulaDesde, setAulaDesde] = useState(0);
+  const [privado, setPrivado] = useState(false);
+  const usaVivo = querVivo && vivo === "ok";
+  const modoAntigo = vivo === "antigo";
+  const obraDisponivel = agenteId === "jarbas" && !servidora && !usaVivo && vivo !== "checando";
   const obraLigada = obraDisponivel && !!obra?.ligado;
   const [texto, setTexto] = useState("");
+  const ditado = useDitado(setTexto, setErro);
+  const aulaRef = useRef(0);
   const [anexos, setAnexos] = useState<{ id: string; nome: string }[]>([]);
   const [gravando, setGravando] = useState(false);
   const [transcrevendo, setTranscrevendo] = useState(false);
@@ -256,6 +271,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     try { window.localStorage.setItem("chatAgente", agenteId); } catch { /* sem storage */ }
     pedidoConversa.current++; setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setAssuntos([]); setFixarAssunto(null); setHabSel(null);
     setModeloSel(agenteId === "jarbas" ? "opus" : "haiku");
+    if (agenteId === "jarbas" && !servidora && !modoAntigo) return; // a sessão viva carrega o próprio histórico
     // 20/10: às vezes a conversa voltava vazia ao navegar pelo painel e só aparecia reabrindo a aba (pedido falho
     // em silêncio ou resposta de um agente anterior chegando atrasada). Agora: ignora resposta velha, tenta de novo
     // e, se a aba voltar a ficar visível com a conversa vazia, carrega outra vez.
@@ -268,7 +284,49 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     const aoVoltar = () => { if (document.visibilityState === "visible" && !conversaIdRef.current && !servidora) carregar(); };
     document.addEventListener("visibilitychange", aoVoltar);
     return () => { vivo = false; document.removeEventListener("visibilitychange", aoVoltar); };
-  }, [agenteId, agentes.length, abrirConversa, servidora]);
+  }, [agenteId, agentes.length, abrirConversa, servidora, modoAntigo]);
+
+  // ── Jarbas sempre ligado: confere o aparelho, carrega o histórico e escuta os eventos ao vivo ──
+  useEffect(() => {
+    if (!querVivo || modoAntigo) return;
+    let aberto = true; let fonte: EventSource | null = null; let acumulado = "";
+    const carregarHist = () => vivoApi.historico().then((h) => {
+      if (!aberto) return;
+      setMsgs(paraMensagens(h.itens, aulaRef.current)); setLicencas(h.motor?.permissoes || []);
+      setOcupado(!!h.motor?.ocupado); if (!h.motor?.ocupado) { setStatus(""); setFluxo(""); acumulado = ""; }
+    }).catch(() => {});
+    const checar = async () => {
+      try {
+        const e = await vivoApi.estado(); if (!aberto) return;
+        setVivoInfo(e);
+        if (!e.entrou) { setVivo("fora"); fonte?.close(); fonte = null; return; }
+        setVivo("ok");
+        if (fonte) return;
+        fonte = vivoApi.eventos();
+        fonte.onopen = () => { setErro(""); carregarHist(); };
+        fonte.onerror = () => { if (fonte?.readyState === 2) { fonte = null; checar(); } };
+        fonte.onmessage = (m) => {
+          let ev: any; try { ev = JSON.parse(m.data); } catch { return; }
+          if (ev.tipo === "estado") { setOcupado(!!ev.ocupado); if (!ev.ocupado) setStatus(""); }
+          else if (ev.tipo === "ela") setMsgs((x) => {
+            const ult = x[x.length - 1];
+            if (ult && ult.papel === "user" && ult.id.startsWith("tmp-") && ult.texto === ev.texto) return x; // fui eu que mandei daqui
+            return [...x, { id: "e" + Date.now(), papel: "user", texto: ev.texto, ts: new Date(ev.quando || Date.now()).toISOString() }];
+          });
+          else if (ev.tipo === "texto") { acumulado += ev.texto; setFluxo(acumulado); }
+          else if (ev.tipo === "ferramenta" && !ev.sub) setStatus("⚙️ " + ev.resumo);
+          else if (ev.tipo === "permissao") setLicencas((x) => x.some((l) => l.id === ev.id) ? x : [...x, { id: ev.id, ferramenta: ev.ferramenta, resumo: ev.resumo, aparelho: ev.aparelho }]);
+          else if (ev.tipo === "permissao-respondida") setLicencas((x) => x.filter((l) => l.id !== ev.id));
+          else if (ev.tipo === "fim" || ev.tipo === "nova-conversa") { acumulado = ""; setFluxo(""); setStatus(""); carregarHist(); }
+          else if (ev.tipo === "erro") setErro(ev.texto);
+        };
+      } catch { if (aberto) setVivo("fora"); } // VPS fora do ar: oferece o chat antigo
+    };
+    checar();
+    const aoVoltar = () => { if (document.visibilityState === "visible") checar(); };
+    window.addEventListener("focus", aoVoltar); document.addEventListener("visibilitychange", aoVoltar);
+    return () => { aberto = false; fonte?.close(); window.removeEventListener("focus", aoVoltar); document.removeEventListener("visibilitychange", aoVoltar); };
+  }, [querVivo, modoAntigo]);
 
   useEffect(() => {
     if (!obraDisponivel) { setObra(null); return; }
@@ -292,6 +350,17 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const enviar = useCallback(async (conteudo: string, assuntoIdParam?: string) => {
     const m = conteudo.trim() || (anexos.length ? "Veja o anexo." : "");
     if (!m || ocupado) return;
+    if (ditado.ativo) ditado.parar();
+    if (usaVivo) {
+      const t = m + (anexos.length ? "\n" + anexos.map((a) => `[Anexo: ${a.id}]`).join("\n") : "");
+      const comHab = habSel ? `[Usar a habilidade ${habSel}]\n${t}` : t;
+      setErro(""); setOcupado(true); setStatus("pensando…");
+      setMsgs((x) => [...x, { id: "tmp-" + Date.now(), papel: "user", texto: comHab, ts: new Date().toISOString(), anexos, habilidade: habSel ?? undefined }]);
+      setTexto(""); setAnexos([]); setHabSel(null);
+      const r = await vivoApi.enviar(comHab).catch(() => ({ ok: false, erro: "Não consegui falar com o Jarbas. Confira a internet." }));
+      if (!r.ok) { setErro(r.erro || "Não consegui mandar."); setOcupado(false); setStatus(""); }
+      return;
+    }
     setErro(""); setOcupado(true); setFluxo(""); setStatus("pensando…");
     const idsAnexos = anexos.map((a) => a.id);
     setPrevias((p) => ({ ...p, [agenteId]: { texto: m, ts: new Date().toISOString(), minha: true } })); // sobe na lista
@@ -317,7 +386,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     chatApi.conversas(agenteId).then(setConversas).catch(() => {});
     chatApi.uso().then(setUso).catch(() => {});
     if (obraDisponivel) obraApi.estado().then(setObra).catch(() => {});
-  }, [obraDisponivel, ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel, servidora]);
+  }, [obraDisponivel, ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel, servidora, usaVivo, ditado]);
 
   // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
   const escolherModelo = async (chave: string) => {
@@ -338,9 +407,25 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     try { setAssuntos(await chatApi.assunto(conversaId, id, { arquivado })); if (arquivado && fixarAssunto === id) setFixarAssunto(null); } catch (e) { setErro((e as Error).message); }
   };
 
-  const parar = () => ctl.current?.abort();
+  const parar = () => { if (usaVivo) vivoApi.interromper().catch(() => {}); else ctl.current?.abort(); };
 
-  const nova = () => { setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setHistoricoAberto(false); };
+  const alternarAula = () => {
+    const d = aulaDesde ? 0 : Date.now();
+    setAulaDesde(d); aulaRef.current = d;
+    vivoApi.historico().then((h) => setMsgs(paraMensagens(h.itens, d))).catch(() => {});
+  };
+  const responderLicenca = async (id: string, permitir: boolean) => {
+    const r = await vivoApi.permissao(id, permitir).catch(() => ({ ok: false, erro: "Não consegui falar com o Jarbas." }));
+    if (!r.ok) setErro(r.erro || "Esse pedido já não vale.");
+    setLicencas((x) => x.filter((l) => l.id !== id));
+  };
+
+  const nova = () => {
+    if (usaVivo) {
+      if (!window.confirm("Começar uma conversa nova? A anterior fica guardada, mas o Jarbas começa este assunto do zero.")) return;
+      vivoApi.nova().catch(() => {}); setErro(""); setAnexos([]); return;
+    }
+    setConversaId(null); setMsgs([]); setFluxo(""); setErro(""); setAnexos([]); setHistoricoAberto(false); };
 
   const apagar = async (id: string) => {
     if (!window.confirm("Apagar esta conversa? Não dá para desfazer.")) return;
@@ -362,13 +447,18 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     if (!arqs) return;
     for (const f of Array.from(arqs).slice(0, 3 - anexos.length)) {
       if (f.size > 10 * 1024 * 1024) { setErro(`"${f.name}" passa de 10 MB.`); continue; }
-      try { const [a] = await chatApi.anexo(f); setAnexos((x) => [...x, { id: a.id, nome: a.nome }]); } catch (e) { setErro((e as Error).message); }
+      try {
+        if (usaVivo) { const caminho = await vivoApi.anexo(f); setAnexos((x) => [...x, { id: caminho, nome: f.name }]); }
+        else { const [a] = await chatApi.anexo(f); setAnexos((x) => [...x, { id: a.id, nome: a.nome }]); }
+      } catch (e) { setErro((e as Error).message); }
     }
     if (fileRef.current) fileRef.current.value = "";
   };
 
   const alternarGravacao = async () => {
+    if (ditado.ativo) { ditado.parar(); return; }
     if (gravando) { rec.current?.stop(); return; }
+    if (!privado && temDitado() && ditado.iniciar(texto)) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const tipos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
@@ -377,7 +467,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       r.ondataavailable = (e) => { if (e.data.size) partes.push(e.data); };
       r.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop()); setGravando(false); setTranscrevendo(true);
-        try { const t = await chatApi.audio(new Blob(partes, { type: r.mimeType || "audio/webm" })); setTexto((x) => (x ? x + " " : "") + t); }
+        try {
+          const b = new Blob(partes, { type: r.mimeType || "audio/webm" });
+          const t = usaVivo ? await vivoApi.transcrever(b) : await chatApi.audio(b);
+          setTexto((x) => (x ? x + " " : "") + t);
+        }
         catch (e) { setErro((e as Error).message); } finally { setTranscrevendo(false); }
       };
       rec.current = r; r.start(); setGravando(true);
@@ -420,7 +514,8 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     {habFalada && <p className="mt-2"><button type="button" onClick={() => setHabSel(habFalada.id)} className="text-[12.5px] font-bold rounded-full px-3 py-1 border border-[var(--ac)]/50 bg-[var(--accent-soft)] text-[var(--text-primary)] hover:brightness-95 cursor-pointer">usar {habFalada.icone} {habFalada.rotulo.toLowerCase()}?</button></p>}
   </>);
 
-  const limiteBatido = !!uso && (uso.hora.usadas >= uso.hora.limite || uso.dia.usadas >= uso.dia.limite);
+  const ouvindo = gravando || ditado.ativo;
+  const limiteBatido = !usaVivo && !!uso && (uso.hora.usadas >= uso.hora.limite || uso.dia.usadas >= uso.dia.limite);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col md:flex-row">
@@ -494,7 +589,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           </div>
           {agente && (perfilDe(agente)?.bio || perfilDe(agente)?.skills) && <button onClick={alternarDica} aria-expanded={dicaAberta} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] underline-offset-2 hover:underline cursor-pointer">{dicaAberta ? "recolher descrição" : "ver descrição"}</button>}
           </>}
-          <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+          {!usaVivo && <label className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
             <span className="sr-only md:not-sr-only">Modelo</span>
             <select value={modeloSel} onChange={(e) => escolherModelo(e.target.value)} disabled={ocupado} aria-label="Modelo que responde nesta conversa"
               className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] px-2 py-1.5 text-xs text-[var(--text-primary)] cursor-pointer disabled:opacity-50">
@@ -507,15 +602,25 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
                 </optgroup>
               )}
             </select>
-          </label>
+          </label>}
           {/* 19/10: sem botão 🔨 nem código — o chat usa as "mãos" sozinho quando o pedido precisa */}
-          {uso && (
+          {uso && !usaVivo && (
             <span className={`${compacto ? "hidden md:inline" : ""} text-xs px-2 py-1 rounded-lg border ${uso.aviso ? "border-[var(--warning)] bg-[var(--warning)]/15" : "border-[var(--border)]"} text-[var(--text-secondary)]`}
               title="Cada mensagem gasta uma parte da assinatura do Claude">
               Hora {uso.hora.usadas}/{uso.hora.limite} · Hoje {uso.dia.usadas}/{uso.dia.limite}
             </span>
           )}
-          {servidora ? null : agente?.assuntosAuto ? (
+          {servidora ? null : usaVivo ? (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--text-primary)] font-bold" title="O Jarbas fica ligado na VPS e faz de verdade. O que for sensível pede licença no celular.">⚡ sempre ligado</span>
+              <button onClick={nova} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer" title="Começa um assunto do zero">✨ Nova</button>
+              <button onClick={alternarAula} aria-pressed={!!aulaDesde} title="Esconde a conversa anterior para projetar no curso"
+                className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${aulaDesde ? "border-[var(--ac)] bg-[var(--accent-soft)] font-bold" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"}`}>🎓 {aulaDesde ? "Sair do modo aula" : "Modo aula"}</button>
+              <a href={JARBAS_VIVO} target="_blank" rel="noreferrer" title="Aparelhos conectados, trocar a senha" className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] no-underline text-[var(--text-primary)]">📱 Aparelhos</a>
+            </div>
+          ) : querVivo && modoAntigo ? (
+            <button onClick={() => setVivo("checando")} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--ac)] bg-[var(--accent-soft)] font-bold cursor-pointer">⚡ Voltar ao Jarbas sempre ligado</button>
+          ) : agente?.assuntosAuto ? (
             <button onClick={() => setPainelAssuntos(!painelAssuntos)} aria-expanded={painelAssuntos} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer">
               📁 Assuntos ({assuntos.filter((a) => !a.arquivado).length})
             </button>
@@ -546,7 +651,17 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           <PainelAssuntos assuntos={assuntos} msgs={msgs} fixado={fixarAssunto} onFixar={setFixarAssunto} onArquivar={arquivarAssunto} />
         )}
         <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-6 2xl:px-10" : "px-4"}`} aria-live="polite">
-          {!msgs.length && !ocupado && agente && (
+          {querVivo && vivo === "fora" && (
+            <div className="rounded-xl border-[1.5px] border-[var(--ac)] bg-[var(--accent-soft)] p-4 space-y-2 max-w-2xl">
+              <p className="m-0 font-bold text-[var(--text-primary)]">⚡ Conecte este aparelho ao Jarbas sempre ligado</p>
+              <p className="m-0 text-sm text-[var(--text-secondary)]">Uma vez por aparelho: digite a senha do Jarbas e, se o aparelho for novo, toque em <b>Permitir</b> no celular. Depois ele conversa aqui, rápido e fazendo de verdade.</p>
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={() => vivoApi.conectar()} className="px-3 py-2 rounded-lg bg-[var(--ac)] text-[var(--on-ac)] text-sm font-bold cursor-pointer">Conectar este aparelho</button>
+                <button onClick={() => setVivo("antigo")} className="px-3 py-2 rounded-lg border border-[var(--border)] text-sm cursor-pointer">Usar o chat antigo (só consulta)</button>
+              </div>
+            </div>
+          )}
+          {!msgs.length && !ocupado && agente && !(querVivo && vivo === "fora") && (
             compacto ? (
               <p className="text-sm text-[var(--text-secondary)] mt-2">Fale ou escreva abaixo. {agente.nome} responde aqui, e o que precisar da sua aprovação aparece como cartão.</p>
             ) : (
@@ -569,6 +684,9 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             </div>
           )}
           {ocupado && obraLigada && !!obra?.o2 && <CartoesPosso ativo />}
+          {usaVivo && licencas.map((l) => (
+            <CartaoLicenca key={l.id} l={l} podeAprovar={!!(vivoInfo?.principal || !vivoInfo?.temPrincipal)} onResponder={(p) => responderLicenca(l.id, p)} />
+          ))}
           {erro && <p role="alert" className="text-sm text-[var(--danger)] bg-[var(--danger)]/10 border border-[var(--danger)]/30 rounded-lg px-3 py-2">{erro}</p>}
           <div ref={fim} />
         </div>
@@ -597,14 +715,14 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               {chipNode}
               <textarea {...camposHab} style={{ outline: "none" }} value={texto} rows={1} maxLength={8000}
-                placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… toque no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : habilidadeSel ? "Escreva o pedido…" : (celular ? "Escreva ou fale…" : `Fale ou escreva para ${agente?.nome ?? "o Jarbas"}… (digite / para habilidades)`)}
+                placeholder={transcrevendo ? "Transcrevendo o áudio…" : ditado.ativo ? "Ouvindo… fale à vontade, o texto aparece aqui" : gravando ? "Gravando… toque no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : habilidadeSel ? "Escreva o pedido…" : (celular ? "Escreva ou fale…" : `Fale ou escreva para ${agente?.nome ?? "o Jarbas"}… (digite / para habilidades)`)}
                 disabled={limiteBatido}
                 className="flex-1 min-w-[6rem] resize-none bg-transparent px-0 py-2.5 text-[15px] leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none max-h-40" aria-label="Mensagem" />
             </div>
             <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 3} title="Anexar PDF, imagem, texto ou planilha CSV (até 10 MB)" aria-label="Anexar arquivo"
               className="h-11 w-11 shrink-0 text-xl leading-none rounded-xl bg-[var(--bg-tertiary)] hover:brightness-95 disabled:opacity-40 cursor-pointer">📎</button>
-            <button onClick={alternarGravacao} disabled={transcrevendo} title={gravando ? "Parar e transcrever" : "Gravar áudio"} aria-label={gravando ? "Parar gravação" : "Gravar áudio"}
-              className={`h-11 w-11 shrink-0 text-xl leading-none rounded-xl cursor-pointer ${gravando ? "bg-[var(--danger)] text-white animate-pulse" : "bg-[var(--ac)] text-[var(--on-ac)]"} disabled:opacity-40`}>{gravando ? "⏹" : "🎙️"}</button>
+            <button onClick={alternarGravacao} disabled={transcrevendo} title={ouvindo ? "Parar" : privado ? "Gravar (transcreve no servidor)" : "Falar: o texto aparece enquanto você fala"} aria-label={ouvindo ? "Parar de ouvir" : "Falar"}
+              className={`h-11 w-11 shrink-0 text-xl leading-none rounded-xl cursor-pointer ${ouvindo ? "bg-[var(--danger)] text-white animate-pulse" : "bg-[var(--ac)] text-[var(--on-ac)]"} disabled:opacity-40`}>{ouvindo ? "⏹" : "🎙️"}</button>
             {/* 18/10: botão de enviar SEMPRE visível (no celular o Enter quebra a linha e não dava pra mandar) */}
             {ocupado
               ? <button onClick={parar} aria-label="Parar" title="Parar" className="h-11 w-11 shrink-0 rounded-xl bg-[var(--danger)] text-white text-lg font-bold cursor-pointer">■</button>
@@ -619,12 +737,12 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             <input ref={fileRef} type="file" hidden multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.csv,.json" onChange={(e) => anexar(e.target.files)} />
             <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 3} title="Anexar PDF, imagem, texto ou planilha CSV (até 10 MB)" aria-label="Anexar arquivo"
               className="h-12 w-12 shrink-0 text-2xl leading-none rounded-xl border border-[var(--border)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 cursor-pointer">📎</button>
-            <button onClick={alternarGravacao} disabled={transcrevendo} title={gravando ? "Parar e transcrever" : "Gravar áudio"} aria-label={gravando ? "Parar gravação" : "Gravar áudio"}
-              className={`h-12 w-12 shrink-0 text-2xl leading-none rounded-xl border cursor-pointer ${gravando ? "bg-[var(--danger)] text-white border-[var(--danger)] animate-pulse" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"} disabled:opacity-40`}>{gravando ? "⏹" : "🎙"}</button>
+            <button onClick={alternarGravacao} disabled={transcrevendo} title={ouvindo ? "Parar" : privado ? "Gravar (transcreve no servidor)" : "Falar: o texto aparece enquanto você fala"} aria-label={ouvindo ? "Parar de ouvir" : "Falar"}
+              className={`h-12 w-12 shrink-0 text-2xl leading-none rounded-xl border cursor-pointer ${ouvindo ? "bg-[var(--danger)] text-white border-[var(--danger)] animate-pulse" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"} disabled:opacity-40`}>{ouvindo ? "⏹" : "🎙"}</button>
             <div className="flex-1 min-w-0 rounded-xl border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-2 focus-within:border-[var(--accent)]">
               {chipNode && <div className="mb-1.5">{chipNode}</div>}
               <textarea {...camposHab} style={{ outline: "none" }} value={texto} rows={2} maxLength={8000}
-                placeholder={transcrevendo ? "Transcrevendo o áudio…" : gravando ? "Gravando… clique no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : `Mensagem para ${agente?.nome ?? ""} (Enter envia, Shift+Enter quebra a linha, / abre as habilidades)`}
+                placeholder={transcrevendo ? "Transcrevendo o áudio…" : ditado.ativo ? "Ouvindo… fale à vontade, o texto aparece aqui" : gravando ? "Gravando… clique no quadrado para parar" : limiteBatido ? "Limite de mensagens atingido" : `Mensagem para ${agente?.nome ?? ""} (Enter envia, Shift+Enter quebra a linha, / abre as habilidades)`}
                 disabled={limiteBatido}
                 className="w-full resize-none bg-transparent text-sm focus:outline-none" aria-label="Mensagem" />
             </div>
@@ -635,7 +753,14 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           </div>
           )}
           {avisosHab}
-          <p className={`text-[11px] text-[var(--text-muted)] mt-1.5 ${compacto ? "px-2 hidden md:block" : ""}`}>Uma conversa por vez · 20 mensagens por hora e 100 por dia · o áudio vira texto na caixa para você conferir antes de enviar.</p>
+          <div className={`flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 ${compacto ? "px-2" : ""}`}>
+            <label className="inline-flex items-center gap-1.5 text-[11.5px] text-[var(--text-secondary)] cursor-pointer" title={usaVivo ? "Grava e transcreve na própria VPS: não aparece ao vivo, mas a voz não sai daqui" : "Grava e transcreve no servidor, sem o ditado ao vivo do navegador"}>
+              <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} /> 🔒 {usaVivo ? "voz aqui dentro (assunto sigiloso)" : "gravar sem ditado ao vivo"}
+            </label>
+            <p className={`m-0 text-[11px] text-[var(--text-muted)] ${compacto ? "hidden md:block" : ""}`}>{usaVivo
+              ? "⚡ Jarbas sempre ligado: faz de verdade e pede licença no celular para o que for sensível · 🎙️ o texto aparece enquanto você fala."
+              : "Uma conversa por vez · 20 mensagens por hora e 100 por dia · o áudio vira texto na caixa para você conferir antes de enviar."}</p>
+          </div>
         </footer>
       </section>
     </div>
@@ -784,6 +909,25 @@ function CartaoSquad({ a, ocupado, onDecidir }: { a: Acao; ocupado: boolean; onD
       {(a.estado === "feita" || a.estado === "erro") && a.resultado && (
         <p className={`text-sm mt-2 ${a.resultado.ok ? "text-[var(--accent)]" : "text-[var(--danger)]"}`}>{a.resultado.ok ? "✓ " : "✗ "}{a.resultado.texto}</p>
       )}
+    </div>
+  );
+}
+
+// Pedido de licença da sessão viva (o Jarbas quer fazer algo sensível). D2: o ok é no celular principal.
+function CartaoLicenca({ l, podeAprovar, onResponder }: { l: LicencaVivo; podeAprovar: boolean; onResponder: (permitir: boolean) => void }) {
+  const [enviando, setEnviando] = useState(false);
+  const responder = (p: boolean) => { setEnviando(true); onResponder(p); };
+  return (
+    <div className="my-2 max-w-2xl rounded-xl border-[1.5px] border-[var(--af-gold)] bg-[var(--af-gold)]/10 p-3" role="alert">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">🟡 O Jarbas pede licença</p>
+      <p className="text-sm text-[var(--text-primary)] mt-0.5">{l.resumo || l.ferramenta}</p>
+      <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Ferramenta: {l.ferramenta}</p>
+      {podeAprovar ? (
+        <div className="flex gap-2 mt-2">
+          <button disabled={enviando} onClick={() => responder(true)} className="px-3 py-1.5 rounded-lg bg-[var(--accent)] text-white text-sm disabled:opacity-40 cursor-pointer">Permitir</button>
+          <button disabled={enviando} onClick={() => responder(false)} className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm disabled:opacity-40 cursor-pointer">Negar</button>
+        </div>
+      ) : <p className="text-sm mt-2 text-[var(--text-secondary)]">O ok é no seu celular ⭐. A Donna já te avisou.</p>}
     </div>
   );
 }
