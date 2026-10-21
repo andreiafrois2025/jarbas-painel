@@ -244,7 +244,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   useEffect(() => {
     try {
       // ?agente=izzy (vindo do Escritório) vale mais que o último agente do aparelho
-      const pedido = new URLSearchParams(window.location.search).get("agente");
+      const pedido = new URLSearchParams(window.location.search).get("agente") || (window.location.pathname === "/jarbas" ? "jarbas" : null);
       const s = agenteFixo || (pedido && /^[a-z]{3,10}$/.test(pedido) ? pedido : window.localStorage.getItem("chatAgente"));
       if (s) setAgenteId(s);
       // ?texto=... (ex.: "+ Nova squad") deixa a mensagem escrita, pronta para ela completar

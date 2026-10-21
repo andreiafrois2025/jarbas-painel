@@ -41,26 +41,6 @@
           "type": "image/png"
         }
       ]
-    },
-    {
-      "name": "Conversa com o Jarbas",
-      "url": "/conversa",
-      "icons": [
-        {
-          "src": "/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Áreas",
-      "url": "/areas",
-      "icons": [
-        {
-          "src": "/icon-192.png",
-          "sizes": "192x192"
-        }
-      ]
     }
   ]
 }
