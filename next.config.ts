@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       // "/" é uma página (src/app/page.tsx) que respeita Ajustes › "Abrir o painel em".
+      // 21/10: atalho direto para o chat do Jarbas (o ?agente= já abre a conversa no celular)
+      redirecionar("/jarbas", "/conversa?agente=jarbas"),
       redirecionar("/inicio", "/conversa"),
       redirecionar("/chat", "/conversa"),
       redirecionar("/producao", "/maquina?aba=mapa"),
