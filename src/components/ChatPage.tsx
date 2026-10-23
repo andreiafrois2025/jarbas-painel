@@ -130,7 +130,7 @@ function agenteInicial(agenteFixo?: string): string {
 // `agenteFixo` (19/10/2026, Escritório): chat embutido ao lado dos bonequinhos, já com o agente escolhido,
 // sem a lista de pessoas; a seta de voltar chama `aoFechar`.
 export default function ChatPage({ compacto = false, servidora = false, cabecalho, agenteFixo, aoFechar }: { compacto?: boolean; servidora?: boolean; cabecalho?: React.ReactNode; agenteFixo?: string; aoFechar?: () => void }) {
-  const { collaborators } = usePainel();
+  const { collaborators, setModo } = usePainel();
   const perfilDe = useCallback((a?: Agente) => (a ? collaborators.find((c) => c.name.trim().toLowerCase() === a.nome.toLowerCase()) : undefined), [collaborators]);
   const [abertos, setAbertos] = useState<Set<string>>(new Set()); // itens da lista com a descrição aberta
   const alternarItem = (id: string) => setAbertos((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -743,6 +743,14 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           {usaVivo && prov && (
             <div role="status" className="rounded-xl border-2 border-[var(--warning)] bg-[var(--warning)]/15 px-3 py-2 text-sm text-[var(--text-primary)]">
               🫥 <b>Chat provisório.</b> Aqui eu só converso, corrijo e reviso texto e leio anexos. Não mexo em código, arquivos, Notion, Drive nem agenda. Nada fica salvo: some ao tocar em “Sair do provisório” ou depois de 1 hora parado.
+            </div>
+          )}
+          {/* 23/10 (ela achou a conversa "zerada"): no Só Igam o Jarbas usa o chat de aula, separado
+              da conversa de sempre. Avisa e oferece voltar para o Tudo */}
+          {servidora && agenteId === "jarbas" && VIVO_DISPONIVEL && (
+            <div role="status" className="rounded-xl border-2 border-[var(--ouro)] bg-[var(--ouro)]/10 px-3 py-2 text-sm text-[var(--text-primary)] flex flex-wrap items-center gap-2">
+              <span className="flex-1 min-w-[12rem]">🏛 <b>Você está no modo Só Igam.</b> Aqui o Jarbas usa o chat de aula, separado. A sua conversa de sempre está no modo <b>Tudo</b>.</span>
+              <button onClick={() => setModo("tudo")} className="px-3 py-1.5 rounded-lg bg-[var(--ac)] text-[var(--on-ac)] text-xs font-bold cursor-pointer">✨ Voltar para o Tudo</button>
             </div>
           )}
           {querVivo && vivo === "fora" && (
