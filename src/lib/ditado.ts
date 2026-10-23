@@ -38,6 +38,9 @@ export function useDitado(aoMudar: (texto: string) => void, aoErro: (msg: string
     let finais = "";
     let ultimo = textoAtual;
     r.onresult = (e) => {
+      // 23/10: depois de "parar" (ex.: ao enviar) o navegador ainda entrega o último pedaço;
+      // ignorar, senão o texto já enviado volta para a caixa
+      if (rec.current !== r) return;
       let provisorio = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];

@@ -399,7 +399,8 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
 
   const enviar = useCallback(async (conteudo: string, assuntoIdParam?: string) => {
     const m = conteudo.trim() || (anexos.length ? "Veja o anexo." : "");
-    if (!m || ocupado) return;
+    // 23/10: no Jarbas sempre ligado dá para mandar o próximo pedido enquanto ele trabalha (entra na fila)
+    if (!m || (ocupado && !usaVivo)) return;
     if (ditado.ativo) ditado.parar();
     if (usaVivo) {
       const t = m + (anexos.length ? "\n" + anexos.map((a) => `[Anexo: ${a.id}]`).join("\n") : "");
@@ -803,9 +804,8 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             <button onClick={alternarGravacao} disabled={transcrevendo} title={ouvindo ? "Parar" : privado ? "Gravar (transcreve no servidor)" : "Falar: o texto aparece enquanto você fala"} aria-label={ouvindo ? "Parar de ouvir" : "Falar"}
               className={`h-11 w-11 shrink-0 text-xl leading-none rounded-xl cursor-pointer ${ouvindo ? "bg-[var(--danger)] text-white animate-pulse" : "bg-[var(--ac)] text-[var(--on-ac)]"} disabled:opacity-40`}>{ouvindo ? "⏹" : "🎙️"}</button>
             {/* 18/10: botão de enviar SEMPRE visível (no celular o Enter quebra a linha e não dava pra mandar) */}
-            {ocupado
-              ? <button onClick={parar} aria-label="Parar" title="Parar" className="h-11 w-11 shrink-0 rounded-xl bg-[var(--danger)] text-white text-lg font-bold cursor-pointer">■</button>
-              : <button onClick={() => enviar(texto)} disabled={(!texto.trim() && !anexos.length) || limiteBatido} aria-label="Enviar mensagem" title="Enviar"
+            {ocupado && <button onClick={parar} aria-label="Parar" title="Parar o que o Jarbas está fazendo" className="h-11 w-11 shrink-0 rounded-xl bg-[var(--danger)] text-white text-lg font-bold cursor-pointer">■</button>}
+            {(!ocupado || usaVivo) && <button onClick={() => enviar(texto)} disabled={(!texto.trim() && !anexos.length) || limiteBatido} aria-label="Enviar mensagem" title={ocupado ? "Enviar: entra na fila e o Jarbas pega assim que terminar" : "Enviar"}
                   className="h-11 w-11 shrink-0 rounded-xl bg-[var(--ac)] text-[var(--on-ac)] text-xl font-bold leading-none disabled:opacity-35 cursor-pointer">➤</button>}
           </div>
           </div>
@@ -825,9 +825,8 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
                 disabled={limiteBatido}
                 className="w-full resize-none bg-transparent text-sm focus:outline-none" aria-label="Mensagem" />
             </div>
-            {ocupado
-              ? <button onClick={parar} className="h-12 px-4 rounded-xl bg-[var(--danger)] text-white text-sm font-medium cursor-pointer">Parar</button>
-              : <button onClick={() => enviar(texto)} disabled={(!texto.trim() && !anexos.length) || limiteBatido} className="h-12 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium disabled:opacity-40 cursor-pointer">Enviar</button>}
+            {ocupado && <button onClick={parar} title="Parar o que o Jarbas está fazendo" className="h-12 px-4 rounded-xl bg-[var(--danger)] text-white text-sm font-medium cursor-pointer">Parar</button>}
+            {(!ocupado || usaVivo) && <button onClick={() => enviar(texto)} disabled={(!texto.trim() && !anexos.length) || limiteBatido} title={ocupado ? "Entra na fila: o Jarbas pega assim que terminar o pedido atual" : undefined} className="h-12 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium disabled:opacity-40 cursor-pointer">{ocupado ? "Enviar (fila)" : "Enviar"}</button>}
           </div>
           </div>
           )}
