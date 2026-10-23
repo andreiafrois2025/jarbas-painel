@@ -596,3 +596,9 @@ body {
    Abaixo disso o chat do Jarbas já está na tela e o aviso só piscaria. */
 @keyframes espera-aparece { to { opacity: 1; } }
 .espera-demorada { opacity: 0; animation: espera-aparece .2s ease .6s forwards; }
+
+/* 23/10/2026: cores trocadas a pedido dela. O balão do Jarbas usa o fundo de destaque
+   (o que era o dela) e o texto de dentro herda a cor certa para ler */
+.balao-jarbas, .balao-jarbas * { color: var(--on-ac) !important; }
+.balao-jarbas a { text-decoration: underline; }
+.balao-jarbas pre, .balao-jarbas code { background: rgba(0, 0, 0, 0.12); }
