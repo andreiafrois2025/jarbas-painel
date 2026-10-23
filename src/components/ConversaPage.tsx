@@ -120,7 +120,7 @@ function ItemEsperandoLinha({ it, onIr, verValores }: { it: ItemEsperando; onIr:
     <div
       className={`rounded-[10px] px-2.5 mb-[7px] text-[13px] text-[var(--text-primary)] ${
         alta ? "py-2.5 border-2 border-[var(--af-gold)] bg-[var(--accent-soft)]"
-          : noticia ? `py-2 bg-[var(--bg-tertiary)] border-l-4 ${it.selo === "UAU" ? "border-[var(--uau)]" : "border-[var(--accent)]"}`
+          : noticia ? "py-2 bg-[var(--bg-tertiary)] border-l-4 border-[var(--ouro)]"
           : "py-[9px] bg-[var(--bg-tertiary)] border-l-4 border-[var(--ouro)]"}`}>
       <div className="flex gap-2.5 items-center">
         <Mascote nome={it.agente || "jarbas"} emoji="⚡" tamanho={noticia ? 24 : 30} />
