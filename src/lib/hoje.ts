@@ -14,6 +14,8 @@ export interface CardCaixa {
   /** de onde veio, em palavras (ex.: Radar de notícias) */
   origem?: string;
   tipo?: string;
+  /** 23/10: texto que a Izzy escreveu para o grupo (entender sem abrir o Notion) */
+  resumo?: string;
 }
 
 export interface ItemEscola {
@@ -39,6 +41,8 @@ export interface ItemParaMim {
   tema?: string;
   quando?: string;
   lido?: boolean;
+  /** 23/10: resumo curto pensado para ela (Claude Haiku) */
+  resumo?: string;
 }
 
 export interface TarefaNotion {
@@ -185,6 +189,16 @@ export async function marcarLido(url: string, lido: boolean) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url, lido }),
+  });
+  return r.ok;
+}
+
+// 23/10: tira a notícia do "Pra você ficar por dentro" (não volta)
+export async function excluirParaMim(url: string) {
+  const r = await comToken(`/api/para-mim/excluir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
   });
   return r.ok;
 }

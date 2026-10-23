@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStatus } from "@/lib/status";
 import { useUI } from "./ui";
-import { useHoje, useTarefas, marcarLido, promoverProGrupo, promoverProConteudo, type CardCaixa, type ItemParaMim, type TarefaNotion } from "@/lib/hoje";
+import { useHoje, useTarefas, marcarLido, promoverProGrupo, promoverProConteudo, excluirParaMim, type CardCaixa, type ItemParaMim, type TarefaNotion } from "@/lib/hoje";
 import { tempoRelativo } from "@/lib/metrics";
 
 const AGENDA_URL = "https://calendar.google.com/calendar/u/0/r";
@@ -121,6 +121,22 @@ function PrimeiroOlhar({ naCaixa, paraLer }: { naCaixa: number; paraLer: number 
 //
 // Botão que decide o destino de um texto que você não leu é armadilha, não
 // atalho. O card agora só mostra e leva pro Notion, que é onde dá pra ler.
+// 23/10 (pedido dela): resumo que abre e fecha no próprio card, sem sair do painel
+// (no trabalho ela tem receio de abrir site desconhecido)
+export function ResumoRecolhivel({ texto }: { texto?: string }) {
+  const [aberto, setAberto] = useState(false);
+  if (!texto) return null;
+  return (
+    <div className="mt-1">
+      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAberto(!aberto); }} aria-expanded={aberto}
+        className="text-[12px] font-semibold text-[var(--accent)] hover:underline cursor-pointer">
+        {aberto ? "▾ fechar resumo" : "▸ ver resumo"}
+      </button>
+      {aberto && <p className="mt-1 text-[13px] leading-snug text-[var(--text-primary)] whitespace-pre-line bg-[var(--bg-primary)] rounded-lg p-2 border border-[var(--border)]">{texto}</p>}
+    </div>
+  );
+}
+
 export function CardAprovacao({ card }: { card: CardCaixa }) {
   const uau = ehUau(card);
   const meta = uau ? { rotulo: "🔥 UAU", cor: "#A0583C" } : { rotulo: "Notícia", cor: "#456B74" };
@@ -143,6 +159,7 @@ export function CardAprovacao({ card }: { card: CardCaixa }) {
       <p className={`text-sm text-[var(--text-primary)] ${uau ? "font-semibold" : ""}`}>
         {card.titulo.replace("[Prioridade] ", "")}
       </p>
+      <ResumoRecolhivel texto={card.resumo} />
     </a>
   );
 }
@@ -150,11 +167,12 @@ export function CardAprovacao({ card }: { card: CardCaixa }) {
 // 📰 "Pra você ficar por dentro" (F4): notícias de IA que NÃO foram pro grupo,
 // só pra ela se manter antenada do mercado. Leitura, não decisão — separado da
 // caixa de aprovação de propósito.
-export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProConteudo }: {
+export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProConteudo, onExcluir }: {
   itens: ItemParaMim[];
   onToggleLido: (url: string, lido: boolean) => void;
   onProGrupo: (url: string) => void;
   onProConteudo: (url: string) => void;
+  onExcluir?: (url: string) => void;
 }) {
   if (itens.length === 0) return null;
   const naoLidas = itens.filter((n) => !n.lido).length;
@@ -182,6 +200,7 @@ export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProC
                 <span className="block text-[11px] text-[var(--text-muted)]">
                   {n.fonte}{n.tema ? ` · ${n.tema}` : ""}
                 </span>
+                <ResumoRecolhivel texto={n.resumo} />
               </div>
               <button onClick={() => onProGrupo(n.url)}
                 title="Mandar pra caixa de aprovação do grupo"
@@ -193,6 +212,14 @@ export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProC
                 className="text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] whitespace-nowrap shrink-0 border border-[var(--border)] rounded px-1.5 py-0.5">
                 ↑ Conteúdo
               </button>
+              {onExcluir && (
+                <button onClick={() => onExcluir(n.url)}
+                  title="Excluir: tira esta notícia da lista"
+                  aria-label={`Excluir ${n.titulo}`}
+                  className="text-[11px] text-[var(--text-muted)] hover:text-[var(--danger)] whitespace-nowrap shrink-0 border border-[var(--border)] rounded px-1.5 py-0.5">
+                  🗑 excluir
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -349,6 +376,7 @@ export default function HojePanel({ lateral }: { lateral?: React.ReactNode }) {
               onToggleLido={onToggleLido}
               onProGrupo={onProGrupo}
               onProConteudo={onProConteudo}
+              onExcluir={(url) => { setPromovidos((p) => new Set(p).add(url)); excluirParaMim(url); }}
             />
 
             {/* 25/07 (F6.5): o feed da equipe DESCEU e as notícias SUBIRAM,

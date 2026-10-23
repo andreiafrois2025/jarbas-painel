@@ -6,7 +6,7 @@
 // mandar pro grupo ou pro banco de Conteúdos).
 
 import { useState } from "react";
-import { useHoje, marcarLido, promoverProGrupo, promoverProConteudo } from "@/lib/hoje";
+import { useHoje, marcarLido, promoverProGrupo, promoverProConteudo, excluirParaMim } from "@/lib/hoje";
 import { usePainel } from "@/lib/painel-context";
 import { COLUNAS_CAIXA, ehUau, CardAprovacao, ParaVoceFicarPorDentro } from "./HojePanel";
 
@@ -47,7 +47,8 @@ export default function NoticiasLista() {
                 itens={radar}
                 onToggleLido={(url, v) => { setLidos((m) => new Map(m).set(url, v)); marcarLido(url, v); }}
                 onProGrupo={async (url) => { setPromovidos((s) => new Set(s).add(url)); if (await promoverProGrupo(url)) setTimeout(recarregar, 800); }}
-                onProConteudo={async (url) => { setPromovidos((s) => new Set(s).add(url)); await promoverProConteudo(url); }} />}
+                onProConteudo={async (url) => { setPromovidos((s) => new Set(s).add(url)); await promoverProConteudo(url); }}
+                onExcluir={(url) => { setPromovidos((s) => new Set(s).add(url)); excluirParaMim(url); }} />}
         </section>
       </div>
     </div>
