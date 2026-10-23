@@ -198,9 +198,9 @@ function BlocoAtividades({ servidora }: { servidora: boolean }) {
   return (
     <section>
       <Titulo extra={<span className="inline-flex items-center gap-1">
-        {/* 23/10 (pedido dela): atalho para a página "Meu DIA" do Notion, onde ela vê o dia e as atividades */}
-        <a href="https://www.notion.so/2fbb90b9061d8159bb6ec21a18dd4b7e" target="_blank" rel="noreferrer" title="Abrir o Meu DIA no Notion"
-          className="h-6 px-2 inline-flex items-center rounded-md text-[11px] font-bold text-[var(--ac)] border border-[var(--border)] hover:bg-[var(--bg-tertiary)] no-underline">Meu DIA ↗</a>
+        {/* 23/10 (pedido dela): atalho para a página "Revisão Diária" do Notion, onde ela vê o dia e as atividades */}
+        <a href="https://www.notion.so/2fbb90b9061d81f8910aca4a14eb484e" target="_blank" rel="noreferrer" title="Abrir a Revisão Diária no Notion"
+          className="h-6 px-2 inline-flex items-center rounded-md text-[11px] font-bold text-[var(--ac)] border border-[var(--border)] hover:bg-[var(--bg-tertiary)] no-underline">Revisão Diária ↗</a>
         <OlhoBotao aberto={aberto} onClick={() => setAberto((v) => !v)} rotulo="atividades" />
       </span>}>Atividades</Titulo>
       {aberto ? <ListaTarefas modo={servidora ? "servidora" : undefined} />
