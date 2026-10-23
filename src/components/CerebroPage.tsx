@@ -69,6 +69,7 @@ export default function CerebroPage() {
   const [conteudo, setConteudo] = useState<NotaAberta | null>(null);
   const [erroNota, setErroNota] = useState(false);
   const [todasTags, setTodasTags] = useState(false);
+  const [verEtiquetas, setVerEtiquetas] = useState(false);
   const cache = useRef<Record<string, NotaAberta>>({});
   const topoNota = useRef<HTMLDivElement>(null);
 
@@ -194,9 +195,12 @@ export default function CerebroPage() {
             </button>
           ))}
         </div>
-        {tagsFreq.length > 0 && (
+        {tagsFreq.length > 0 && !verEtiquetas && !tag && (
+          <button type="button" onClick={() => setVerEtiquetas(true)} className="self-start text-xs font-semibold text-[var(--accent)] cursor-pointer bg-transparent border-0 p-0">🏷️ filtrar por etiqueta ▾</button>
+        )}
+        {tagsFreq.length > 0 && (verEtiquetas || !!tag) && (
           <div className="flex flex-wrap gap-1.5 items-center">
-            <span className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--text-muted)] mr-1">Etiquetas</span>
+            <button type="button" onClick={() => setVerEtiquetas(false)} className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--text-muted)] mr-1 cursor-pointer bg-transparent border-0 p-0" title="Esconder etiquetas">Etiquetas ▴</button>
             {(todasTags ? tagsFreq : tagsFreq.slice(0, TOP_TAGS)).map(([t]) => <Chip key={t} t={t} />)}
             {tagsFreq.length > TOP_TAGS && (
               <button type="button" onClick={() => setTodasTags(!todasTags)} className="text-xs font-semibold text-[var(--accent)] cursor-pointer bg-transparent border-0">
@@ -213,7 +217,28 @@ export default function CerebroPage() {
         )}
       </div>
       <div className="p-4 md:p-6">
-        {filtradas.length === 0 ? <p className="p-6 text-sm text-[var(--text-secondary)] text-center">Nenhuma nota encontrada.</p> : (
+        {filtradas.length === 0 ? <p className="p-6 text-sm text-[var(--text-secondary)] text-center">Nenhuma nota encontrada.</p>
+          : !pasta && !busca && !tag ? (
+          // 23/10 (pedido dela): sem filtro, as notas vêm em grupos com título que abrem e fecham,
+          // em vez de tudo misturado; o diário vem por data (mais novo primeiro) e começa fechado
+          <div className="space-y-3">
+            {Object.keys(PASTAS).map((p) => {
+              const lista = filtradas.filter((n) => n.pasta === p)
+                .sort((a, b) => p === "diario" ? b.nome.localeCompare(a.nome) : (b.atualizado || "").localeCompare(a.atualizado || ""));
+              if (!lista.length) return null;
+              return (
+                <details key={p} open={p !== "diario" && p !== "reunioes"} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)]">
+                  <summary className="cursor-pointer select-none px-4 py-3 flex items-center gap-2 text-[15px] font-bold text-[var(--text-primary)]">
+                    <Pontinho p={p} />{PASTAS[p].rotulo} <span className="text-[13px] font-semibold text-[var(--text-muted)]">· {lista.length}</span>
+                  </summary>
+                  <div className="grid gap-3 px-4 pb-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {lista.map((n) => <CartaoNota key={n.id} n={n} onAbrir={() => setAberta(n.id)} />)}
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {filtradas.map((n) => <CartaoNota key={n.id} n={n} onAbrir={() => setAberta(n.id)} />)}
           </div>
