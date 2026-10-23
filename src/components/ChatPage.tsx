@@ -647,7 +647,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       )}
 
       {/* ===== CONVERSA ===== */}
-      <section className={`flex-1 min-w-0 min-h-0 flex flex-col ${compacto && telaCelular === "lista" ? "max-md:hidden" : ""}`}>
+      <section className={`tema-chat-claro flex-1 min-w-0 min-h-0 flex flex-col ${compacto && telaCelular === "lista" ? "max-md:hidden" : ""}`}>
         {/* 18/10: cabeçalho (saudação + agente) em faixa de outra cor, para não se misturar com a área das mensagens */}
         {compacto && cabecalho && <div className="max-md:hidden shrink-0 bg-[var(--bg-secondary)]">{cabecalho}</div>}
         <header className={`flex items-center gap-3 flex-wrap ${compacto ? "px-4 md:px-6 2xl:px-10 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)] shadow-[0_2px_8px_var(--sombra)] relative z-[1]" : "px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]"}`}>
@@ -879,7 +879,7 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
   if (m.papel === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[min(40rem,90%)] rounded-2xl rounded-tr-sm bg-[var(--ac)] text-[var(--on-ac)] px-4 py-2.5">
+        <div className="max-w-[min(40rem,90%)] rounded-2xl rounded-tr-sm bg-[var(--accent)] text-white px-4 py-2.5">
           {m.habilidade && <p className="text-xs font-bold opacity-90 mb-1">{habilidades?.find((h) => h.id === m.habilidade)?.icone ?? "🧩"} {(habilidades?.find((h) => h.id === m.habilidade)?.rotulo ?? m.habilidade).toLowerCase()}</p>}
           <p className="text-sm whitespace-pre-wrap break-words">{m.texto}</p>
           {m.anexos?.map((a) => <p key={a.id} className="text-xs opacity-80 mt-1">📎 {a.nome}</p>)}
@@ -893,7 +893,7 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
       <div className="max-w-[min(48rem,100%)] min-w-0">
         <p className="text-[11.5px] font-bold text-[var(--text-secondary)] mb-0.5">{agente?.nome}</p>
         {assunto && m.respostaDe && <EtiquetaAssunto atual={assunto} assuntos={assuntos!} onMover={(id, t) => onMover(m.respostaDe!, id, t)} />}
-        <div className="rounded-2xl rounded-tl-sm bg-[var(--bg-secondary)] border border-[var(--border)] px-4 py-2.5">
+        <div className="rounded-2xl rounded-tl-sm border border-[var(--ouro)]/50 px-4 py-2.5" style={{ background: "color-mix(in srgb, var(--ouro) 14%, var(--bg-secondary))" }}>
           <Resposta texto={m.texto} onEscolha={(t) => onEscolha(t, m.assuntoId)} desativado={ocupado} />
           {m.acoes?.map((a, i) => <CartaoAcao key={i} a={a} ocupado={ocupado} onDecidir={(c) => onAcao(i, c)} />)}
           {m.arquivos?.map((f) => <CartaoArquivoObra key={f.url} f={f} />)}

@@ -125,6 +125,72 @@
   --win-text: #EDE6D6;
 }
 
+/* 23/10/2026 (pedido dela): "misto" = painel no noturno e SÓ o chat claro, fundo branco */
+:root[data-theme="misto"] {
+  color-scheme: dark;
+  --bg-primary: #0F2A2E;
+  --bg-secondary: #14353A;
+  --bg-tertiary: #183E44;
+  --bg-card: #14353A;
+  --accent: #3A8F88;
+  --accent-hover: #4AA39B;
+  --accent-soft: #2A4A44;
+  --text-primary: #EDE6D6;
+  --text-secondary: #A9BDB8;
+  --text-muted: #94A9A4;
+  --border: #22484E;
+  --border-light: #2F5C62;
+  --success: #6BC0B2;
+  --warning: #C4A460;
+  --danger: #E89A72;
+  --af-teal: #3A8F88;
+  --af-teal-dark: #256460;
+  --af-terracotta: #E89A72;
+  --af-gold: #C4A460;
+  --af-cream: #14353A;
+  --ac: #C4A460;
+  --on-ac: #0F2A2E;
+  --ouro: #C4A460;
+  --uau: #E89A72;
+  --uau-soft: #3A2E28;
+  --sombra: rgba(0, 0, 0, 0.3);
+  --win-surface: #183E44;
+  --win-text: #EDE6D6;
+}
+:root[data-theme="misto"] .tema-chat-claro {
+  color-scheme: light;
+  --bg-primary: #FAFAF7;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F2F5F4;
+  --bg-card: #FFFFFF;
+  --accent: #1F5C5C;
+  --accent-hover: #174747;
+  --accent-soft: #E3EFED;
+  --text-primary: #1F2A2A;
+  --text-secondary: #5E6B69;
+  --text-muted: #687371;
+  --border: #E6E6E0;
+  --border-light: #D5D5CC;
+  --success: #1F5C5C;
+  --warning: #B8913F;
+  --danger: #B4532F;
+  --af-teal: #1F5C5C;
+  --af-teal-dark: #174747;
+  --af-terracotta: #B4532F;
+  --af-gold: #B8913F;
+  --af-blue-gray: #9BB8BE;
+  --af-cream: #FAFAF7;
+  --ac: #1F5C5C;          /* destaque da casca (petróleo / dourado) */
+  --on-ac: #FFFFFF;       /* texto sobre o destaque */
+  --ouro: #B8913F;
+  --uau: #B4532F;
+  --uau-soft: #FBEDE6;
+  --sombra: rgba(0, 0, 0, 0.06);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+
 * {
   box-sizing: border-box;
 }

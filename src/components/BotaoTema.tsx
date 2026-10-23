@@ -5,18 +5,19 @@ import { useEffect, useState } from "react";
 // Tema: "sistema" (padrão, segue o aparelho), "claro" ou "escuro" (noturno).
 // A escolha fica no localStorage; o script de app/layout.tsx a aplica antes da
 // primeira pintura, aqui só trocamos e gravamos.
-type Escolha = "sistema" | "claro" | "escuro";
+type Escolha = "sistema" | "claro" | "escuro" | "misto";
 
 const OPCOES: { id: Escolha; icone: string; rotulo: string }[] = [
   { id: "sistema", icone: "🖥️", rotulo: "Seguir o sistema" },
   { id: "claro", icone: "☀️", rotulo: "Tema claro" },
   { id: "escuro", icone: "🌙", rotulo: "Tema noturno" },
+  { id: "misto", icone: "🌗", rotulo: "Misto: painel noturno e chat claro" },
 ];
 
 function lerEscolha(): Escolha {
   try {
     const t = window.localStorage.getItem("tema");
-    return t === "claro" || t === "escuro" ? t : "sistema";
+    return t === "claro" || t === "escuro" || t === "misto" ? t : "sistema";
   } catch {
     return "sistema";
   }
