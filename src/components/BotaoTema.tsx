@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 type Escolha = "sistema" | "claro" | "escuro" | "misto";
 
 const OPCOES: { id: Escolha; icone: string; rotulo: string }[] = [
-  { id: "sistema", icone: "🖥️", rotulo: "Seguir o sistema" },
   { id: "claro", icone: "☀️", rotulo: "Tema claro" },
   { id: "escuro", icone: "🌙", rotulo: "Tema noturno" },
   { id: "misto", icone: "🌗", rotulo: "Misto: painel noturno e chat claro" },
@@ -17,9 +16,9 @@ const OPCOES: { id: Escolha; icone: string; rotulo: string }[] = [
 function lerEscolha(): Escolha {
   try {
     const t = window.localStorage.getItem("tema");
-    return t === "claro" || t === "escuro" || t === "misto" ? t : "sistema";
+    return t === "escuro" || t === "misto" ? t : "claro"; // 23/10: "seguir o sistema" saiu (era igual ao claro para ela)
   } catch {
-    return "sistema";
+    return "claro";
   }
 }
 
@@ -28,7 +27,7 @@ const EVENTO = "tema-mudou";
 
 /** Tema atual + como trocar. Vários controles na mesma tela (topo e Ajustes) ficam em sincronia. */
 export function useTema(): [Escolha, (e: Escolha) => void] {
-  const [escolha, setEscolha] = useState<Escolha>("sistema");
+  const [escolha, setEscolha] = useState<Escolha>("claro");
   useEffect(() => {
     setEscolha(lerEscolha());
     const aoMudar = (ev: Event) => setEscolha((ev as CustomEvent<Escolha>).detail);

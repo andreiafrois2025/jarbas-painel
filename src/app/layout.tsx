@@ -47,7 +47,7 @@ export const viewport: Viewport = {
 // Roda antes da primeira pintura: lê a escolha de tema e marca o <html>, pra
 // a tela não piscar clara quando ela escolheu noturno. Sem escolha = nada marcado
 // (o CSS segue o sistema).
-const SCRIPT_TEMA = `try{var t=localStorage.getItem("tema");if(t==="claro"||t==="escuro"||t==="misto")document.documentElement.setAttribute("data-theme",t)}catch(e){}`;
+const SCRIPT_TEMA = `try{var t=localStorage.getItem("tema");document.documentElement.setAttribute("data-theme",(t==="escuro"||t==="misto")?t:"claro")}catch(e){}`;
 
 export default function RootLayout({
   children,

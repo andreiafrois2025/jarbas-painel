@@ -160,7 +160,7 @@ export function CartaoAparencia({ id }: { id?: string }) {
       <ul>
         <LinhaItem titulo="Tema" direita={
           <Opcoes rotulo="Tema da tela" valor={tema} onChange={escolherTema}
-            opcoes={[{ id: "sistema", rotulo: "sistema" }, { id: "claro", rotulo: "claro" }, { id: "escuro", rotulo: "noturno" }]} />} />
+            opcoes={[{ id: "claro", rotulo: "claro" }, { id: "escuro", rotulo: "noturno" }, { id: "misto", rotulo: "misto" }]} />} />
         <LinhaItem titulo="Animações do escritório" direita={<Interruptor rotulo="Animações do escritório" ligado={anim} onChange={mudaAnim} />} />
         <LinhaItem titulo="Sons do escritório" direita={<Interruptor rotulo="Sons do escritório" ligado={som} onChange={mudaSom} />} />
         <LinhaItem titulo="Abrir o painel em" detalhe="vale só neste navegador" direita={
