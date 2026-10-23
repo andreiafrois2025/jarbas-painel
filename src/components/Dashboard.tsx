@@ -15,6 +15,7 @@ import type { Category as CategoryType } from "@/lib/types";
 import JobsMonitor from "./JobsMonitor";
 import BuscaGlobal from "./BuscaGlobal";
 import BotaoTema from "./BotaoTema";
+import MelhoriaBotao from "./MelhoriaBotao";
 import Mascote from "./Mascote";
 import { PORTAS, PORTA_CONFIG, portaAtiva } from "@/lib/navegacao";
 import { PainelContext } from "@/lib/painel-context";
@@ -196,6 +197,7 @@ export default function Dashboard({ session, children }: DashboardProps) {
             <span className="fonte-maquina max-md:!font-[family-name:var(--font-manrope)] max-md:!font-extrabold text-[22px] max-md:text-[18px] leading-none text-[var(--ac)] max-md:text-[var(--text-primary)]">Jarbas</span>
           </button>
           <div className="order-2 md:order-3 flex-1" />
+          <MelhoriaBotao />
           <div className="order-3 md:order-5 max-md:hidden"><BotaoTema /></div>
           <button onClick={abrirBusca} aria-label="Procurar em tudo" className="order-3 md:hidden w-8 h-8 rounded-full grid place-items-center text-lg cursor-pointer bg-[var(--bg-tertiary)]">🔎</button>
           <div className="order-5 md:order-6 relative">
