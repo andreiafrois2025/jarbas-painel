@@ -70,6 +70,24 @@ export interface MetricsHistory {
   };
 }
 
+// 23/10/2026 (decisão dela): os números contam a partir de 01/10/2026. O histórico
+// antigo continua guardado no arquivo; só não entra nas telas. Para voltar, apague a data.
+export const INICIO_CONTAGEM = "2026-10-01";
+
+function aPartirDoInicio(d: MetricsHistory): MetricsHistory {
+  // semana entra se terminar em 01/10 ou depois (a semana de 28/09 contém o dia 1º)
+  const fica = (k: string) => { const ini = domingoDaSemana(k); if (!ini) return true; const fim = new Date(ini); fim.setUTCDate(ini.getUTCDate() + 6); return fim.toISOString().slice(0, 10) >= INICIO_CONTAGEM; };
+  const corta = <T,>(m?: Record<string, T>) => m ? Object.fromEntries(Object.entries(m).filter(([k]) => fica(k))) as Record<string, T> : m;
+  return {
+    ...d,
+    days: (d.days || []).filter((x) => x.date >= INICIO_CONTAGEM),
+    radar_semanas: corta(d.radar_semanas) || {},
+    radar_semanas_por_agente: d.radar_semanas_por_agente
+      ? Object.fromEntries(Object.entries(d.radar_semanas_por_agente).map(([a, m]) => [a, corta(m) || {}])) : undefined,
+    envios_semanas: corta(d.envios_semanas) || {},
+  };
+}
+
 export function useMetricsHistory(refreshMs = 0) {
   const [data, setData] = useState<MetricsHistory | null>(null);
   const [erro, setErro] = useState(false);
@@ -79,7 +97,7 @@ export function useMetricsHistory(refreshMs = 0) {
     const carrega = () =>
       fetch(`${METRICS_URL}?t=${Date.now()}`)
         .then((r) => r.json())
-        .then((d) => vivo && setData(d))
+        .then((d) => vivo && setData(aPartirDoInicio(d)))
         .catch(() => vivo && setErro(true));
     carrega();
     if (refreshMs > 0) {
