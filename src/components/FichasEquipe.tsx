@@ -104,7 +104,7 @@ export default function FichasEquipe({ colaboradores, servidora, desligados, mos
           {busca ? "Nenhum agente encontrado." : "Nenhum agente nesta sala."}
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 items-stretch">
+        <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 items-stretch">
           {lista.map((c) => {
             const id = mascoteId(c.name);
             const sl = salaDe(c.name);
@@ -115,45 +115,46 @@ export default function FichasEquipe({ colaboradores, servidora, desligados, mos
             const e = id ? entregas[id] : undefined;
             const desligado = c.status === "dismissed";
             return (
-              <article key={c.id} className={`relative rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 flex flex-col items-center text-center gap-2 min-w-0 ${desligado ? "opacity-60" : ""}`}>
-                <span className={`absolute left-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${trab ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"}`}
-                  title={trab ? vivo?.tarefa : undefined}>
-                  {desligado ? "desligado" : trab ? <><span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />trabalhando</> : "livre"}
-                </span>
+              // 23/10 (pedido dela): cartão na horizontal, mascote à esquerda e tudo ao lado, para caber
+              // mais agentes por tela e o "Chame para" aparecer inteiro
+              <article key={c.id} className={`relative rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3 flex gap-3 items-start min-w-0 ${desligado ? "opacity-60" : ""}`}>
                 <button onClick={(ev) => { ev.stopPropagation(); setMenu(menu === c.id ? null : c.id); }} aria-label={`Mais opções de ${c.name}`}
-                  className="absolute right-2 top-2 w-8 h-8 rounded-lg text-lg leading-none text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] cursor-pointer">⋯</button>
+                  className="absolute right-1.5 top-1.5 w-7 h-7 rounded-lg text-lg leading-none text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] cursor-pointer">⋯</button>
                 {menu === c.id && (
-                  <div className="absolute right-3 top-11 z-20 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg py-1 min-w-[170px] text-left" onClick={(ev) => ev.stopPropagation()}>
+                  <div className="absolute right-3 top-9 z-20 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg py-1 min-w-[170px] text-left" onClick={(ev) => ev.stopPropagation()}>
                     <button onClick={() => { setMenu(null); onVerFicha(c); }} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--bg-tertiary)] cursor-pointer">📋 Ver ficha completa</button>
                     <button onClick={() => { setMenu(null); onEditar(c); }} className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--bg-tertiary)] cursor-pointer">✏️ Editar</button>
                     <button onClick={() => { setMenu(null); onExcluir(c); }} className="w-full text-left px-3 py-2 text-sm text-[var(--danger)] hover:bg-[var(--bg-tertiary)] cursor-pointer">🗑️ Excluir</button>
                   </div>
                 )}
-
-                <div className="mt-5"><Mascote nome={c.name} emoji={c.icon} tamanho={112} grande /></div>
-                <div>
-                  <h2 className="text-base font-bold text-[var(--text-primary)] leading-tight">{c.name}</h2>
-                  <p className="text-[13px] text-[var(--text-secondary)]">{cargoDe(c.name, c.specialization?.split("/")[0]?.trim())}</p>
+                <div className="shrink-0 flex flex-col items-center gap-1.5 w-[84px]">
+                  <Mascote nome={c.name} emoji={c.icon} tamanho={76} grande />
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold ${trab ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "bg-[var(--bg-tertiary)] text-[var(--text-muted)]"}`}
+                    title={trab ? vivo?.tarefa : undefined}>
+                    {desligado ? "desligado" : trab ? <><span className="w-1.5 h-1.5 rounded-full bg-[var(--success)] animate-pulse" />trabalhando</> : "livre"}
+                  </span>
                 </div>
-                {sl && <span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--accent)]">{SALA_EMOJI[sl]} {SALA_ROTULO[sl]}</span>}
-                {chame && (
-                  <p className="w-full rounded-xl bg-[var(--bg-tertiary)] px-3 py-2 text-[13px] leading-snug text-[var(--text-secondary)] text-left">
-                    <span aria-hidden>💡 </span><b className="text-[var(--text-primary)] font-semibold">Chame para:</b> {chame}
-                  </p>
-                )}
-                {(h !== undefined || e !== undefined) && (
-                  <div className="flex items-end justify-center gap-5 text-[var(--text-secondary)]">
-                    {h !== undefined && <div><b className="block text-base text-[var(--text-primary)] tabular-nums leading-tight">{fmtH(h)}</b><span className="text-xs">economizadas</span></div>}
-                    {e !== undefined && <div><b className="block text-base text-[var(--text-primary)] tabular-nums leading-tight">{e}</b><span className="text-xs">entregas</span></div>}
+                <div className="min-w-0 flex-1 flex flex-col gap-1.5 pr-5">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <h2 className="text-base font-bold text-[var(--text-primary)] leading-tight m-0">{c.name}</h2>
+                    <span className="text-[12.5px] text-[var(--text-secondary)]">{cargoDe(c.name, c.specialization?.split("/")[0]?.trim())}</span>
+                    {sl && <span className="rounded-full bg-[var(--accent-soft)] px-2 py-px text-[10.5px] font-bold text-[var(--accent)]">{SALA_EMOJI[sl]} {SALA_ROTULO[sl]}</span>}
                   </div>
-                )}
-                <div className="mt-auto pt-1">
-                  {id && !desligado && (
-                    <button onClick={() => router.push(`/conversa?agente=${id}`)}
-                      className="inline-flex items-center gap-1.5 rounded-full px-5 py-2 text-[13px] font-bold cursor-pointer bg-[var(--ac)] text-[var(--on-ac)] hover:opacity-90">
-                      💬 Conversar
-                    </button>
+                  {chame && (
+                    <p className="m-0 text-[12.5px] leading-snug text-[var(--text-secondary)]">
+                      <span aria-hidden>💡 </span><b className="text-[var(--text-primary)] font-semibold">Chame para:</b> {chame}
+                    </p>
                   )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-auto">
+                    {h !== undefined && <span className="text-[12px] text-[var(--text-secondary)]"><b className="text-[var(--text-primary)] tabular-nums">{fmtH(h)}</b> economizadas</span>}
+                    {e !== undefined && <span className="text-[12px] text-[var(--text-secondary)]"><b className="text-[var(--text-primary)] tabular-nums">{e}</b> entregas</span>}
+                    {id && !desligado && (
+                      <button onClick={() => router.push(`/conversa?agente=${id}`)}
+                        className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-bold cursor-pointer bg-[var(--ac)] text-[var(--on-ac)] hover:opacity-90">
+                        💬 Conversar
+                      </button>
+                    )}
+                  </div>
                 </div>
               </article>
             );
