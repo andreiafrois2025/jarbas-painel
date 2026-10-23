@@ -270,6 +270,13 @@ export default function ConversaPage() {
               💻<span className="max-md:hidden">VPS</span>
             </Link>
           )}
+          {/* 23/10/2026: Claude da VPS do Geoportal (Remote Control "Geoportal Igam") */}
+          {!servidora && (
+            <Link href="/remoto?alvo=geoportal" title="Conversar com o Claude da VPS do Geoportal"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm font-bold text-[var(--text-primary)] no-underline hover:bg-[var(--bg-tertiary)]">
+              🗺️<span className="max-md:hidden">Geoportal</span>
+            </Link>
+          )}
           {/* 19/10/2026: atalho para o Escritório (ver a equipe trabalhando; bom para aula) */}
           <Link href="/equipe?aba=escritorio" title="Abrir o escritório: ver a equipe trabalhando"
             className={`${servidora ? "ml-auto " : ""}shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm font-bold text-[var(--text-primary)] no-underline hover:bg-[var(--bg-tertiary)]`}>
