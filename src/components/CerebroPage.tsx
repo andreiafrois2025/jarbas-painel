@@ -381,6 +381,12 @@ function CartaoNota({ n, onAbrir }: { n: Nota; onAbrir: () => void }) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-xs text-[var(--text-muted)]">
         {n.area && <span className="rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 font-semibold text-[var(--text-secondary)]">{n.area}</span>}
         <span>{quando(n.atualizado)}</span>
+        {(() => {
+          // 23/10 (pedido dela): projeto sem novidade há mais de 7 dias ganha selo, para não virar arquivo morto
+          if (n.pasta !== "projetos" || /conclu|arquiv|feito/i.test(n.status || "") || !n.atualizado) return null;
+          const dias = Math.floor((Date.now() - new Date(n.atualizado + "T12:00:00").getTime()) / 86400000);
+          return dias > 7 ? <span className="rounded-full px-2 py-0.5 font-semibold bg-[var(--warning)]/20 text-[var(--text-primary)]" title="Sem novidade registrada há mais de uma semana">⏸ parado há {dias} dias</span> : null;
+        })()}
       </div>
     </button>
   );
