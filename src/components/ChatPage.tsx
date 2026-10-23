@@ -389,10 +389,23 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
 
   // Ao abrir uma conversa vai direto pra última mensagem; depois, novas mensagens rolam suave
   const pularFim = useRef(true);
+  // 23/10 (pedido dela): se ela subiu a tela para reler, a rolagem fica onde ela deixou;
+  // só desce sozinha quando ela está perto do fim, quando manda mensagem ou quando volta ao app
+  const colado = useRef(true);
+  const aoRolar = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    colado.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  };
   useEffect(() => { pularFim.current = true; }, [conversaId, agenteId, telaCelular]);
   useEffect(() => {
+    const voltou = () => { if (document.visibilityState === "visible") { pularFim.current = true; colado.current = true; } };
+    document.addEventListener("visibilitychange", voltou);
+    return () => document.removeEventListener("visibilitychange", voltou);
+  }, []);
+  useEffect(() => {
     const salto = pularFim.current && msgs.length > 0;
-    if (salto) pularFim.current = false;
+    if (salto) { pularFim.current = false; colado.current = true; }
+    if (!salto && !colado.current) return;
     const ir = () => fim.current?.scrollIntoView({ behavior: salto ? "auto" : "smooth", block: "end" });
     ir(); if (salto) requestAnimationFrame(() => setTimeout(ir, 60));
   }, [msgs, fluxo, status, telaCelular]);
@@ -402,6 +415,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     // 23/10: no Jarbas sempre ligado dá para mandar o próximo pedido enquanto ele trabalha (entra na fila)
     if (!m || (ocupado && !usaVivo)) return;
     if (ditado.ativo) ditado.parar();
+    colado.current = true;
     if (usaVivo) {
       const t = m + (anexos.length ? "\n" + anexos.map((a) => `[Anexo: ${a.id}]`).join("\n") : "");
       const comHab = habSel ? `[Usar a habilidade ${habSel}]\n${t}` : t;
@@ -725,7 +739,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
         {agente?.assuntosAuto && painelAssuntos && (
           <PainelAssuntos assuntos={assuntos} msgs={msgs} fixado={fixarAssunto} onFixar={setFixarAssunto} onArquivar={arquivarAssunto} />
         )}
-        <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-6 2xl:px-10" : "px-4"}`} aria-live="polite">
+        <div onScroll={aoRolar} className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-6 2xl:px-10" : "px-4"}`} aria-live="polite">
           {usaVivo && prov && (
             <div role="status" className="rounded-xl border-2 border-[var(--warning)] bg-[var(--warning)]/15 px-3 py-2 text-sm text-[var(--text-primary)]">
               🫥 <b>Chat provisório.</b> Aqui eu só converso, corrijo e reviso texto e leio anexos. Não mexo em código, arquivos, Notion, Drive nem agenda. Nada fica salvo: some ao tocar em “Sair do provisório” ou depois de 1 hora parado.
