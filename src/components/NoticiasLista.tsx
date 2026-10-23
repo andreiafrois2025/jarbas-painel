@@ -44,6 +44,7 @@ export default function NoticiasLista() {
                 </p>
               </>
             : <ParaVoceFicarPorDentro
+                cheia
                 itens={radar}
                 onToggleLido={(url, v) => { setLidos((m) => new Map(m).set(url, v)); marcarLido(url, v); }}
                 onProGrupo={async (url) => { setPromovidos((s) => new Set(s).add(url)); if (await promoverProGrupo(url)) setTimeout(recarregar, 800); }}

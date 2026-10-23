@@ -167,12 +167,14 @@ export function CardAprovacao({ card }: { card: CardCaixa }) {
 // 📰 "Pra você ficar por dentro" (F4): notícias de IA que NÃO foram pro grupo,
 // só pra ela se manter antenada do mercado. Leitura, não decisão — separado da
 // caixa de aprovação de propósito.
-export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProConteudo, onExcluir }: {
+export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProConteudo, onExcluir, cheia }: {
   itens: ItemParaMim[];
   onToggleLido: (url: string, lido: boolean) => void;
   onProGrupo: (url: string) => void;
   onProConteudo: (url: string) => void;
   onExcluir?: (url: string) => void;
+  /** 23/10: na página do Radar a lista usa a altura da tela (na home fica a caixinha) */
+  cheia?: boolean;
 }) {
   if (itens.length === 0) return null;
   const naoLidas = itens.filter((n) => !n.lido).length;
@@ -182,7 +184,7 @@ export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProC
         <summary className="text-sm font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-2 cursor-pointer select-none">
           📰 Pra você ficar por dentro <span className="text-[var(--text-muted)] font-normal normal-case">({naoLidas} não lidas) · notícia de mercado, não vai pro grupo</span>
         </summary>
-        <div className="bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)] mt-2 max-h-72 overflow-y-auto space-y-1.5">
+        <div className={`bg-[var(--bg-secondary)] rounded-xl p-3 border border-[var(--border)] mt-2 ${cheia ? "max-h-[calc(100dvh-12rem)]" : "max-h-72"} overflow-y-auto space-y-1.5`}>
           {itens.map((n) => (
             <div key={n.url} className={`flex items-start gap-2 text-sm border-b border-[var(--border)] last:border-0 pb-1.5 last:pb-0 ${n.lido ? "opacity-50" : ""}`}>
               <input
@@ -217,7 +219,7 @@ export function ParaVoceFicarPorDentro({ itens, onToggleLido, onProGrupo, onProC
                   title="Excluir: tira esta notícia da lista"
                   aria-label={`Excluir ${n.titulo}`}
                   className="text-[11px] text-[var(--text-muted)] hover:text-[var(--danger)] whitespace-nowrap shrink-0 border border-[var(--border)] rounded px-1.5 py-0.5">
-                  🗑 excluir
+                  ✕ excluir
                 </button>
               )}
             </div>
