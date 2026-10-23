@@ -597,8 +597,13 @@ body {
 @keyframes espera-aparece { to { opacity: 1; } }
 .espera-demorada { opacity: 0; animation: espera-aparece .2s ease .6s forwards; }
 
-/* 23/10/2026: cores trocadas a pedido dela. O balão do Jarbas usa o fundo de destaque
-   (o que era o dela) e o texto de dentro herda a cor certa para ler */
-.balao-jarbas, .balao-jarbas * { color: var(--on-ac) !important; }
-.balao-jarbas a { text-decoration: underline; }
-.balao-jarbas pre, .balao-jarbas code { background: rgba(0, 0, 0, 0.12); }
+/* 23/10/2026 (pedido dela): cores dos balões do chat.
+   Claro (e o chat claro do misto): como sempre foi, ela no destaque e o Jarbas no fundo claro.
+   Noturno: trocadas, o Jarbas no destaque dourado e ela no fundo escuro. */
+.balao-ela { background: var(--ac); color: var(--on-ac); }
+.balao-jarbas { background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-primary); }
+:root[data-theme="escuro"] .balao-ela { background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-primary); }
+:root[data-theme="escuro"] .balao-jarbas { background: var(--ac); border-color: var(--ac); }
+:root[data-theme="escuro"] .balao-jarbas, :root[data-theme="escuro"] .balao-jarbas * { color: var(--on-ac) !important; }
+:root[data-theme="escuro"] .balao-jarbas a { text-decoration: underline; }
+:root[data-theme="escuro"] .balao-jarbas pre, :root[data-theme="escuro"] .balao-jarbas code { background: rgba(0, 0, 0, 0.12); }
