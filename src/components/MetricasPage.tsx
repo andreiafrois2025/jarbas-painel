@@ -15,6 +15,7 @@ import { ehPessoal, ehColaboradorOculto, pareceComando } from "@/lib/modo";
 import { useMetricsHistory, semanasOrdenadas, tempoRelativo } from "@/lib/metrics";
 import { useNumerosResumo } from "@/lib/saude";
 import { useAbaUrl } from "@/lib/navegacao";
+import { squadFetch } from "@/lib/squadFetch";
 import HorasEquipe from "./HorasEquipe";
 import { Abas, CartaoSecao } from "./ui";
 
@@ -331,6 +332,42 @@ function AbaProducao({ data, hoje, taxaSemanal, area }: {
   );
 }
 
+// 23/10 (pedido dela): "3 melhorias no sistema... quais?" Abre a lista do que foi feito no dia,
+// lida do registro de atividades e do livro-caixa (nada é gerado, zero token)
+function DetalheDia({ dia }: { dia: string }) {
+  const [aberto, setAberto] = useState(false);
+  const [itens, setItens] = useState<{ em: string; agente: string; icone?: string; texto: string }[] | null>(null);
+  const [erro, setErro] = useState(false);
+  const abrir = async () => {
+    const novo = !aberto; setAberto(novo);
+    if (!novo || itens) return;
+    try { const r = await squadFetch(`/api/numeros/dia?data=${dia}`); const j = await r.json(); setItens(j.itens || []); }
+    catch { setErro(true); }
+  };
+  const hora = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+  return (
+    <div className="mt-1.5">
+      <button type="button" onClick={abrir} aria-expanded={aberto} className="text-[12px] font-semibold text-[var(--accent)] hover:underline cursor-pointer">
+        {aberto ? "▾ fechar" : "▸ ver o que foi feito"}
+      </button>
+      {aberto && (
+        <div className="mt-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3 space-y-1.5">
+          {erro ? <p className="text-xs text-[var(--text-secondary)]">Não consegui carregar agora.</p>
+            : itens === null ? <p className="text-xs text-[var(--text-secondary)]">Carregando…</p>
+            : itens.length === 0 ? <p className="text-xs text-[var(--text-secondary)]">Nada registrado neste dia.</p>
+            : itens.map((it, k) => (
+              <p key={k} className="text-[13px] leading-snug text-[var(--text-primary)] m-0">
+                <span className="text-[var(--text-muted)] tabular-nums">{hora(it.em)}</span>{" "}
+                <b className="capitalize">{it.agente}</b>{": "}{it.texto}
+              </p>
+            ))}
+          <Link href={`/cerebro?nota=${encodeURIComponent(`diario/${dia}.md`)}`} className="inline-block text-[12px] text-[var(--accent)] hover:underline mt-1">🧠 abrir o diário deste dia no Cérebro</Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AbaDiario({ data }: { data: any }) {
   const dias = [...(data.days ?? [])].reverse(); // mais recente primeiro
   const cartaoCerebro = (
@@ -377,6 +414,7 @@ function AbaDiario({ data }: { data: any }) {
                   <span key={m} className="text-xs px-2.5 py-1 rounded-full bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-secondary)]">{m}</span>
                 )) : <span className="text-xs text-[var(--text-muted)]">dia tranquilo</span>}
               </div>
+              <DetalheDia dia={d.date} />
             </div>
           );
         })}

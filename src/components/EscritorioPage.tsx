@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Mascote from "./Mascote";
+import { squadFetch } from "@/lib/squadFetch";
 import ChatPage from "./ChatPage";
 import Ambiente from "./EscritorioAmbiente";
 import { usePainel } from "@/lib/painel-context";
@@ -660,6 +661,28 @@ function AvatarAF({ tamanho }: { tamanho: number }) {
     className="shrink-0 rounded-full bg-[#C4A460] text-[#0F2A2E] font-extrabold flex items-center justify-center">AF</span>;
 }
 
+// 23/10 (pedido dela): "3 melhorias no sistema... quais?" Lista o que foi feito hoje, item por item
+// (registro de atividades + livro-caixa; nada é gerado)
+function QuaisHoje({ agente }: { agente: string }) {
+  const [itens, setItens] = useState<{ em: string; agente: string; texto: string }[] | null>(null);
+  const [aberto, setAberto] = useState(false);
+  const abrir = async () => {
+    setAberto(!aberto);
+    if (itens || aberto) return;
+    try { const j = await (await squadFetch("/api/numeros/dia")).json(); setItens((j.itens || []).filter((x: { agente: string }) => x.agente === agente)); }
+    catch { setItens([]); }
+  };
+  return (
+    <div className="mt-1">
+      <button type="button" onClick={abrir} className="text-[12px] font-semibold text-[var(--accent)] hover:underline cursor-pointer">{aberto ? "▾ fechar" : "▸ ver quais"}</button>
+      {aberto && (itens === null ? <p className="text-[12px] m-0">Carregando…</p>
+        : <ul className="m-0 mt-1 pl-4 text-[12.5px] space-y-0.5">{itens.length ? itens.map((x, k) => (
+            <li key={k}>{new Date(x.em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })} · {x.texto}</li>
+          )) : <li>Sem detalhe registrado.</li>}</ul>)}
+    </div>
+  );
+}
+
 function Cartao({ a, v, aula, servidora, entregas, desdeRegistro, onFechar, onConversar }: {
   a: PerfilAgente; v?: Vivo; aula: boolean; servidora: boolean;
   entregas?: { texto: string; qtd: number; pessoal?: boolean }[];
@@ -682,7 +705,8 @@ function Cartao({ a, v, aula, servidora, entregas, desdeRegistro, onFechar, onCo
         <span className="block text-[11px] font-extrabold tracking-[0.08em] uppercase text-[var(--text-secondary)]">Entregou hoje</span>
         {aula ? <p className="m-0 mt-1 text-[13px] text-[var(--text-secondary)]">Exemplo, sem dado real.</p>
           : lista.length
-            ? <ul className="m-0 mt-1 pl-4 text-[13px]">{lista.slice(0, 4).map((e) => <li key={e.texto}>{e.qtd} {e.texto}</li>)}</ul>
+            ? <><ul className="m-0 mt-1 pl-4 text-[13px]">{lista.slice(0, 4).map((e) => <li key={e.texto}>{e.qtd} {e.texto}</li>)}</ul>
+              {!servidora && <QuaisHoje agente={a.id} />}</>
             : <p className="m-0 mt-1 text-[13px] text-[var(--text-secondary)]">Nada registrado hoje.</p>}
       </div>
       <div className="max-md:col-span-2">

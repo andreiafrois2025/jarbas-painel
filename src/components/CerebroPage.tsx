@@ -63,7 +63,9 @@ export default function CerebroPage() {
   const [pasta, setPasta] = useState("");
   const [tag, setTag] = useState("");
   const [painel, setPainel] = useState<Painel>("inicio");
-  const [aberta, setAberta] = useState<string | null>(null);
+  // 23/10: /cerebro?nota=diario/AAAA-MM-DD.md abre a nota direto (link do diário de bordo)
+  const [aberta, setAberta] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("nota"));
   const [conteudo, setConteudo] = useState<NotaAberta | null>(null);
   const [erroNota, setErroNota] = useState(false);
   const [todasTags, setTodasTags] = useState(false);
