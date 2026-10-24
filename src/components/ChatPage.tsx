@@ -361,7 +361,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           else if (ev.tipo === "ferramenta" && !ev.sub) setStatus("⚙️ " + ev.resumo);
           else if (ev.tipo === "permissao") setLicencas((x) => x.some((l) => l.id === ev.id) ? x : [...x, { id: ev.id, ferramenta: ev.ferramenta, resumo: ev.resumo, aparelho: ev.aparelho }]);
           else if (ev.tipo === "permissao-respondida") setLicencas((x) => x.filter((l) => l.id !== ev.id));
-          else if (ev.tipo === "fim" || ev.tipo === "nova-conversa") { acumulado = ""; setFluxo(""); setStatus(""); carregarHist(); }
+          else if (ev.tipo === "fim" || ev.tipo === "nova-conversa") { if (ev.tipo === "fim" && ev.texto) falarRef.current?.(ev.texto); acumulado = ""; setFluxo(""); setStatus(""); carregarHist(); }
           else if (ev.tipo === "erro") setErro(ev.texto);
         };
         falhas = 0;
@@ -452,6 +452,50 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     chatApi.uso().then(setUso).catch(() => {});
     if (obraDisponivel) obraApi.estado().then(setObra).catch(() => {});
   }, [obraDisponivel, ocupado, anexos, agenteId, conversaId, modeloSel, fixarAssunto, habSel, servidora, usaVivo, ditado, prov]);
+
+  // ── 🗣️ Conversa por voz (24/10/2026, pedido dela): fala, pausa = manda; a resposta é lida em voz
+  // alta pela voz do próprio aparelho (grátis) e o microfone volta a ouvir. Licença continua no toque.
+  const [voz, setVoz] = useState(false);
+  const vozRef = useRef(false);
+  const textoRef = useRef(""); textoRef.current = texto;
+  const enviarRef = useRef(enviar); enviarRef.current = enviar;
+  const silencio = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ouvir = () => { if (vozRef.current) { try { ditado.iniciar(""); } catch { /* já ouvindo */ } } };
+  useEffect(() => {
+    if (!voz || !ditado.ativo) return;
+    if (silencio.current) clearTimeout(silencio.current);
+    if (!texto.trim()) return;
+    silencio.current = setTimeout(() => {
+      const t = textoRef.current.trim();
+      if (t && vozRef.current) enviarRef.current(`[Conversa por voz: responda curto, em 2 a 4 frases para ouvir, sem listas, tabelas nem links]\n${t}`);
+    }, 2200);
+    return () => { if (silencio.current) clearTimeout(silencio.current); };
+  }, [texto, voz, ditado.ativo]);
+  const falar = (t: string) => {
+    if (!vozRef.current || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const limpo = t.replace(/```[\s\S]*?```/g, " ").replace(/https?:\/\/\S+/g, "link").replace(/[*_`#>|]/g, "").replace(/\n+/g, ". ").slice(0, 1500);
+    const u = new SpeechSynthesisUtterance(limpo);
+    u.lang = "pt-BR";
+    const v = window.speechSynthesis.getVoices().find((x) => (x.lang || "").replace("_", "-").startsWith("pt-BR"));
+    if (v) u.voice = v;
+    u.onend = () => setTimeout(ouvir, 300);
+    u.onerror = () => ouvir();
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+  };
+  const falarRef = useRef(falar); falarRef.current = falar;
+  const alternarVoz = () => {
+    if (voz) {
+      vozRef.current = false; setVoz(false);
+      try { window.speechSynthesis.cancel(); } catch { /* sem voz */ }
+      if (ditado.ativo) ditado.parar();
+      return;
+    }
+    // iPhone só deixa falar depois de um toque: "destrava" a voz agora
+    try { window.speechSynthesis.speak(new SpeechSynthesisUtterance(" ")); } catch { /* sem voz */ }
+    vozRef.current = true; setVoz(true); setTexto("");
+    ditado.iniciar("");
+  };
 
   // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
   const escolherModelo = async (chave: string) => {
@@ -701,6 +745,10 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               </> : <>
               <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--text-primary)] font-bold" title="O Jarbas fica ligado na VPS e faz de verdade. O que for sensível pede licença no celular.">⚡ sempre ligado</span>
               <button onClick={alternarProv} disabled={ocupado} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer disabled:opacity-50" title="Conversa avulsa para corrigir e revisar texto: não mexe em nada e não fica salva">🫥 Provisório</button>
+              {temDitado() && (
+                <button onClick={alternarVoz} aria-pressed={voz} title="Fale, faça uma pausa e ouça a resposta; o microfone volta sozinho"
+                  className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${voz ? "border-[var(--ac)] bg-[var(--accent-soft)] font-bold animate-pulse" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"}`}>🗣️ {voz ? "Parar conversa" : "Conversa por voz"}</button>
+              )}
               <button onClick={nova} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer" title="Começa um assunto do zero">✨ Nova</button>
               <button onClick={alternarAula} aria-pressed={!!aulaDesde} title="Esconde a conversa anterior para projetar no curso"
                 className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${aulaDesde ? "border-[var(--ac)] bg-[var(--accent-soft)] font-bold" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"}`}>🎓 {aulaDesde ? "Sair do modo aula" : "Modo aula"}</button>
@@ -740,6 +788,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           <PainelAssuntos assuntos={assuntos} msgs={msgs} fixado={fixarAssunto} onFixar={setFixarAssunto} onArquivar={arquivarAssunto} />
         )}
         <div onScroll={aoRolar} className={`flex-1 min-w-0 min-h-0 overflow-y-auto py-4 space-y-4 ${compacto ? "px-4 md:px-6 2xl:px-10" : "px-4"}`} aria-live="polite">
+          {usaVivo && voz && (
+            <div role="status" className="rounded-xl border-2 border-[var(--ac)] bg-[var(--accent-soft)] px-3 py-2 text-sm text-[var(--text-primary)]">
+              🗣️ <b>Conversa por voz ligada.</b> Fale e faça uma pausa: eu mando sozinho, respondo em voz alta e volto a ouvir. O que for sensível ainda pede o seu toque em Permitir. Para encerrar, toque em “Parar conversa”.
+            </div>
+          )}
           {usaVivo && prov && (
             <div role="status" className="rounded-xl border-2 border-[var(--warning)] bg-[var(--warning)]/15 px-3 py-2 text-sm text-[var(--text-primary)]">
               🫥 <b>Chat provisório.</b> Aqui eu só converso, corrijo e reviso texto e leio anexos. Não mexo em código, arquivos, Notion, Drive nem agenda. Nada fica salvo: some ao tocar em “Sair do provisório” ou depois de 1 hora parado.
@@ -889,7 +942,7 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
       <div className="flex justify-end">
         <div className="balao-ela max-w-[min(40rem,90%)] rounded-2xl rounded-tr-sm px-4 py-2.5">
           {m.habilidade && <p className="text-xs font-bold opacity-90 mb-1">{habilidades?.find((h) => h.id === m.habilidade)?.icone ?? "🧩"} {(habilidades?.find((h) => h.id === m.habilidade)?.rotulo ?? m.habilidade).toLowerCase()}</p>}
-          <p className="text-sm whitespace-pre-wrap break-words">{m.texto}</p>
+          <p className="text-sm whitespace-pre-wrap break-words">{m.texto.replace(/^\[Conversa por voz:[^\]]*\]\n/, "🗣️ ")}</p>
           {m.anexos?.map((a) => <p key={a.id} className="text-xs opacity-80 mt-1">📎 {a.nome}</p>)}
         </div>
       </div>
