@@ -43,6 +43,12 @@ export const vivoApi = {
     return r.ok ? r.json() : null;
   },
   sair: () => postar("/api/sair"),
+  // 25/10/2026: voz gerada na VPS (o iPhone não toca a voz do aparelho dentro do app)
+  falar: async (texto: string): Promise<Blob> => {
+    const r = await ir("/api/falar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texto }) });
+    if (!r.ok) throw new Error("sem voz");
+    return r.blob();
+  },
   // chat provisório (21/10): conversa avulsa, só leitura e conversa, não fica salva
   prov: {
     historico: async (): Promise<{ itens: ItemVivo[]; motor: MotorVivo; ativo: boolean }> => (await ir("/api/provisorio/historico")).json(),

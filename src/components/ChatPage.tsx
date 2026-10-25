@@ -472,37 +472,21 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     return () => { if (silencio.current) clearTimeout(silencio.current); };
   }, [texto, voz, ditado.ativo]);
   const falar = (t: string) => {
-    if (!vozRef.current || typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const limpo = t.replace(/```[\s\S]*?```/g, " ").replace(/https?:\/\/\S+/g, "link").replace(/[*_`#>|]/g, "").replace(/\n+/g, ". ").slice(0, 1500);
-    const u = new SpeechSynthesisUtterance(limpo);
-    u.lang = "pt-BR";
-    const v = window.speechSynthesis.getVoices().find((x) => (x.lang || "").replace("_", "-").startsWith("pt-BR"));
-    if (v) u.voice = v;
-    u.onend = () => setTimeout(ouvir, 300);
-    u.onerror = () => ouvir();
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    if (!vozRef.current) return;
+    tocarVoz(t, () => setTimeout(ouvir, 300));
   };
   const falarRef = useRef(falar); falarRef.current = falar;
   const alternarVoz = () => {
     if (voz) {
       vozRef.current = false; setVoz(false);
-      try { window.speechSynthesis.cancel(); } catch { /* sem voz */ }
+      pararAudio();
       if (ditado.ativo) ditado.parar();
       return;
     }
-    // iPhone só deixa falar se a PRIMEIRA fala acontecer no toque: falo uma frase de verdade aqui
-    // e só ligo o microfone quando ela termina (25/10: com fala vazia o iPhone não destravava)
+    // iPhone: o som só toca se o primeiro "play" acontecer no toque; destrava o tocador agora
     vozRef.current = true; setVoz(true); setTexto("");
-    try {
-      const u = new SpeechSynthesisUtterance("Pode falar.");
-      u.lang = "pt-BR";
-      const v = window.speechSynthesis.getVoices().find((x) => (x.lang || "").replace("_", "-").startsWith("pt-BR"));
-      if (v) u.voice = v;
-      u.onend = () => ouvir(); u.onerror = () => ouvir();
-      window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
-      setTimeout(() => { if (vozRef.current && !ditado.ativo && !window.speechSynthesis.speaking) ouvir(); }, 2500);
-    } catch { ditado.iniciar(""); }
+    destravarAudio();
+    ditado.iniciar("");
   };
 
   // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
@@ -590,7 +574,8 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const alternarGravacao = async () => {
+  // 25/10: com a conversa por voz ligada, o microfone vira "parar tudo" (ela não conseguia desligar)
+  const alternarGravacaoBase = async () => {
     if (ditado.ativo) { ditado.parar(); return; }
     if (gravando) { rec.current?.stop(); return; }
     if (!privado && temDitado() && ditado.iniciar(texto)) return;
@@ -612,6 +597,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       rec.current = r; r.start(); setGravando(true);
     } catch { setErro("Não consegui usar o microfone. Confira a permissão do navegador."); }
   };
+  const alternarGravacao = () => (voz ? alternarVoz() : alternarGravacaoBase());
 
   // teclado da caixa: com o menu aberto, setas/Enter/Tab/Esc são do menu; senão Enter envia
   const teclas = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -980,16 +966,32 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
   );
 }
 
-// 25/10/2026: lê um texto em voz alta com a voz do próprio aparelho (de graça); tocar de novo para parar
+// 25/10/2026: voz gerada na VPS (Piper) e tocada num <audio> só, reaproveitado. O iPhone não deixa
+// a voz do aparelho falar dentro do app, mas toca áudio se o tocador foi "destravado" num toque.
+let tocador: HTMLAudioElement | null = null;
+function pegaTocador() { if (!tocador) { tocador = new Audio(); tocador.setAttribute("playsinline", ""); } return tocador; }
+function destravarAudio() {
+  const a = pegaTocador();
+  a.src = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//NwwAAAAAAAAAAAAEluZm8AAAAPAAAACAAAA/oAR0dHR0dHR0dHR0dHYmJiYmJiYmJiYmJifHx8fHx8fHx8fHx8fJaWlpaWlpaWlpaWlrGxsbGxsbGxsbGxsbHLy8vLy8vLy8vLy8vl5eXl5eXl5eXl5eXl////////////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQC1AAAAAAAAAP6yysejgAAAAAAAAAAAAAAAAD/80DEAAAAA0gAAAAATEFNRTMuMTAwVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsRbAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVUxBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQMSkAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NCxKMAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NAxKQAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80LEowAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/80DEpAAAA0gAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/zQsSjAAADSAAAAABVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ==";
+  a.play().catch(() => { /* sem som ainda */ });
+}
+function pararAudio() { try { pegaTocador().pause(); } catch { /* nada tocando */ } }
+async function tocarVoz(t: string, aoFim?: () => void) {
+  const a = pegaTocador();
+  try {
+    const blob = await vivoApi.falar(t);
+    const url = URL.createObjectURL(blob);
+    a.onended = () => { URL.revokeObjectURL(url); aoFim?.(); };
+    a.onerror = () => aoFim?.();
+    a.src = url;
+    await a.play();
+  } catch { aoFim?.(); }
+}
+// botão 🔊 ouvir: tocar de novo para parar
 function lerEmVozAlta(t: string) {
-  const ss = window.speechSynthesis;
-  if (ss.speaking) { ss.cancel(); return; }
-  const limpo = t.replace(/```[\s\S]*?```/g, " ").replace(/https?:\/\/\S+/g, "link").replace(/[*_`#>|]/g, "").replace(/\n+/g, ". ").slice(0, 3000);
-  const u = new SpeechSynthesisUtterance(limpo);
-  u.lang = "pt-BR";
-  const v = ss.getVoices().find((x) => (x.lang || "").replace("_", "-").startsWith("pt-BR"));
-  if (v) u.voice = v;
-  ss.speak(u);
+  const a = pegaTocador();
+  if (!a.paused && a.src.startsWith("blob:")) { a.pause(); return; }
+  tocarVoz(t);
 }
 
 // Etiqueta "📁 assunto" acima da resposta; clicar permite corrigir (mover para outro assunto ou criar um novo).
