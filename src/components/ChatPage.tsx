@@ -980,7 +980,7 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
   );
 }
 
-// 25/10/2026: lê um texto em voz alta com a voz do próprio aparelho (de graça); tocar de novo para
+// 25/10/2026: lê um texto em voz alta com a voz do próprio aparelho (de graça); tocar de novo para parar
 function lerEmVozAlta(t: string) {
   const ss = window.speechSynthesis;
   if (ss.speaking) { ss.cancel(); return; }
