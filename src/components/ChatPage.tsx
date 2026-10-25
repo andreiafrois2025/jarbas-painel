@@ -564,7 +564,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
 
   const anexar = async (arqs: FileList | File[] | null) => {
     if (!arqs) return;
-    for (const f of Array.from(arqs).slice(0, 3 - anexos.length)) {
+    for (const f of Array.from(arqs).slice(0, 10 - anexos.length)) {
       if (f.size > 10 * 1024 * 1024) { setErro(`"${f.name}" passa de 10 MB.`); continue; }
       try {
         if (usaVivo) { const caminho = await vivoApi.anexo(f); setAnexos((x) => [...x, { id: caminho, nome: f.name }]); }
@@ -868,7 +868,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
                 disabled={limiteBatido}
                 className="flex-1 min-w-[6rem] resize-none bg-transparent px-0 py-2.5 text-[15px] leading-snug text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none max-h-40" aria-label="Mensagem" />
             </div>
-            <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 3} title="Anexar PDF, imagem, texto ou planilha CSV (até 10 MB)" aria-label="Anexar arquivo"
+            <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 10} title="Anexar até 10 arquivos: PDF, imagem, texto ou planilha CSV (até 10 MB cada)" aria-label="Anexar arquivo"
               className="h-11 w-11 shrink-0 text-xl leading-none rounded-xl bg-[var(--bg-tertiary)] hover:brightness-95 disabled:opacity-40 cursor-pointer">📎</button>
             <button onClick={alternarGravacao} disabled={transcrevendo} title={ouvindo ? "Parar" : privado ? "Gravar (transcreve no servidor)" : "Falar: o texto aparece enquanto você fala"} aria-label={ouvindo ? "Parar de ouvir" : "Falar"}
               className={`h-11 w-11 shrink-0 text-xl leading-none rounded-xl cursor-pointer ${ouvindo ? "bg-[var(--danger)] text-white animate-pulse" : "bg-[var(--ac)] text-[var(--on-ac)]"} disabled:opacity-40`}>{ouvindo ? "⏹" : "🎙️"}</button>
@@ -883,7 +883,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           {menuNode}
           <div className="flex items-end gap-2">
             <input ref={fileRef} type="file" hidden multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.md,.csv,.json" onChange={(e) => anexar(e.target.files)} />
-            <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 3} title="Anexar PDF, imagem, texto ou planilha CSV (até 10 MB)" aria-label="Anexar arquivo"
+            <button onClick={() => fileRef.current?.click()} disabled={anexos.length >= 10} title="Anexar até 10 arquivos: PDF, imagem, texto ou planilha CSV (até 10 MB cada)" aria-label="Anexar arquivo"
               className="h-12 w-12 shrink-0 text-2xl leading-none rounded-xl border border-[var(--border)] hover:bg-[var(--bg-tertiary)] disabled:opacity-40 cursor-pointer">📎</button>
             <button onClick={alternarGravacao} disabled={transcrevendo} title={ouvindo ? "Parar" : privado ? "Gravar (transcreve no servidor)" : "Falar: o texto aparece enquanto você fala"} aria-label={ouvindo ? "Parar de ouvir" : "Falar"}
               className={`h-12 w-12 shrink-0 text-2xl leading-none rounded-xl border cursor-pointer ${ouvindo ? "bg-[var(--danger)] text-white border-[var(--danger)] animate-pulse" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"} disabled:opacity-40`}>{ouvindo ? "⏹" : "🎙"}</button>
