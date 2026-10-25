@@ -491,10 +491,18 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
       if (ditado.ativo) ditado.parar();
       return;
     }
-    // iPhone só deixa falar depois de um toque: "destrava" a voz agora
-    try { window.speechSynthesis.speak(new SpeechSynthesisUtterance(" ")); } catch { /* sem voz */ }
+    // iPhone só deixa falar se a PRIMEIRA fala acontecer no toque: falo uma frase de verdade aqui
+    // e só ligo o microfone quando ela termina (25/10: com fala vazia o iPhone não destravava)
     vozRef.current = true; setVoz(true); setTexto("");
-    ditado.iniciar("");
+    try {
+      const u = new SpeechSynthesisUtterance("Pode falar.");
+      u.lang = "pt-BR";
+      const v = window.speechSynthesis.getVoices().find((x) => (x.lang || "").replace("_", "-").startsWith("pt-BR"));
+      if (v) u.voice = v;
+      u.onend = () => ouvir(); u.onerror = () => ouvir();
+      window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+      setTimeout(() => { if (vozRef.current && !ditado.ativo && !window.speechSynthesis.speaking) ouvir(); }, 2500);
+    } catch { ditado.iniciar(""); }
   };
 
   // seletor de modelo: com conversa aberta troca no servidor; sem conversa, vale para a primeira mensagem
@@ -960,11 +968,28 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
           {m.arquivos?.map((f) => <CartaoArquivoObra key={f.url} f={f} />)}
           {m.obra && m.tarefaId && <Bastidores tarefa={m.tarefaId} />}
           {m.obra && m.tarefaId && m.mudancas && <BotaoDesfazer tarefa={m.tarefaId} />}
-          <p className="text-[10px] text-[var(--text-muted)] mt-1">{hora(m.ts)}{m.modeloRotulo ? ` · ${m.modeloRotulo}` : ""}</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-1">{hora(m.ts)}{m.modeloRotulo ? ` · ${m.modeloRotulo}` : ""}
+            {/* 25/10: ouvir a resposta (toque = funciona até no iPhone) */}
+            {typeof window !== "undefined" && "speechSynthesis" in window && (
+              <button type="button" onClick={() => lerEmVozAlta(m.texto)} className="ml-2 underline cursor-pointer bg-transparent border-0 p-0 text-[10px]" title="Ouvir esta resposta">🔊 ouvir</button>
+            )}
+          </p>
         </div>
       </div>
     </div>
   );
+}
+
+// 25/10/2026: lê um texto em voz alta com a voz do próprio aparelho (de graça); tocar de novo para
+function lerEmVozAlta(t: string) {
+  const ss = window.speechSynthesis;
+  if (ss.speaking) { ss.cancel(); return; }
+  const limpo = t.replace(/```[\s\S]*?```/g, " ").replace(/https?:\/\/\S+/g, "link").replace(/[*_`#>|]/g, "").replace(/\n+/g, ". ").slice(0, 3000);
+  const u = new SpeechSynthesisUtterance(limpo);
+  u.lang = "pt-BR";
+  const v = ss.getVoices().find((x) => (x.lang || "").replace("_", "-").startsWith("pt-BR"));
+  if (v) u.voice = v;
+  ss.speak(u);
 }
 
 // Etiqueta "📁 assunto" acima da resposta; clicar permite corrigir (mover para outro assunto ou criar um novo).
