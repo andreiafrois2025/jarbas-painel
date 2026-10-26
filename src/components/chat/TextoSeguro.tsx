@@ -5,17 +5,33 @@
 
 import { Fragment, type ReactNode } from "react";
 
-function inline(s: string, chave: string): ReactNode[] {
-  const out: ReactNode[] = []; const re = /(\*\*[^*]+\*\*|`[^`]+`)/g; let ult = 0; let m: RegExpExecArray | null; let n = 0;
+// 25/10/2026: links clicáveis ([texto](https://...) e endereço solto). Só http/https.
+const LINK = "text-[var(--accent)] underline break-all";
+function linksSoltos(s: string, chave: string): ReactNode[] {
+  const out: ReactNode[] = []; const re = /https?:\/\/[^\s<>()]+[^\s<>().,;:!?"']/g; let ult = 0; let m: RegExpExecArray | null; let n = 0;
   while ((m = re.exec(s))) {
     if (m.index > ult) out.push(s.slice(ult, m.index));
+    out.push(<a key={`${chave}-u${n++}`} href={m[0]} target="_blank" rel="noopener noreferrer" className={LINK}>{m[0]}</a>);
+    ult = m.index + m[0].length;
+  }
+  if (ult < s.length) out.push(s.slice(ult));
+  return out;
+}
+
+function inline(s: string, chave: string): ReactNode[] {
+  const out: ReactNode[] = []; const re = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g; let ult = 0; let m: RegExpExecArray | null; let n = 0;
+  while ((m = re.exec(s))) {
+    if (m.index > ult) out.push(...linksSoltos(s.slice(ult, m.index), `${chave}-${n++}`));
     const t = m[0];
-    out.push(t.startsWith("**")
-      ? <strong key={`${chave}-${n++}`}>{t.slice(2, -2)}</strong>
+    if (t.startsWith("[")) {
+      const fim = t.indexOf("](");
+      out.push(<a key={`${chave}-${n++}`} href={t.slice(fim + 2, -1)} target="_blank" rel="noopener noreferrer" className={LINK}>{inline(t.slice(1, fim), `${chave}-${n}`)}</a>);
+    } else out.push(t.startsWith("**")
+      ? <strong key={`${chave}-${n++}`}>{inline(t.slice(2, -2), `${chave}-${n}`)}</strong>
       : <code key={`${chave}-${n++}`} className="px-1 rounded bg-[var(--bg-tertiary)] text-[0.9em]">{t.slice(1, -1)}</code>);
     ult = m.index + t.length;
   }
-  if (ult < s.length) out.push(s.slice(ult));
+  if (ult < s.length) out.push(...linksSoltos(s.slice(ult), `${chave}-f`));
   return out;
 }
 
