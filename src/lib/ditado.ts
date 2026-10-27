@@ -33,7 +33,10 @@ export function useDitado(aoMudar: (texto: string) => void, aoErro: (msg: string
     const Classe = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Classe) return false;
     const r = new Classe();
-    r.lang = "pt-BR"; r.continuous = true; r.interimResults = true;
+    // 27/10/2026: no Chrome do Android o modo contínuo devolve a frase acumulada várias vezes
+    // (o texto saía repetido). No Android grava uma fala por vez; o onend religa.
+    const android = /Android/i.test(navigator.userAgent);
+    r.lang = "pt-BR"; r.continuous = !android; r.interimResults = true;
     let base = textoAtual ? textoAtual.trimEnd() + " " : "";
     let finais = "";
     let ultimo = textoAtual;
@@ -41,10 +44,11 @@ export function useDitado(aoMudar: (texto: string) => void, aoErro: (msg: string
       // 23/10: depois de "parar" (ex.: ao enviar) o navegador ainda entrega o último pedaço;
       // ignorar, senão o texto já enviado volta para a caixa
       if (rec.current !== r) return;
-      let provisorio = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
+      // remonta a fala inteira a cada evento, em vez de ir somando (somar duplicava)
+      let provisorio = ""; finais = "";
+      for (let i = 0; i < e.results.length; i++) {
         const res = e.results[i];
-        if (res.isFinal) finais += res[0].transcript + " "; else provisorio += res[0].transcript;
+        if (res.isFinal) finais += res[0].transcript.trim() + " "; else provisorio += res[0].transcript;
       }
       ultimo = base + finais + provisorio;
       aoMudar(ultimo);
