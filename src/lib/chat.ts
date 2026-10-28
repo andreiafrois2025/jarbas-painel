@@ -16,7 +16,7 @@ export interface Acao {
 }
 export interface Mensagem {
   id: string; papel: "user" | "assistant" | "sistema"; texto: string; ts: string;
-  anexos?: { id: string; nome: string }[]; acoes?: Acao[]; habilidade?: string;
+  anexos?: { id: string; nome: string; previa?: string }[]; acoes?: Acao[]; habilidade?: string;
   assuntoId?: string; modeloRotulo?: string; respostaDe?: string;
   obra?: boolean; arquivos?: ArquivoObra[];
   /** Modo obra O2/O3: id da tarefa (AAAA-MM-DD/id) para os bastidores e o botão de desfazer. */

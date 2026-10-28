@@ -178,7 +178,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const ditado = useDitado(setTexto, setErro);
   const aulaRef = useRef(0);
   const recarregarVivo = useRef<(() => void) | null>(null);
-  const [anexos, setAnexos] = useState<{ id: string; nome: string }[]>([]);
+  const [anexos, setAnexos] = useState<{ id: string; nome: string; previa?: string }[]>([]);
   const [gravando, setGravando] = useState(false);
   const [transcrevendo, setTranscrevendo] = useState(false);
   const [historicoAberto, setHistoricoAberto] = useState(false);
@@ -566,9 +566,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
     if (!arqs) return;
     for (const f of Array.from(arqs).slice(0, 10 - anexos.length)) {
       if (f.size > 10 * 1024 * 1024) { setErro(`"${f.name}" passa de 10 MB.`); continue; }
+      // 28/10/2026: imagem ganha prévia (endereço local do próprio aparelho, não sai dele)
+      const previa = f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined;
       try {
-        if (usaVivo) { const caminho = await vivoApi.anexo(f); setAnexos((x) => [...x, { id: caminho, nome: f.name }]); }
-        else { const [a] = await chatApi.anexo(f); setAnexos((x) => [...x, { id: a.id, nome: a.nome }]); }
+        if (usaVivo) { const caminho = await vivoApi.anexo(f); setAnexos((x) => [...x, { id: caminho, nome: f.name, previa }]); }
+        else { const [a] = await chatApi.anexo(f); setAnexos((x) => [...x, { id: a.id, nome: a.nome, previa }]); }
       } catch (e) { setErro((e as Error).message); }
     }
     if (fileRef.current) fileRef.current.value = "";
@@ -850,7 +852,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           {anexos.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
               {anexos.map((a) => (
-                <span key={a.id} className="text-xs px-2 py-1 rounded-full bg-[var(--bg-tertiary)] flex items-center gap-1">📎 {a.nome}
+                <span key={a.id} className="text-xs px-2 py-1 rounded-full bg-[var(--bg-tertiary)] flex items-center gap-1">{a.previa ? <img src={a.previa} alt="" className="w-8 h-8 rounded object-cover" /> : "📎"} {a.nome}
                   <button onClick={() => setAnexos((x) => x.filter((y) => y.id !== a.id))} aria-label={`Remover ${a.nome}`} className="cursor-pointer text-[var(--text-muted)] hover:text-[var(--danger)]">×</button>
                 </span>
               ))}
@@ -937,7 +939,12 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
         <div className="balao-ela max-w-[min(40rem,90%)] rounded-2xl rounded-tr-sm px-4 py-2.5">
           {m.habilidade && <p className="text-xs font-bold opacity-90 mb-1">{habilidades?.find((h) => h.id === m.habilidade)?.icone ?? "🧩"} {(habilidades?.find((h) => h.id === m.habilidade)?.rotulo ?? m.habilidade).toLowerCase()}</p>}
           <p className="text-sm whitespace-pre-wrap break-words">{m.texto.replace(/^\[Conversa por voz:[^\]]*\]\n/, "🗣️ ")}</p>
-          {m.anexos?.map((a) => <p key={a.id} className="text-xs opacity-80 mt-1">📎 {a.nome}</p>)}
+          {m.anexos?.some((a) => a.previa) && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {m.anexos.filter((a) => a.previa).map((a) => <img key={a.id} src={a.previa} alt={a.nome} className="max-h-56 max-w-full rounded-lg object-cover" />)}
+            </div>
+          )}
+          {m.anexos?.filter((a) => !a.previa).map((a) => <p key={a.id} className="text-xs opacity-80 mt-1">📎 {a.nome}</p>)}
         </div>
       </div>
     );

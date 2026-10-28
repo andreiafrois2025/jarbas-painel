@@ -3,10 +3,30 @@
 // Markdown mínimo (títulos, listas, negrito, código) desenhado como NÓS DO REACT.
 // Nunca usa dangerouslySetInnerHTML: o que vier do modelo é só texto.
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 
 // 25/10/2026: links clicáveis ([texto](https://...) e endereço solto). Só http/https.
 const LINK = "text-[var(--accent)] underline break-all";
+
+// 28/10/2026: bloco de texto para copiar (legendas, mensagens prontas) ganha o botão "Copiar"
+function BlocoCopiavel({ texto }: { texto: string }) {
+  const [ok, setOk] = useState(false);
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(texto); }
+    catch { const t = document.createElement("textarea"); t.value = texto; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+    setOk(true); setTimeout(() => setOk(false), 1800);
+  };
+  return (
+    <div className="relative my-2">
+      <button type="button" onClick={copiar} aria-label="Copiar texto"
+        className="absolute top-2 right-2 text-xs font-semibold px-2.5 py-1 rounded-md bg-[var(--bg-secondary)] border border-[var(--border)] hover:border-[var(--accent)] cursor-pointer">
+        {ok ? "Copiado ✓" : "Copiar"}
+      </button>
+      <pre className="p-3 pt-10 rounded-lg bg-[var(--bg-tertiary)] text-xs overflow-x-auto whitespace-pre-wrap">{texto}</pre>
+    </div>
+  );
+}
+
 function linksSoltos(s: string, chave: string): ReactNode[] {
   const out: ReactNode[] = []; const re = /https?:\/\/[^\s<>()]+[^\s<>().,;:!?"']/g; let ult = 0; let m: RegExpExecArray | null; let n = 0;
   while ((m = re.exec(s))) {
@@ -44,7 +64,7 @@ export default function TextoSeguro({ texto }: { texto: string }) {
       const cod: string[] = []; i++;
       while (i < linhas.length && !linhas[i].startsWith("```")) cod.push(linhas[i++]);
       i++;
-      blocos.push(<pre key={k++} className="my-2 p-3 rounded-lg bg-[var(--bg-tertiary)] text-xs overflow-x-auto whitespace-pre-wrap">{cod.join("\n")}</pre>);
+      blocos.push(<BlocoCopiavel key={k++} texto={cod.join("\n")} />);
     } else if (/^\s*([-*]|\d+\.)\s+/.test(l)) { // lista
       const ordenada = /^\s*\d+\./.test(l); const itens: ReactNode[] = [];
       while (i < linhas.length && /^\s*([-*]|\d+\.)\s+/.test(linhas[i])) { itens.push(<li key={itens.length}>{inline(linhas[i].replace(/^\s*([-*]|\d+\.)\s+/, ""), `l${k}-${itens.length}`)}</li>); i++; }
