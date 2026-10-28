@@ -938,12 +938,25 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
       <div className="flex justify-end">
         <div className="balao-ela max-w-[min(40rem,90%)] rounded-2xl rounded-tr-sm px-4 py-2.5">
           {m.habilidade && <p className="text-xs font-bold opacity-90 mb-1">{habilidades?.find((h) => h.id === m.habilidade)?.icone ?? "🧩"} {(habilidades?.find((h) => h.id === m.habilidade)?.rotulo ?? m.habilidade).toLowerCase()}</p>}
-          <p className="text-sm whitespace-pre-wrap break-words">{m.texto.replace(/^\[Conversa por voz:[^\]]*\]\n/, "🗣️ ")}</p>
-          {m.anexos?.some((a) => a.previa) && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {m.anexos.filter((a) => a.previa).map((a) => <img key={a.id} src={a.previa} alt={a.nome} className="max-h-56 max-w-full rounded-lg object-cover" />)}
-            </div>
-          )}
+          {(() => {
+            // 28/10/2026: "[Anexo: caminho]" vira a foto (servida por /api/anexo-ver); o caminho some do texto
+            const caminhos = [...m.texto.matchAll(/\[Anexo: ([^\]]+)\]/g)].map((x) => x[1]);
+            const ehFoto = (c: string) => /\.(png|jpe?g|webp|gif)$/i.test(c);
+            const texto = m.texto.replace(/^\[Conversa por voz:[^\]]*\]\n/, "🗣️ ").replace(/\n?\[Anexo: [^\]]+\]/g, "").trim();
+            const fotos = m.anexos?.some((a) => a.previa)
+              ? m.anexos.filter((a) => a.previa).map((a) => ({ k: a.id, src: a.previa as string, alt: a.nome }))
+              : caminhos.filter(ehFoto).map((c) => ({ k: c, src: "/api/anexo-ver?c=" + encodeURIComponent(c), alt: c.split("/").pop() || "foto" }));
+            const outros = caminhos.filter((c) => !ehFoto(c));
+            return (<>
+              {texto && <p className="text-sm whitespace-pre-wrap break-words">{texto}</p>}
+              {fotos.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {fotos.map((f) => <img key={f.k} src={f.src} alt={f.alt} loading="lazy" className="max-h-56 max-w-full rounded-lg object-cover" />)}
+                </div>
+              )}
+              {!m.anexos?.length && outros.map((c) => <p key={c} className="text-xs opacity-80 mt-1">📎 {c.split("/").pop()}</p>)}
+            </>);
+          })()}
           {m.anexos?.filter((a) => !a.previa).map((a) => <p key={a.id} className="text-xs opacity-80 mt-1">📎 {a.nome}</p>)}
         </div>
       </div>
