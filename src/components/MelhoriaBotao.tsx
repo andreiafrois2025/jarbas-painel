@@ -28,12 +28,15 @@ export default function MelhoriaBotao() {
     setTitulo(document.title.replace(/\s*[·|-]\s*Jarbas.*$/i, "") || pagina);
     try {
       // print da tela como ela está agora (antes de a caixinha aparecer)
-      const img = await toJpeg(document.body, {
+      // 29/10/2026: no Safari do iPhone o print às vezes trava para sempre e a caixinha nunca abria;
+      // agora espera no máximo 3 s e, se não der, abre sem o print
+      const limite = new Promise<string>((_, rej) => setTimeout(() => rej(new Error("print demorou")), 3000));
+      const img = await Promise.race([limite, toJpeg(document.body, {
         quality: 0.7, pixelRatio: Math.min(1, 1600 / window.innerWidth),
         width: window.innerWidth, height: window.innerHeight,
         style: { transform: `translateY(-${window.scrollY}px)` },
         filter: (n) => !(n instanceof HTMLElement && n.dataset.semPrint === "1"),
-      });
+      })]);
       setPrint(img);
     } catch { /* sem print: segue só com o texto */ }
     setAberto(true);
