@@ -694,7 +694,7 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
         {compacto && cabecalho && <div className="max-md:hidden shrink-0 bg-[var(--bg-secondary)]">{cabecalho}</div>}
         <header className={`flex items-center gap-3 flex-wrap ${compacto ? "px-4 md:px-6 2xl:px-10 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border)] shadow-[0_2px_8px_var(--sombra)] relative z-[1]" : "px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-secondary)]"}`}>
           {compacto ? (
-            <div className="flex items-center gap-2 flex-1 basis-40 min-w-0">
+            <div className="flex items-center gap-2 flex-1 basis-0 min-w-0">
               <button onClick={() => (aoFechar ? aoFechar() : setTelaCelular("lista"))} aria-label={aoFechar ? "Fechar a conversa" : "Voltar para a lista de agentes"}
                 className={`${aoFechar ? "" : "md:hidden "}h-10 w-10 -ml-2 shrink-0 inline-flex items-center justify-center rounded-full text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] cursor-pointer`}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>
@@ -736,15 +736,15 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
             </span>
           )}
           {servidora ? null : usaVivo || (querVivo && vivo === "checando") ? (
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className={`flex items-center gap-1.5 flex-wrap ${opcoesAbertas ? "" : "shrink-0"}`}>
               {prov ? <>
                 <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--warning)]/25 text-[var(--text-primary)] font-bold" title="Conversa avulsa: só conversa e lê anexos, não mexe em nada e não fica salva">🫥 provisório</span>
                 <button onClick={alternarProv} disabled={ocupado} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--warning)] font-bold hover:bg-[var(--bg-tertiary)] cursor-pointer disabled:opacity-50">✖ Sair do provisório</button>
               </> : <>
-              <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--text-primary)] font-bold" title="O Jarbas fica ligado na VPS e faz de verdade. O que for sensível pede licença no celular.">⚡ sempre ligado</span>
-              <button onClick={() => setOpcoesAbertas((x) => !x)} aria-expanded={opcoesAbertas} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer">⚙️ opções {opcoesAbertas ? "▴" : "▾"}</button>
+              <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--text-primary)] font-bold" title="Jarbas sempre ligado: fica na VPS e faz de verdade. O que for sensível pede licença no celular." aria-label="Jarbas sempre ligado">⚡</span>
+              <button onClick={() => setOpcoesAbertas((x) => !x)} aria-expanded={opcoesAbertas} aria-label={opcoesAbertas ? "Recolher opções" : "Mostrar opções"} title="Opções da conversa" className="text-sm w-8 h-8 inline-flex items-center justify-center rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer">{opcoesAbertas ? "▴" : "▾"}</button>
               {!opcoesAbertas && voz && <button onClick={alternarVoz} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--ac)] bg-[var(--accent-soft)] font-bold animate-pulse cursor-pointer">🗣️ Parar conversa</button>}
-              {!opcoesAbertas && aulaDesde && <button onClick={alternarAula} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--ac)] bg-[var(--accent-soft)] font-bold cursor-pointer">🎓 Sair do modo aula</button>}
+              {!opcoesAbertas && !!aulaDesde && <button onClick={alternarAula} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--ac)] bg-[var(--accent-soft)] font-bold cursor-pointer">🎓 Sair do modo aula</button>}
               {!opcoesAbertas && privado && <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--bg-tertiary)]">🔒 voz sigilosa</span>}
               {opcoesAbertas && <>
               <button onClick={alternarProv} disabled={ocupado} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer disabled:opacity-50" title="Conversa avulsa para corrigir e revisar texto: não mexe em nada e não fica salva">🫥 Provisório</button>
