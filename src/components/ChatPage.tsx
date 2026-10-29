@@ -167,6 +167,8 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
   const [histVivo, setHistVivo] = useState(false); // o histórico da sessão viva já chegou (antes disso, nem a dica de "conversa vazia")
   const [aulaDesde, setAulaDesde] = useState(0);
   const [privado, setPrivado] = useState(false);
+  // 29/10/2026 (pedido dela): opções do "sempre ligado" num painel recolhível, para sobrar tela no celular
+  const [opcoesAbertas, setOpcoesAbertas] = useState(false);
   const usaVivo = querVivo && vivo === "ok";
   // chat provisório: conversa avulsa, só leitura e conversa, some ao sair
   const [prov, setProv] = useState(false);
@@ -740,6 +742,11 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
                 <button onClick={alternarProv} disabled={ocupado} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--warning)] font-bold hover:bg-[var(--bg-tertiary)] cursor-pointer disabled:opacity-50">✖ Sair do provisório</button>
               </> : <>
               <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--text-primary)] font-bold" title="O Jarbas fica ligado na VPS e faz de verdade. O que for sensível pede licença no celular.">⚡ sempre ligado</span>
+              <button onClick={() => setOpcoesAbertas((x) => !x)} aria-expanded={opcoesAbertas} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer">⚙️ opções {opcoesAbertas ? "▴" : "▾"}</button>
+              {!opcoesAbertas && voz && <button onClick={alternarVoz} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--ac)] bg-[var(--accent-soft)] font-bold animate-pulse cursor-pointer">🗣️ Parar conversa</button>}
+              {!opcoesAbertas && aulaDesde && <button onClick={alternarAula} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--ac)] bg-[var(--accent-soft)] font-bold cursor-pointer">🎓 Sair do modo aula</button>}
+              {!opcoesAbertas && privado && <span className="text-[11px] px-2 py-1 rounded-full bg-[var(--bg-tertiary)]">🔒 voz sigilosa</span>}
+              {opcoesAbertas && <>
               <button onClick={alternarProv} disabled={ocupado} className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] cursor-pointer disabled:opacity-50" title="Conversa avulsa para corrigir e revisar texto: não mexe em nada e não fica salva">🫥 Provisório</button>
               {temDitado() && (
                 <button onClick={alternarVoz} aria-pressed={voz} title="Fale, faça uma pausa e ouça a resposta; o microfone volta sozinho"
@@ -749,6 +756,10 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
               <button onClick={alternarAula} aria-pressed={!!aulaDesde} title="Esconde a conversa anterior para projetar no curso"
                 className={`text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${aulaDesde ? "border-[var(--ac)] bg-[var(--accent-soft)] font-bold" : "border-[var(--border)] hover:bg-[var(--bg-tertiary)]"}`}>🎓 {aulaDesde ? "Sair do modo aula" : "Modo aula"}</button>
               <a href={JARBAS_VIVO + "/#aparelhos"} title="Aparelhos conectados, trocar a senha" className="text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] no-underline text-[var(--text-primary)]">📱 Aparelhos</a>
+              <label className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] cursor-pointer" title="Grava e transcreve na própria VPS: não aparece ao vivo, mas a voz não sai daqui">
+                <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} /> 🔒 voz aqui dentro (sigiloso)
+              </label>
+              </>}
               </>}
             </div>
           ) : querVivo && modoAntigo ? (
@@ -902,14 +913,14 @@ export default function ChatPage({ compacto = false, servidora = false, cabecalh
           </div>
           )}
           {avisosHab}
-          <div className={`flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 ${compacto ? "px-2" : ""}`}>
+          {!usaVivo && <div className={`flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 ${compacto ? "px-2" : ""}`}>
             <label className="inline-flex items-center gap-1.5 text-[11.5px] text-[var(--text-secondary)] cursor-pointer" title={usaVivo ? "Grava e transcreve na própria VPS: não aparece ao vivo, mas a voz não sai daqui" : "Grava e transcreve no servidor, sem o ditado ao vivo do navegador"}>
               <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} /> 🔒 {usaVivo || (querVivo && vivo === "checando") ? "voz aqui dentro (assunto sigiloso)" : "gravar sem ditado ao vivo"}
             </label>
             <p className={`m-0 text-[11px] text-[var(--text-muted)] ${compacto ? "hidden md:block" : ""}`}>{usaVivo
               ? "⚡ Jarbas sempre ligado: faz de verdade e pede licença no celular para o que for sensível · 🎙️ o texto aparece enquanto você fala."
               : "Uma conversa por vez · 20 mensagens por hora e 100 por dia · o áudio vira texto na caixa para você conferir antes de enviar."}</p>
-          </div>
+          </div>}
         </footer>
       </section>
     </div>
@@ -968,8 +979,14 @@ function Balao({ m, agente, habilidades, ocupado, onEscolha, onAcao, assuntos, o
       <div className="max-w-[min(48rem,100%)] min-w-0">
         <p className="text-[11.5px] font-bold text-[var(--text-secondary)] mb-0.5">{agente?.nome}</p>
         {assunto && m.respostaDe && <EtiquetaAssunto atual={assunto} assuntos={assuntos!} onMover={(id, t) => onMover(m.respostaDe!, id, t)} />}
+        {/* 29/10/2026 (pedido dela): cada assunto da resposta num balão próprio; a linha "---" separa */}
+        {m.texto.split(/\n\s*-{3,}\s*\n/).slice(0, -1).map((parte, i) => (
+          <div key={i} className="balao-jarbas rounded-2xl rounded-tl-sm px-4 py-2.5 mb-2">
+            <Resposta texto={parte} onEscolha={(t) => onEscolha(t, m.assuntoId)} desativado={ocupado} />
+          </div>
+        ))}
         <div className="balao-jarbas rounded-2xl rounded-tl-sm px-4 py-2.5">
-          <Resposta texto={m.texto} onEscolha={(t) => onEscolha(t, m.assuntoId)} desativado={ocupado} />
+          <Resposta texto={m.texto.split(/\n\s*-{3,}\s*\n/).slice(-1)[0]} onEscolha={(t) => onEscolha(t, m.assuntoId)} desativado={ocupado} />
           {m.acoes?.map((a, i) => <CartaoAcao key={i} a={a} ocupado={ocupado} onDecidir={(c) => onAcao(i, c)} />)}
           {m.arquivos?.map((f) => <CartaoArquivoObra key={f.url} f={f} />)}
           {m.obra && m.tarefaId && <Bastidores tarefa={m.tarefaId} />}
