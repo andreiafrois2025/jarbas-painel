@@ -257,16 +257,16 @@ export default function ConversaPage() {
       {/* ===== CENTRO: saudação + chat ===== */}
       <div className="flex flex-col min-w-0 lg:flex-1 lg:min-h-0 h-full min-h-[420px] lg:h-auto shrink-0 lg:shrink">
         <ChatPage compacto servidora={servidora} cabecalho={(
-          <div className="flex items-center gap-3.5 px-4 md:px-6 2xl:px-10 pt-4 md:pt-[22px] pb-1 shrink-0">
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-x-3.5 gap-y-2 px-4 md:px-6 2xl:px-10 pt-4 md:pt-[22px] pb-1 shrink-0">
           <Mascote nome="jarbas" emoji="⚡" tamanho={64} className="max-md:!w-10 max-md:!h-10" />
-          <div className="min-w-0">
+          <div className="min-w-0 max-md:flex-1 max-md:basis-[calc(100%-3.5rem)]">
             <h1 className="fonte-maquina m-0 text-[22px] md:text-[28px] leading-tight text-[var(--text-primary)]">{saudacao()}, Andréia</h1>
             <p className="m-0 mt-0.5 text-sm text-[var(--text-secondary)]">{dataPorExtenso()}{espera}</p>
           </div>
           {/* 19/10/2026: conversa avançada (Jarbas na VPS, Claude Code): /remoto mostra o botão que abre o app do Claude */}
           {!servidora && (
             <Link href="/remoto" title="Conversa avançada: o Jarbas na VPS (Claude Code), que mexe no sistema"
-              className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm font-bold text-[var(--text-primary)] no-underline hover:bg-[var(--bg-tertiary)]">
+              className="ml-auto max-md:ml-[3.375rem] shrink-0 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-primary)] px-3 py-1.5 text-sm font-bold text-[var(--text-primary)] no-underline hover:bg-[var(--bg-tertiary)]">
               💻<span className="max-md:hidden">VPS</span>
             </Link>
           )}

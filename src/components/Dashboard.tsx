@@ -221,11 +221,11 @@ export default function Dashboard({ session, children }: DashboardProps) {
           <div role="group" aria-label="O que mostrar"
             className="order-4 md:order-4 flex shrink-0 rounded-full p-0.5 md:p-1 gap-0.5 text-[12px] md:text-[13px] font-bold bg-[var(--bg-tertiary)]">
             {([["servidora", "🏛️ Só Igam", "Só Igam: esconde finanças, Luiz, casa e agentes pessoais (para projetar em aula)"], ["tudo", "✨ Tudo", "Tudo: mostra o painel completo"]] as const).map(([m, rotulo, dica]) => (
-              <button key={m} onClick={() => setModo(m)} aria-pressed={modo === m} title={dica}
-                className={`px-2 md:px-3.5 py-1.5 rounded-full cursor-pointer whitespace-nowrap transition-colors ${
+              <button key={m} onClick={() => setModo(m)} aria-pressed={modo === m} aria-label={rotulo} title={dica}
+                className={`px-2.5 md:px-3.5 py-1.5 rounded-full cursor-pointer whitespace-nowrap transition-colors ${
                   modo === m ? "bg-[var(--ac)] text-[var(--on-ac)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 }`}>
-                {m === "servidora" ? <>🏛️ <span className="max-md:hidden">Só </span>Igam</> : rotulo}
+                {m === "servidora" ? <>🏛️<span className="max-md:hidden"> Só Igam</span></> : <>✨<span className="max-md:hidden"> Tudo</span></>}
               </button>
             ))}
           </div>
