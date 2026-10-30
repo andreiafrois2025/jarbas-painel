@@ -32,40 +32,65 @@ export function useDitado(aoMudar: (texto: string) => void, aoErro: (msg: string
     const w = window as unknown as { SpeechRecognition?: new () => Reconhecedor; webkitSpeechRecognition?: new () => Reconhecedor };
     const Classe = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Classe) return false;
-    const r = new Classe();
     // 27/10/2026: no Chrome do Android o modo contínuo devolve a frase acumulada várias vezes
-    // (o texto saía repetido). No Android grava uma fala por vez; o onend religa.
-    const android = /Android/i.test(navigator.userAgent);
-    r.lang = "pt-BR"; r.continuous = !android; r.interimResults = true;
+    // (o texto saía repetido). 30/10: no Safari do iPhone o contínuo às vezes trava calado
+    // (para de transcrever sem avisar). No celular grava uma fala por vez e religa sozinho.
+    const celular = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     let base = textoAtual ? textoAtual.trimEnd() + " " : "";
-    let finais = "";
     let ultimo = textoAtual;
-    r.onresult = (e) => {
-      // 23/10: depois de "parar" (ex.: ao enviar) o navegador ainda entrega o último pedaço;
-      // ignorar, senão o texto já enviado volta para a caixa
-      if (rec.current !== r) return;
-      // remonta a fala inteira a cada evento, em vez de ir somando (somar duplicava)
-      let provisorio = ""; finais = "";
-      for (let i = 0; i < e.results.length; i++) {
-        const res = e.results[i];
-        if (res.isFinal) finais += res[0].transcript.trim() + " "; else provisorio += res[0].transcript;
-      }
-      ultimo = base + finais + provisorio;
-      aoMudar(ultimo);
+    let ultimoSinal = Date.now();
+
+    // cada religada usa um reconhecedor NOVO: o iPhone às vezes não aceita religar o mesmo
+    const ligar = (): boolean => {
+      const r = new Classe();
+      r.lang = "pt-BR"; r.continuous = !celular; r.interimResults = true;
+      r.onresult = (e) => {
+        // 23/10: depois de "parar" (ex.: ao enviar) o navegador ainda entrega o último pedaço;
+        // ignorar, senão o texto já enviado volta para a caixa
+        if (rec.current !== r) return;
+        ultimoSinal = Date.now();
+        // remonta a fala inteira a cada evento, em vez de ir somando (somar duplicava)
+        let provisorio = "", finais = "";
+        for (let i = 0; i < e.results.length; i++) {
+          const res = e.results[i];
+          if (res.isFinal) finais += res[0].transcript.trim() + " "; else provisorio += res[0].transcript;
+        }
+        ultimo = base + finais + provisorio;
+        aoMudar(ultimo);
+      };
+      // o navegador encerra sozinho depois de uma pausa; enquanto ela não toca em parar, religa
+      r.onend = () => {
+        if (!ligado.current || rec.current !== r) return;
+        religar();
+      };
+      r.onerror = (e) => {
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          parar(); aoErro("O navegador não deixou usar o microfone. Libere o microfone para o painel, ou marque 🔒 para gravar.");
+        } else if (e.error === "audio-capture") {
+          parar(); aoErro("O microfone está ocupado por outro app (ligação, gravador, vídeo). Feche e toque no 🎤 de novo.");
+        }
+        // no-speech, aborted, network: o onend religa
+      };
+      rec.current = r;
+      ultimoSinal = Date.now();
+      try { r.start(); return true; } catch { return false; }
     };
-    // o navegador encerra sozinho depois de uma pausa; enquanto ela não toca em parar, religa
-    r.onend = () => {
-      if (!ligado.current) return;
-      base = ultimo ? ultimo.trimEnd() + " " : ""; finais = "";
-      try { r.start(); } catch { parar(); }
+    const religar = () => {
+      base = ultimo ? ultimo.trimEnd() + " " : "";
+      const velho = rec.current;
+      rec.current = null;
+      try { velho?.stop(); } catch { /* já parou */ }
+      if (!ligar()) parar();
     };
-    r.onerror = (e) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        parar(); aoErro("O navegador não deixou usar o microfone. Libere o microfone para o painel, ou marque 🔒 para gravar.");
-      }
-    };
-    rec.current = r; ligado.current = true;
-    try { r.start(); } catch { parar(); return false; }
+    // vigia: se ficou 7 s sem sinal nenhum (nem texto, nem religada), troca o reconhecedor.
+    // É o caso do "travou e não transcreve nada"; o texto já ditado fica na caixa.
+    const vigia = window.setInterval(() => {
+      if (!ligado.current) { window.clearInterval(vigia); return; }
+      if (Date.now() - ultimoSinal > 7000) religar();
+    }, 1000);
+
+    ligado.current = true;
+    if (!ligar()) { window.clearInterval(vigia); parar(); return false; }
     setAtivo(true);
     return true;
   }, [aoMudar, aoErro, parar]);
